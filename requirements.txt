@@ -1,0 +1,6 @@
+mysqlclient
+
+# dev/deploy
+invoke
+twine
+wheel
