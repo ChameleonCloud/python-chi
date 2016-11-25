@@ -8,7 +8,7 @@ from six.moves import urllib
 from invoke import task
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
-PACKAGE_NAME = 'bag-of-hammers'
+PACKAGE_NAME = 'hammers'
 
 
 @task

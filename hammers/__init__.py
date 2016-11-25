@@ -6,3 +6,5 @@ from .mysqlshim import *
 from .mysqlargs import *
 
 from . import query
+
+__version__ = '0.1.0'

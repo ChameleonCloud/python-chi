@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 import sys
 import setuptools
-
-if not sys.hexversion >= 0x02070000:
-    raise RuntimeError("Python 2.7 or newer is required")
-
 from setuptools import setup, find_packages
 
+import hammers
+
 setup(
-    name='bag-o-hammers',
-    version='0.1.0',
+    name='hammers',
+    version=hammers.__version__,
     description='Bag of hammers to fix problems',
     packages=find_packages(),
 
