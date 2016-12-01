@@ -71,6 +71,7 @@ def main(argv=None):
 
     if args.info:
         # no-op
+        print('CONFLICTS')
         for mac in conflict_macs:
             node = nodes[node_mac_map[mac]]
             neut_port = neut_ports[neut_mac_map[mac]]
