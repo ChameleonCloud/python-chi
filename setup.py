@@ -13,7 +13,7 @@ setup(
 
     author='Nick Timkovich',
     author_email='npt@uchicago.edu',
-    url='https://github.org/ChameleonCloud/bag-o-hammers',
+    url='https://github.org/ChameleonCloud/hammers',
 
     long_description=open('README.rst', 'r').read(),
     keywords=[
