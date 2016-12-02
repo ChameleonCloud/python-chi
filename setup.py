@@ -13,7 +13,7 @@ setup(
 
     author='Nick Timkovich',
     author_email='npt@uchicago.edu',
-    url='https://github.org/ChameleonCloud/hammers',
+    url='https://github.com/ChameleonCloud/hammers',
 
     long_description=open('README.rst', 'r').read(),
     keywords=[
@@ -23,6 +23,7 @@ setup(
     entry_points={
         'console_scripts': [
             'neutron-reaper = hammers.scripts.reaper:main',
+            'conflict-macs = hammers.scripts.stale_ports:main',
         ],
     },
 

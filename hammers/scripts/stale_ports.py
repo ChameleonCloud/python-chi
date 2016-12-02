@@ -2,6 +2,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import sys
+import os
 import argparse
 import json
 from pprint import pprint
@@ -9,6 +10,9 @@ from pprint import pprint
 import requests
 
 from hammers.osapi import load_osrc, Auth
+from hammers.slack import reporter_factory
+
+OS_ENV_PREFIX = 'OS_'
 
 
 def main(argv=None):
@@ -18,15 +22,35 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Remove orphan ports in '
         'Neutron referring to an inactive Ironic instance')
 
-    parser.add_argument('-i', '--info', action='store_true',
-        help='Rather than do anything, print info about what we\'d do.')
-    parser.add_argument('rcfile', type=str,
-        help='Connection parameter file. Should include password.')
+    parser.add_argument('mode', choices=['info', 'delete'],
+        help='Just display data on the conflict ports or delete them')
+    parser.add_argument('--slack', type=str,
+        help='JSON file with Slack webhook information to send a notification to')
+    parser.add_argument('--osrc', type=str,
+        help='Connection parameter file. Should include password. envars used '
+        'if not provided by this file.')
 
     args = parser.parse_args(argv[1:])
 
-    rc = load_osrc(args.rcfile)
-    auth = Auth(rc)
+    if args.slack:
+        reporter = reporter_factory(args.slack)
+    else:
+        reporter = None
+
+    os_vars = {k: os.environ[k] for k in os.environ if k.startswith(OS_ENV_PREFIX)}
+    if args.osrc:
+        os_vars.update(load_osrc(args.osrc))
+    missing_os_vars = set(Auth.required_os_vars) - set(os_vars)
+    if missing_os_vars:
+        print(
+            'Missing required OS values in env/rcfile: {}'
+            .format(', '.join(missing_os_vars)),
+            file=sys.stderr
+        )
+        return -1
+
+    auth = Auth(os_vars)
+
     ironic = auth.endpoint('baremetal')
 
     nodes = requests.get(
@@ -69,9 +93,12 @@ def main(argv=None):
 
     conflict_macs = orphan_macs & neut_macs
 
-    if args.info:
+    if args.mode == 'info':
         # no-op
-        print('CONFLICTS')
+        if conflict_macs:
+            print('CONFLICTS')
+        else:
+            print('No conflicts currently.')
         for mac in conflict_macs:
             node = nodes[node_mac_map[mac]]
             neut_port = neut_ports[neut_mac_map[mac]]
@@ -88,8 +115,17 @@ def main(argv=None):
             print('Neutron Port ID:      {}'.format(neut_port['id']))
             print('Neutron Port Details:')
             pprint(neut_port)
+
+    elif args.mode == 'delete':
+        # TODO: enable this
+        if reporter:
+            if conflict_macs:
+                reporter('Possible ironic/neutron MAC conflicts: {}'.format(conflict_macs))
+        else:
+            raise RuntimeError("we don't actually do anything yet...")
+
     else:
-        raise RuntimeError("we don't actually do anything yet...")
+        assert False, 'unknown command'
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

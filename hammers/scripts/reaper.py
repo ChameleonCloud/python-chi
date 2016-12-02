@@ -11,6 +11,7 @@ from pprint import pprint
 from MySQLdb import ProgrammingError
 
 from hammers import MySqlArgs, query
+from hammers.slack import reporter_factory
 
 RESOURCE_QUERY = {
     'ip': query.owned_ip_single,
@@ -65,19 +66,24 @@ def reaper(db, type_, idle_days, whitelist, describe=False):
     resource_query = RESOURCE_QUERY[type_]
     command = RESOURCE_DELETE_COMMAND[type_]
 
+    n_things_to_remove = 0
     if not describe:
         for proj_id in too_idle_project_ids:
             for resource in resource_query(db, proj_id):
                 print('{} {}'.format(command, resource['id']))
+                n_things_to_remove += 1
     else:
         projects = collections.defaultdict(dict)
         for proj_id in too_idle_project_ids:
             for resource in resource_query(db, proj_id):
                 assert proj_id == resource.pop('project_id')
                 projects[proj_id][resource.pop('id')] = resource
+                n_things_to_remove += 1
         print('Format: {project_id: {resource_id: {INFO} ...}, ...}\n')
         pprint(dict(projects))
         # print(json.dumps(dict(projects), indent=4))
+
+    return n_things_to_remove
 
 
 def main(argv=None):
@@ -99,6 +105,8 @@ def main(argv=None):
              'Ignores case and dashes.')
     parser.add_argument('-i', '--info', action='store_true',
         help='Rather than print Neutron commands, print out info about them.')
+    parser.add_argument('--slack', type=str,
+        help='JSON file with Slack webhook information to send a notification to')
     parser.add_argument('type', choices=list(RESOURCE_QUERY),
         help='Grab floating IPs or ports?')
     parser.add_argument('idle_days', type=float,
@@ -108,6 +116,11 @@ def main(argv=None):
     args = parser.parse_args(argv[1:])
     mysqlargs.extract(args)
 
+    if args.slack:
+        reporter = reporter_factory(args.slack)
+    else:
+        reporter = None
+
     whitelist = set()
     if args.whitelist:
         with open(args.whitelist) as f:
@@ -115,7 +128,20 @@ def main(argv=None):
 
     db = mysqlargs.connect()
 
-    reaper(db, args.type, args.idle_days, whitelist, args.info)
+    remove_count = reaper(db, args.type, args.idle_days, whitelist, args.info)
+
+    if reporter and not args.info:
+        thing = '{}{}'.format(
+            {'ip': 'floating IP', 'port': 'port'}[args.type],
+            ('' if remove_count == 1 else 's'),
+        )
+
+        if remove_count > 0:
+            reporter('Neutron Reaper: Commanded deletion of {} {} ({:.0f} day grace-period)'
+                     .format(remove_count, thing, args.idle_days))
+        else:
+            reporter('Neutron Reaper: No {} to delete () ({} day grace-period)'
+                     .format(thing, args.idle_days))
 
 
 if __name__ == '__main__':

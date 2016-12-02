@@ -45,6 +45,13 @@ def load_osrc(fn, get_pass=False):
 class Auth(object):
     L = logging.getLogger(__name__ + '.Auth')
 
+    required_os_vars = [
+        'OS_USERNAME',
+        'OS_PASSWORD',
+        'OS_TENANT_NAME',
+        'OS_AUTH_URL',
+    ]
+
     def __init__(self, rc):
         self.rc = rc
         self.authenticate()
@@ -59,12 +66,19 @@ class Auth(object):
             'tenantName': self.rc['OS_TENANT_NAME']
         }})
         if response.status_code != 200:
-            raise RuntimeError(response)
+            raise RuntimeError(
+                'HTTP {}: {}'
+                .format(response.status_code, response.content[:400])
+            )
 
+        jresponse = response.json()
         try:
-            self.access = response.json()['access']
+            self.access = jresponse['access']
         except KeyError:
-            raise RuntimeError(self.access)
+            raise RuntimeError(
+                'expected "access" key not present in response '
+                '(found keys: {})'.format(list(jresponse))
+            )
 
         self._token = self.access['token']['id']
         self.expiry = datetime.datetime.strptime(self.access['token']['expires'], '%Y-%m-%dT%H:%M:%SZ')
