@@ -71,27 +71,25 @@ def main(argv=None):
     ).json()['ports']
     neut_ports = {p['id']: p for p in neut_ports}
 
-    active_nodes = {
+    neut_mac_map = {port['mac_address']: pid for pid, port in neut_ports.items()}
+    node_mac_map = {port['address']: port['node_uuid'] for port in ports.values()}
+    neut_macs = set(neut_mac_map)
+
+    inactive_nodes = {
         nid: node
         for nid, node
         in nodes.items()
-        if node['instance_uuid']
+        if node['instance_uuid'] is None
     }
-    orphan_ports = {
+    inactive_ports = {
         pid: port
         for pid, port
         in ports.items()
-        if (port['extra']
-            and port['node_uuid'] not in active_nodes)
+        if port['node_uuid'] in inactive_nodes
     }
+    inactive_macs = {port['address'] for port in inactive_ports.values()}
 
-    neut_mac_map = {port['mac_address']: pid for pid, port in neut_ports.items()}
-    node_mac_map = {port['address']: port['node_uuid'] for port in ports.values()}
-
-    neut_macs = set(neut_mac_map)
-    orphan_macs = {ports[pid]['address'] for pid in orphan_ports}
-
-    conflict_macs = orphan_macs & neut_macs
+    conflict_macs = neut_macs & inactive_macs
 
     if args.mode == 'info':
         # no-op
