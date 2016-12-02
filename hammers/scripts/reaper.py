@@ -140,7 +140,7 @@ def main(argv=None):
             reporter('Neutron Reaper: Commanded deletion of {} {} ({:.0f} day grace-period)'
                      .format(remove_count, thing, args.idle_days))
         else:
-            reporter('Neutron Reaper: No {} to delete () ({} day grace-period)'
+            reporter('Neutron Reaper: No {} to delete ({} day grace-period)'
                      .format(thing, args.idle_days))
 
 

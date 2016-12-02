@@ -1,4 +1,5 @@
 mysqlclient
+requests
 
 # dev/deploy
 invoke

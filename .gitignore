@@ -61,3 +61,11 @@ target/
 # IPython Notebook
 .ipynb_checkpoints/
 Untitled*.ipynb
+
+# pyenv
+.python-version
+
+# Local test stuff
+*.json
+*.ini
+*.cnf
