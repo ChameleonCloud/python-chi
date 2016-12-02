@@ -14,6 +14,41 @@ from hammers.slack import reporter_factory
 
 OS_ENV_PREFIX = 'OS_'
 
+def ironic_nodes(auth):
+    response = requests.get(
+        url=auth.endpoint('baremetal') + '/v1/nodes',
+        headers={'X-Auth-Token': auth.token},
+    )
+    data = response.json()
+    if response.status_code != requests.codes.OK:
+        raise RuntimeError(data)
+    else:
+        return {n['uuid']: n for n in data['nodes']}
+
+
+def ironic_ports(auth):
+    response = requests.get(
+        url=auth.endpoint('baremetal') + '/v1/ports/detail',
+        headers={'X-Auth-Token': auth.token},
+    )
+    data = response.json()
+    if response.status_code != requests.codes.OK:
+        raise RuntimeError(data)
+    else:
+        return {n['uuid']: n for n in data['ports']}
+
+
+def neutron_ports(auth):
+    response = requests.get(
+        url=auth.endpoint('network') + '/v2.0/ports',
+        headers={'X-Auth-Token': auth.token},
+    )
+    data = response.json()
+    if response.status_code != requests.codes.OK:
+        raise RuntimeError(data)
+    else:
+        return {n['id']: n for n in data['ports']}
+
 
 def main(argv=None):
     if argv is None:
@@ -51,28 +86,15 @@ def main(argv=None):
 
     auth = Auth(os_vars)
 
-    ironic = auth.endpoint('baremetal')
+    nodes = ironic_nodes(auth)
+    ports = ironic_ports(auth)
+    neut_ports = neutron_ports(auth)
 
-    nodes = requests.get(
-        url=ironic + '/v1/nodes',
-        headers={'X-Auth-Token': auth.token},
-    ).json()['nodes']
-    nodes = {n['uuid']: n for n in nodes}
-
-    ports = requests.get(
-        url=ironic + '/v1/ports/detail',
-        headers={'X-Auth-Token': auth.token},
-    ).json()['ports']
-    ports = {p['uuid']: p for p in ports}
-
-    neut_ports = requests.get(
-        url=auth.endpoint('network') + '/v2.0/ports',
-        headers={'X-Auth-Token': auth.token},
-    ).json()['ports']
-    neut_ports = {p['id']: p for p in neut_ports}
-
-    neut_mac_map = {port['mac_address']: pid for pid, port in neut_ports.items()}
+    # mac --> uuid mappings
     node_mac_map = {port['address']: port['node_uuid'] for port in ports.values()}
+    port_mac_map = {port['address']: pid for pid, port in ports.items()}
+    neut_mac_map = {port['mac_address']: pid for pid, port in neut_ports.items()}
+
     neut_macs = set(neut_mac_map)
 
     inactive_nodes = {
@@ -118,7 +140,14 @@ def main(argv=None):
         # TODO: enable this
         if reporter:
             if conflict_macs:
-                reporter('Possible ironic/neutron MAC conflicts: {}'.format(conflict_macs))
+                message = 'Possible Ironic/Neutron MAC conflicts:\n{}'.format(
+                    '\n'.join(
+                        'Neutron Port `{}` → `{}` ← Ironic Node `{}` (Port `{}`)'
+                        .format(neut_mac_map[m], m, node_mac_map[m], port_mac_map[m])
+                        for m in conflict_macs
+                    )
+                )
+                reporter(message)
         else:
             raise RuntimeError("we don't actually do anything yet...")
 
