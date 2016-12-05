@@ -58,9 +58,9 @@ docs/_build/
 # PyBuilder
 target/
 
-# IPython Notebook
+# IPython Notebook (must opt-in notebooks)
 .ipynb_checkpoints/
-Untitled*.ipynb
+*.ipynb
 
 # pyenv
 .python-version

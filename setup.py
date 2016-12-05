@@ -24,6 +24,7 @@ setup(
         'console_scripts': [
             'neutron-reaper = hammers.scripts.reaper:main',
             'conflict-macs = hammers.scripts.stale_ports:main',
+            'maintenance-reservation = hammers.scripts.maintenance_reservation:main'
         ],
     },
 
