@@ -29,7 +29,7 @@ class Slackbot(object):
         payload = {
             'username': 'Box o\' Hammers',
             'icon_emoji': ':hammer:',
-            'channel': '@nicktimko',
+            # 'channel': '#notifications', # use default for webhook
             'attachments': [{
                 'fallback': '{} | {} | {}'.format(self.host, script, payload),
                 'mrkdwn_in': ['text'],

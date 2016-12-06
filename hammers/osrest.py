@@ -26,6 +26,7 @@ def ironic_node_set_state(auth, node, state):
     response = requests.put(
         url=auth.endpoint('ironic') + '/v1/nodes/{}/states/provision'.format(node),
         json={'target': state},
+        headers={'X-Auth-Token': auth.token},
     )
     if not (200 <= response.status_code < 300):
         raise RuntimeError(response.content[:400])
@@ -53,6 +54,18 @@ def ironic_ports(auth):
         raise RuntimeError(data)
 
     return {n['uuid']: n for n in data['ports']}
+
+
+def neutron_port_delete(auth, port):
+    if isinstance(port, dict):
+        port = port['id']
+
+    response = requests.delete(
+        url=auth.endpoint('network') + '/v2.0/ports/{}'.format(port),
+        headers={'X-Auth-Token': auth.token},
+    )
+    if not (200 <= response.status_code < 300):
+        raise RuntimeError(response.content[:400])
 
 
 def neutron_ports(auth):

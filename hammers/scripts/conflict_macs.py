@@ -10,7 +10,7 @@ from pprint import pprint
 import requests
 
 from hammers.osapi import load_osrc, Auth
-from hammers.osrest import ironic_nodes, ironic_ports, neutron_ports
+from hammers.osrest import ironic_nodes, ironic_ports, neutron_port_delete, neutron_ports
 from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
@@ -98,7 +98,10 @@ def main(argv=None):
             pprint(neut_port)
 
     elif args.mode == 'delete':
-        # TODO: enable this
+        # TODO: enable this (and clear error-warning thing below)
+        # for mac in conflict_macs:
+        #     neutron_port_delete(auth, neut_ports[neut_mac_map[mac]])
+
         if slack:
             if conflict_macs:
                 message = 'Possible Ironic/Neutron MAC conflicts\n{}'.format(
@@ -108,14 +111,14 @@ def main(argv=None):
                         for m in conflict_macs
                     )
                 )
-                color = '#880000'
+                color = '#cc0000'
             else:
                 message = 'No visible Ironic/Neutron MAC conflicts'
                 color = '#cccccc'
 
             slack.post('conflict-macs', message, color=color)
 
-        else:
+        else: # TODO: remove
             raise RuntimeError("we don't actually do anything yet...")
 
     else:

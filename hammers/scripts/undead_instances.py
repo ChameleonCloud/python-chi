@@ -103,7 +103,7 @@ def main(argv=None):
                         for i in unbound_instances
                     )
                 )
-                color = '#880000'
+                color = '#cc0000'
             else:
                 message = 'No Ironic nodes visibly clinging to dead instances'
                 color = '#cccccc'
