@@ -10,44 +10,10 @@ from pprint import pprint
 import requests
 
 from hammers.osapi import load_osrc, Auth
+from hammers.osrest import ironic_nodes, ironic_ports, neutron_ports
 from hammers.slack import reporter_factory
 
 OS_ENV_PREFIX = 'OS_'
-
-def ironic_nodes(auth):
-    response = requests.get(
-        url=auth.endpoint('baremetal') + '/v1/nodes',
-        headers={'X-Auth-Token': auth.token},
-    )
-    data = response.json()
-    if response.status_code != requests.codes.OK:
-        raise RuntimeError(data)
-    else:
-        return {n['uuid']: n for n in data['nodes']}
-
-
-def ironic_ports(auth):
-    response = requests.get(
-        url=auth.endpoint('baremetal') + '/v1/ports/detail',
-        headers={'X-Auth-Token': auth.token},
-    )
-    data = response.json()
-    if response.status_code != requests.codes.OK:
-        raise RuntimeError(data)
-    else:
-        return {n['uuid']: n for n in data['ports']}
-
-
-def neutron_ports(auth):
-    response = requests.get(
-        url=auth.endpoint('network') + '/v2.0/ports',
-        headers={'X-Auth-Token': auth.token},
-    )
-    data = response.json()
-    if response.status_code != requests.codes.OK:
-        raise RuntimeError(data)
-    else:
-        return {n['id']: n for n in data['ports']}
 
 
 def main(argv=None):
@@ -122,11 +88,6 @@ def main(argv=None):
         for mac in conflict_macs:
             node = nodes[node_mac_map[mac]]
             neut_port = neut_ports[neut_mac_map[mac]]
-
-            # node_detail = requests.get(
-            #     url=ironic + '/v1/nodes/{}'.format(node['uuid']),
-            #     headers={'X-Auth-Token': auth.token},
-            # ).json()
 
             print('-----')
             print('MAC Address:          {}'.format(mac))

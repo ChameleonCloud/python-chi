@@ -61,8 +61,6 @@ def reaper(db, type_, idle_days, whitelist, describe=False):
     ]
     too_idle_project_ids = [proj['id'] for proj in too_idle_projects]
 
-    # for ip in owned_ips(db, too_idle_project_ids):
-        # print('floatingip-delete {}'.format(ip['id']))
     resource_query = RESOURCE_QUERY[type_]
     command = RESOURCE_DELETE_COMMAND[type_]
 
