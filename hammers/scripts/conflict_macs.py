@@ -11,7 +11,7 @@ import requests
 
 from hammers.osapi import load_osrc, Auth
 from hammers.osrest import ironic_nodes, ironic_ports, neutron_ports
-from hammers.slack import reporter_factory
+from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
 
@@ -34,9 +34,9 @@ def main(argv=None):
     args = parser.parse_args(argv[1:])
 
     if args.slack:
-        reporter = reporter_factory(args.slack)
+        slack = Slackbot(args.slack)
     else:
-        reporter = None
+        slack = None
 
     os_vars = {k: os.environ[k] for k in os.environ if k.startswith(OS_ENV_PREFIX)}
     if args.osrc:
@@ -99,16 +99,22 @@ def main(argv=None):
 
     elif args.mode == 'delete':
         # TODO: enable this
-        if reporter:
+        if slack:
             if conflict_macs:
-                message = 'Possible Ironic/Neutron MAC conflicts:\n{}'.format(
+                message = 'Possible Ironic/Neutron MAC conflicts\n{}'.format(
                     '\n'.join(
-                        'Neutron Port `{}` → `{}` ← Ironic Node `{}` (Port `{}`)'
+                        ' • Neutron Port `{}` → `{}` ← Ironic Node `{}` (Port `{}`)'
                         .format(neut_mac_map[m], m, node_mac_map[m], port_mac_map[m])
                         for m in conflict_macs
                     )
                 )
-                reporter(message)
+                color = '#880000'
+            else:
+                message = 'No visible Ironic/Neutron MAC conflicts'
+                color = '#cccccc'
+
+            slack.post('conflict-macs', message, color=color)
+
         else:
             raise RuntimeError("we don't actually do anything yet...")
 

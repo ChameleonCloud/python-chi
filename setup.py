@@ -25,7 +25,7 @@ setup(
             'neutron-reaper = hammers.scripts.neutron_reaper:main',
             'conflict-macs = hammers.scripts.conflict_macs:main',
             'maintenance-reservation = hammers.scripts.maintenance_reservation:main',
-            'unbound-instances = hammers.scripts.unbound_instances:main',
+            'undead-instances = hammers.scripts.undead_instances:main',
         ],
     },
 
@@ -37,6 +37,7 @@ setup(
     ],
 
     install_requires=[
+        'requests',
         # 'mysqlclient>=1.3.6', # assume this is installed; could also be mysql-python
     ],
 )

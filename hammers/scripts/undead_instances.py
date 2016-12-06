@@ -11,7 +11,7 @@ import requests
 
 from hammers.osapi import load_osrc, Auth
 from hammers.osrest import ironic_nodes, nova_instances
-from hammers.slack import reporter_factory
+from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
 
@@ -34,9 +34,9 @@ def main(argv=None):
     args = parser.parse_args(argv[1:])
 
     if args.slack:
-        reporter = reporter_factory(args.slack)
+        slack = Slackbot(args.slack)
     else:
-        reporter = None
+        slack = None
 
     os_vars = {k: os.environ[k] for k in os.environ if k.startswith(OS_ENV_PREFIX)}
     if args.osrc:
@@ -90,18 +90,27 @@ def main(argv=None):
 
     elif args.mode == 'delete':
         # TODO: enable this
-        if reporter:
+        # for inst_id in unbound_instances:
+        #     ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
+
+        if slack:
             if unbound_instances:
                 message = 'Possible Ironic nodes with nonexistant instances:\n{}'.format(
                     '\n'.join(
-                        ' * node `{}` → instance `{}`'.format(
+                        ' • node `{}` → instance `{}`'.format(
                             node_instance_map[i]['uuid'],
                             node_instance_map[i]['instance_uuid'])
                         for i in unbound_instances
                     )
                 )
-                reporter(message)
-        else:
+                color = '#880000'
+            else:
+                message = 'No Ironic nodes visibly clinging to dead instances'
+                color = '#cccccc'
+
+            slack.post('undead-instances', message, color=color)
+
+        else: # TODO: remove
             raise RuntimeError("we don't actually do anything yet...")
 
     else:

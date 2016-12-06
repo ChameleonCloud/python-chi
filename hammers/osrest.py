@@ -19,6 +19,18 @@ def ironic_node(auth, node):
     return data
 
 
+def ironic_node_set_state(auth, node, state):
+    if isinstance(node, dict):
+        node = node['uuid']
+
+    response = requests.put(
+        url=auth.endpoint('ironic') + '/v1/nodes/{}/states/provision'.format(node),
+        json={'target': state},
+    )
+    if not (200 <= response.status_code < 300):
+        raise RuntimeError(response.content[:400])
+
+
 def ironic_nodes(auth):
     response = requests.get(
         url=auth.endpoint('baremetal') + '/v1/nodes',

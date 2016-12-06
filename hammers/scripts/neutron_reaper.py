@@ -11,7 +11,7 @@ from pprint import pprint
 from MySQLdb import ProgrammingError
 
 from hammers import MySqlArgs, query
-from hammers.slack import reporter_factory
+from hammers.slack import Slackbot
 
 RESOURCE_QUERY = {
     'ip': query.owned_ip_single,
@@ -115,9 +115,9 @@ def main(argv=None):
     mysqlargs.extract(args)
 
     if args.slack:
-        reporter = reporter_factory(args.slack)
+        slack = Slackbot(args.slack)
     else:
-        reporter = None
+        slack = None
 
     whitelist = set()
     if args.whitelist:
@@ -128,18 +128,26 @@ def main(argv=None):
 
     remove_count = reaper(db, args.type, args.idle_days, whitelist, args.info)
 
-    if reporter and not args.info:
+    if slack and not args.info:
         thing = '{}{}'.format(
             {'ip': 'floating IP', 'port': 'port'}[args.type],
             ('' if remove_count == 1 else 's'),
         )
 
         if remove_count > 0:
-            reporter('Neutron Reaper: Commanded deletion of {} {} ({:.0f} day grace-period)'
-                     .format(remove_count, thing, args.idle_days))
+            message = (
+                'Commanded deletion of *{} {}* ({:.0f} day grace-period)'
+                .format(remove_count, thing, args.idle_days)
+            )
+            color = '#000000'
         else:
-            reporter('Neutron Reaper: No {} to delete ({} day grace-period)'
-                     .format(thing, args.idle_days))
+            message = (
+                'No {} to delete ({:.0f} day grace-period)'
+                .format(thing, args.idle_days)
+            )
+            color = '#cccccc'
+
+        slack.post('neutron-reaper', message, color=color)
 
 
 if __name__ == '__main__':
