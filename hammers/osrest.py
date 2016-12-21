@@ -30,11 +30,13 @@ def ironic_node_set_state(auth, node, state):
     )
     if not (200 <= response.status_code < 300):
         raise RuntimeError(response.content[:400])
+    return response
 
 
-def ironic_nodes(auth):
+def ironic_nodes(auth, details=False):
+    path = '/v1/nodes' if not details else '/v1/nodes/detail'
     response = requests.get(
-        url=auth.endpoint('baremetal') + '/v1/nodes',
+        url=auth.endpoint('baremetal') + path,
         headers={'X-Auth-Token': auth.token},
     )
     data = response.json()
@@ -66,6 +68,7 @@ def neutron_port_delete(auth, port):
     )
     if not (200 <= response.status_code < 300):
         raise RuntimeError(response.content[:400])
+    return response
 
 
 def neutron_ports(auth):
