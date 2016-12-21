@@ -30,6 +30,7 @@ def main(argv=None):
     parser.add_argument('--osrc', type=str,
         help='Connection parameter file. Should include password. envars used '
         'if not provided by this file.')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args(argv[1:])
 
@@ -98,13 +99,9 @@ def main(argv=None):
             pprint(neut_port)
 
     elif args.mode == 'delete':
-        # TODO: enable this (and clear error-warning thing below)
-        # for mac in conflict_macs:
-        #     neutron_port_delete(auth, neut_ports[neut_mac_map[mac]])
-
         if slack:
             if conflict_macs:
-                message = 'Possible Ironic/Neutron MAC conflicts\n{}'.format(
+                message = 'Attempting to remove Ironic/Neutron MAC conflicts\n{}'.format(
                     '\n'.join(
                         ' • Neutron Port `{}` → `{}` ← Ironic Node `{}` (Port `{}`)'
                         .format(neut_mac_map[m], m, node_mac_map[m], port_mac_map[m])
@@ -112,14 +109,23 @@ def main(argv=None):
                     )
                 )
                 color = '#cc0000'
-            else:
+            elif args.verbose:
                 message = 'No visible Ironic/Neutron MAC conflicts'
                 color = '#cccccc'
+            else:
+                message = None
 
-            slack.post('conflict-macs', message, color=color)
+            if message:
+                slack.post('conflict-macs', message, color=color)
 
-        else: # TODO: remove
-            raise RuntimeError("we don't actually do anything yet...")
+        try:
+            for mac in conflict_macs:
+                neutron_port_delete(auth, neut_ports[neut_mac_map[mac]])
+        except Exception as e:
+            if slack:
+                error = '{} raised while trying to delete ports, check logs'.format(type(e))
+                slack.post('conflict-macs', error, color='#ff0000')
+            raise
 
     else:
         assert False, 'unknown command'

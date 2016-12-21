@@ -30,6 +30,7 @@ def main(argv=None):
     parser.add_argument('--osrc', type=str,
         help='Connection parameter file. Should include password. envars used '
         'if not provided by this file.')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args(argv[1:])
 
@@ -89,10 +90,6 @@ def main(argv=None):
             print('  State:    {}'.format(node['provision_state']))
 
     elif args.mode == 'delete':
-        # TODO: enable this
-        # for inst_id in unbound_instances:
-        #     ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
-
         if slack:
             if unbound_instances:
                 message = 'Possible Ironic nodes with nonexistant instances:\n{}'.format(
@@ -104,14 +101,25 @@ def main(argv=None):
                     )
                 )
                 color = '#cc0000'
-            else:
+            elif args.verbose:
                 message = 'No Ironic nodes visibly clinging to dead instances'
                 color = '#cccccc'
+            else:
+                message = None
 
-            slack.post('undead-instances', message, color=color)
+            if message:
+                slack.post('undead-instances', message, color=color)
 
-        else: # TODO: remove
-            raise RuntimeError("we don't actually do anything yet...")
+        try:
+            pass
+            # TODO: test & enable this
+            # for inst_id in unbound_instances:
+            #     ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
+        except Exception as e:
+            if slack:
+                error = '{} raised while trying to clean instances, check logs'.format(type(e))
+                slack.post('undead-instances', error, color='#ff0000')
+            raise
 
     else:
         assert False, 'unknown command'
