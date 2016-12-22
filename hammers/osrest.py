@@ -24,7 +24,7 @@ def ironic_node_set_state(auth, node, state):
         node = node['uuid']
 
     response = requests.put(
-        url=auth.endpoint('ironic') + '/v1/nodes/{}/states/provision'.format(node),
+        url=auth.endpoint('baremetal') + '/v1/nodes/{}/states/provision'.format(node),
         json={'target': state},
         headers={'X-Auth-Token': auth.token},
     )
@@ -81,6 +81,18 @@ def neutron_ports(auth):
         raise RuntimeError(data)
 
     return {n['id']: n for n in data['ports']}
+
+
+def nova_hypervisors(auth, details=False):
+    path = '/os-hypervisors/detail' if details else '/os-hypervisors'
+    response = requests.get(
+        url=auth.endpoint('compute') + path,
+        headers={'X-Auth-Token': auth.token},
+    )
+    data = response.json()
+    if response.status_code != requests.codes.OK:
+        raise RuntimeError(data)
+    return {h['id']: h for h in data['hypervisors']}
 
 
 def nova_instance(auth, id):

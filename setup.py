@@ -22,9 +22,10 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'neutron-reaper = hammers.scripts.neutron_reaper:main',
             'conflict-macs = hammers.scripts.conflict_macs:main',
+            'curiouser = hammers.scripts.curiouser:main',
             'maintenance-reservation = hammers.scripts.maintenance_reservation:main',
+            'neutron-reaper = hammers.scripts.neutron_reaper:main',
             'undead-instances = hammers.scripts.undead_instances:main',
         ],
     },

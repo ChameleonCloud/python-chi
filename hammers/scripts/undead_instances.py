@@ -76,12 +76,8 @@ def main(argv=None):
             print('No zombies currently.')
         for inst_id in unbound_instances:
             node = node_instance_map[inst_id]
-            try:
-                instance = instances[inst_id]
-            except KeyError:
-                pass
-            else:
-                raise AssertionError('contradiction, this should be impossible')
+
+            assert inst_id not in instances, 'contradiction, this should be impossible'
 
             print('-----')
             print('Ironic Node\n'
