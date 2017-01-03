@@ -9,11 +9,12 @@ from pprint import pprint
 
 import requests
 
+from hammers import osrest
 from hammers.osapi import load_osrc, Auth
-from hammers.osrest import ironic_nodes, ironic_ports, neutron_port_delete, neutron_ports
 from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
+SUBCOMMAND = 'conflict-macs'
 
 
 def main(argv=None):
@@ -53,9 +54,9 @@ def main(argv=None):
 
     auth = Auth(os_vars)
 
-    nodes = ironic_nodes(auth)
-    ports = ironic_ports(auth)
-    neut_ports = neutron_ports(auth)
+    nodes = osrest.ironic_nodes(auth)
+    ports = osrest.ironic_ports(auth)
+    neut_ports = osrest.neutron_ports(auth)
 
     # mac --> uuid mappings
     node_mac_map = {port['address']: port['node_uuid'] for port in ports.values()}
@@ -108,24 +109,29 @@ def main(argv=None):
                         for m in conflict_macs
                     )
                 )
-                color = '#cc0000'
+                color = 'xkcd:darkish red'
             elif args.verbose:
                 message = 'No visible Ironic/Neutron MAC conflicts'
-                color = '#cccccc'
+                color = 'xkcd:light grey'
             else:
                 message = None
 
             if message:
-                slack.post('conflict-macs', message, color=color)
+                slack.post(SUBCOMMAND, message, color=color)
 
         try:
             for mac in conflict_macs:
-                neutron_port_delete(auth, neut_ports[neut_mac_map[mac]])
+                osrest.neutron_port_delete(auth, neut_ports[neut_mac_map[mac]])
         except Exception as e:
             if slack:
                 error = '{} raised while trying to delete ports, check logs'.format(type(e))
-                slack.post('conflict-macs', error, color='#ff0000')
+                slack.post(SUBCOMMAND, error, color='xkcd:red')
             raise
+        else:
+            if conflict_macs and slack:
+                ok_message = 'Deleted {} neutron port(s)'.format(len(conflict_macs))
+                slack.post(SUBCOMMAND, ok_message, color='xkcd:chartreuse')
+
 
     else:
         assert False, 'unknown command'

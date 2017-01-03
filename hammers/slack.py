@@ -8,6 +8,7 @@ import socket
 import requests
 
 from hammers import __version__ as VERSION
+from hammers import colors
 
 
 class Slackbot(object):
@@ -26,10 +27,12 @@ class Slackbot(object):
         self.host = host
 
     def post(self, script, payload, color='#ccc'):
+        if color.startswith('xkcd:'):
+            color = colors.XKCD_COLORS[color[5:]]
+
         payload = {
             'username': 'Box o\' Hammers',
             'icon_emoji': ':hammer:',
-            # 'channel': '#notifications', # use default for webhook
             'attachments': [{
                 'fallback': '{} | {} | {}'.format(self.host, script, payload),
                 'mrkdwn_in': ['text'],
@@ -40,6 +43,10 @@ class Slackbot(object):
                 'text': payload,
             }]
         }
+        CH = 'channel'
+        if CH in self.settings:
+            # if nothing specified, uses webhook default (e.g. #notifications)
+            payload[CH] = self.settings[CH]
 
         response = requests.post(self.settings['webhook'], json=payload)
         if response.status_code != requests.codes.OK:

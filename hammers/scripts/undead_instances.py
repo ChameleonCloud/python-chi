@@ -9,11 +9,12 @@ from pprint import pprint
 
 import requests
 
+from hammers import osrest
 from hammers.osapi import load_osrc, Auth
-from hammers.osrest import ironic_nodes, nova_instances
 from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
+SUBCOMMAND = 'undead-instances'
 
 
 def main(argv=None):
@@ -53,8 +54,8 @@ def main(argv=None):
 
     auth = Auth(os_vars)
 
-    nodes = ironic_nodes(auth)
-    instances = nova_instances(auth)
+    nodes = osrest.ironic_nodes(auth)
+    instances = osrest.nova_instances(auth)
 
     node_instance_map = {
         n['instance_uuid']: n
@@ -96,29 +97,35 @@ def main(argv=None):
                         for i in unbound_instances
                     )
                 )
-                color = '#cc0000'
+                color = 'xkcd:darkish red'
             elif args.verbose:
                 message = 'No Ironic nodes visibly clinging to dead instances'
-                color = '#cccccc'
+                color = 'xkcd:light grey'
             else:
                 message = None
 
             if message:
-                slack.post('undead-instances', message, color=color)
+                slack.post(SUBCOMMAND, message, color=color)
 
         try:
-            pass
-            # TODO: test & enable this
-            # for inst_id in unbound_instances:
-            #     ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
+            for inst_id in unbound_instances:
+                osrest.ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
         except Exception as e:
             if slack:
-                error = '{} raised while trying to clean instances, check logs'.format(type(e))
-                slack.post('undead-instances', error, color='#ff0000')
+                error = '{} raised while trying to clean instances; check logs'.format(type(e))
+                slack.post(SUBCOMMAND, error, color='xkcd:red')
             raise
+        else:
+            if unbound_instances and slack:
+                ok_message = (
+                    'Commanded state transition of {} instance(s).'
+                    .format(len(unbound_instances))
+                )
+                slack.post(SUBCOMMAND, ok_message, color='xkcd:chartreuse')
 
     else:
         assert False, 'unknown command'
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
