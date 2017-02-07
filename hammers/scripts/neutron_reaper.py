@@ -34,7 +34,7 @@ def days_past(dt):
     return (datetime.datetime.utcnow() - dt).total_seconds() / (60*60*24)
 
 
-def reaper(db, type_, idle_days, whitelist, describe=False):
+def reaper(db, type_, idle_days, whitelist, describe=False, quiet=False):
     try:
         future_projects = {
             normalize_project_name(row['project_id'])
@@ -77,9 +77,10 @@ def reaper(db, type_, idle_days, whitelist, describe=False):
                 assert proj_id == resource.pop('project_id')
                 projects[proj_id][resource.pop('id')] = resource
                 n_things_to_remove += 1
-        print('Format: {project_id: {resource_id: {INFO} ...}, ...}\n')
-        pprint(dict(projects))
-        # print(json.dumps(dict(projects), indent=4))
+        if (not quiet) or n_things_to_remove:
+            print('Format: {project_id: {resource_id: {INFO} ...}, ...}\n')
+            pprint(dict(projects))
+            # print(json.dumps(dict(projects), indent=4))
 
     return n_things_to_remove
 
@@ -103,6 +104,8 @@ def main(argv=None):
              'Ignores case and dashes.')
     parser.add_argument('-i', '--info', action='store_true',
         help='Rather than print Neutron commands, print out info about them.')
+    parser.add_argument('-q', '--quiet', action='store_true',
+        help='Quiet mode. No output if there was nothing to do.')
     parser.add_argument('--slack', type=str,
         help='JSON file with Slack webhook information to send a notification to')
     parser.add_argument('type', choices=list(RESOURCE_QUERY),
@@ -126,9 +129,10 @@ def main(argv=None):
 
     db = mysqlargs.connect()
 
-    remove_count = reaper(db, args.type, args.idle_days, whitelist, args.info)
+    remove_count = reaper(db, args.type, args.idle_days, whitelist,
+        describe=args.info, quiet=args.quiet)
 
-    if slack and not args.info:
+    if slack and (not args.info) and ((not args.quiet) or remove_count):
         thing = '{}{}'.format(
             {'ip': 'floating IP', 'port': 'port'}[args.type],
             ('' if remove_count == 1 else 's'),
