@@ -12,9 +12,12 @@ import requests
 from hammers import osrest
 from hammers.osapi import load_osrc, Auth
 from hammers.slack import Slackbot
+from hammers.util import assert_message_factory
 
 OS_ENV_PREFIX = 'OS_'
 SUBCOMMAND = 'undead-instances'
+
+_thats_crazy = assert_message_factory(SUBCOMMAND)
 
 
 def main(argv=None):
@@ -32,6 +35,10 @@ def main(argv=None):
         help='Connection parameter file. Should include password. envars used '
         'if not provided by this file.')
     parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('--force-sane', action='store_true',
+        help='Disable sanity checking (i.e. things really are that bad)')
+    parser.add_argument('--force-insane', action='store_true',
+        help=argparse.SUPPRESS) # for testing
 
     args = parser.parse_args(argv[1:])
 
@@ -69,6 +76,9 @@ def main(argv=None):
 
     unbound_instances = node_instance_ids - instance_ids
 
+    if args.force_insane:
+        _thats_crazy('jet fuel cant melt steel beams', slack)
+
     if args.mode == 'info':
         # no-op
         if unbound_instances:
@@ -87,6 +97,18 @@ def main(argv=None):
             print('  State:    {}'.format(node['provision_state']))
 
     elif args.mode == 'delete':
+        if not args.force_sane:
+            # sanity check(s) to avoid doing something stupid
+            if len(instance_ids) == 0 and len(unbound_instances) != 0:
+                _thats_crazy('(in)sanity check: 0 running instances(?!)', slack)
+
+            if len(unbound_instances) > 20:
+                _thats_crazy(
+                    '(in)sanity check: it thinks there are {} unbound instances'
+                        .format(len(unbound_instances)),
+                    slack,
+                )
+
         if slack:
             if unbound_instances:
                 message = 'Possible Ironic nodes with nonexistant instances:\n{}'.format(

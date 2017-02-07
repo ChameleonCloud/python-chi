@@ -1,6 +1,18 @@
 # coding: utf-8
 from __future__ import absolute_import, print_function, unicode_literals
 
+import functools
+
+
+def assert_message_factory(subcommand):
+    return functools.partial(assert_with_message, subcommand)
+
+
+def assert_with_message(subcommand, reason, slack=None):
+    if slack:
+        slack.post(subcommand, reason, color='xkcd:red')
+    raise AssertionError(reason)
+
 
 def drop_prefix(s, start):
     l = len(start)

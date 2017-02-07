@@ -12,9 +12,12 @@ import requests
 from hammers import osrest
 from hammers.osapi import load_osrc, Auth
 from hammers.slack import Slackbot
+from hammers.util import assert_message_factory
 
 OS_ENV_PREFIX = 'OS_'
 SUBCOMMAND = 'conflict-macs'
+
+_thats_crazy = assert_message_factory(SUBCOMMAND)
 
 
 def main(argv=None):
@@ -32,6 +35,8 @@ def main(argv=None):
         help='Connection parameter file. Should include password. envars used '
         'if not provided by this file.')
     parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('--force-sane', action='store_true',
+        help='Disable sanity checking (i.e. things really are that bad)')
 
     args = parser.parse_args(argv[1:])
 
@@ -100,6 +105,11 @@ def main(argv=None):
             pprint(neut_port)
 
     elif args.mode == 'delete':
+        if not args.force_sane:
+            # sanity check, make sure we don't go crazy
+            if len(conflict_macs) > 10:
+                _thats_crazy('(in)sanity check: thinks there are {} conflicting MACs', slack)
+
         if slack:
             if conflict_macs:
                 message = 'Attempting to remove Ironic/Neutron MAC conflicts\n{}'.format(
