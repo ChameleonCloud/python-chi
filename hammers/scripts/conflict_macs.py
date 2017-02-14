@@ -12,12 +12,12 @@ import requests
 from hammers import osrest
 from hammers.osapi import load_osrc, Auth
 from hammers.slack import Slackbot
-from hammers.util import assert_message_factory
+from hammers.util import error_message_factory
 
 OS_ENV_PREFIX = 'OS_'
 SUBCOMMAND = 'conflict-macs'
 
-_thats_crazy = assert_message_factory(SUBCOMMAND)
+_thats_crazy = error_message_factory(SUBCOMMAND)
 
 
 def main(argv=None):

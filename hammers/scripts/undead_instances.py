@@ -12,12 +12,12 @@ import requests
 from hammers import osrest
 from hammers.osapi import load_osrc, Auth
 from hammers.slack import Slackbot
-from hammers.util import assert_message_factory
+from hammers.util import error_message_factory
 
 OS_ENV_PREFIX = 'OS_'
 SUBCOMMAND = 'undead-instances'
 
-_thats_crazy = assert_message_factory(SUBCOMMAND)
+_thats_crazy = error_message_factory(SUBCOMMAND)
 
 
 def main(argv=None):
@@ -76,9 +76,6 @@ def main(argv=None):
 
     unbound_instances = node_instance_ids - instance_ids
 
-    if args.force_insane:
-        _thats_crazy('jet fuel cant melt steel beams', slack)
-
     if args.mode == 'info':
         # no-op
         if unbound_instances:
@@ -97,12 +94,13 @@ def main(argv=None):
             print('  State:    {}'.format(node['provision_state']))
 
     elif args.mode == 'delete':
-        if not args.force_sane:
+        if not args.force_sane or args.force_insane:
             # sanity check(s) to avoid doing something stupid
             if len(instance_ids) == 0 and len(unbound_instances) != 0:
                 _thats_crazy('(in)sanity check: 0 running instances(?!)', slack)
 
-            if len(unbound_instances) > 20:
+            ubi_limit = 20 if not args.force_insane else -1
+            if len(unbound_instances) > ubi_limit:
                 _thats_crazy(
                     '(in)sanity check: it thinks there are {} unbound instances'
                         .format(len(unbound_instances)),
