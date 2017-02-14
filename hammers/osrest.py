@@ -71,6 +71,34 @@ def ironic_node_set_state(auth, node, state):
     return response
 
 
+# def ironic_node_update(auth, node, *, add=None, remove=None, replace=None):
+# <python 2 compat>
+def ironic_node_update(auth, node, **kwargs):
+    add = kwargs.get('add')
+    remove = kwargs.get('remove')
+    replace = kwargs.get('replace')
+# </python 2 compat>
+    patch = []
+    if replace is not None:
+        for key, value in replace.items():
+            patch.append({'op': 'replace', 'path': key, 'value': value})
+
+    if isinstance(node, dict):
+        node = node['uuid']
+
+    response = requests.patch(
+        url=auth.endpoint('baremetal') + '/v1/nodes/{}'.format(node),
+        headers={
+            'X-Auth-Token': auth.token,
+            'X-OpenStack-Ironic-API-Version': '1.9',
+        },
+        json=patch,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data
+
+
 def ironic_nodes(auth, details=False):
     path = '/v1/nodes' if not details else '/v1/nodes/detail'
     response = requests.get(

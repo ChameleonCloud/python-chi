@@ -20,6 +20,32 @@ SUBCOMMAND = 'undead-instances'
 _thats_crazy = error_message_factory(SUBCOMMAND)
 
 
+def clear_node_instance(auth, node, validate=True):
+    if validate:
+        # attempting to clean clean nodes is *probably* a bug in the caller
+        node_data = osrest.ironic_node(auth, node)
+        instance_uuid = node_data['instance_uuid']
+        if instance_uuid is None:
+            raise RuntimeError('there is no instance set on node "{}"'.format(node))
+
+        # check that the instance isn't available (MUST 404)
+        try:
+            instance = osrest.nova_instance(auth, instance_uuid)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                pass
+            else:
+                raise
+        else:
+            raise RuntimeError('node "{}" refers to instance "{}" that is status "{}"'
+                               .format(node, instance_uuid, instance['status']))
+
+    return osrest.ironic_node_update(auth, node, replace={
+        '/instance_uuid': None,
+        '/instance_info': {},
+    })
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -129,22 +155,23 @@ def main(argv=None):
 
         try:
             for inst_id in unbound_instances:
-                osrest.ironic_node_set_state(auth, node_instance_map[inst_id], 'deleted')
+                node = node_instance_map[inst_id]
+                if node['provision_state'] == 'available':
+                    clear_node_instance(auth, node['uuid'])
+                else:
+                    osrest.ironic_node_set_state(auth, node, 'deleted')
         except Exception as e:
             if slack:
-                error = '{} raised while trying to clean instances; check logs'.format(type(e))
+                error = '{} while trying to clean instances; check logs for traceback'.format(str(e))
                 slack.post(SUBCOMMAND, error, color='xkcd:red')
             raise
         else:
             if unbound_instances and slack:
                 ok_message = (
-                    'Commanded state transition of {} instance(s).'
+                    'Cleaned {} instance(s).'
                     .format(len(unbound_instances))
                 )
                 slack.post(SUBCOMMAND, ok_message, color='xkcd:chartreuse')
-
-    else:
-        assert False, 'unknown command'
 
 
 if __name__ == '__main__':
