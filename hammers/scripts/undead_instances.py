@@ -20,7 +20,7 @@ SUBCOMMAND = 'undead-instances'
 _thats_crazy = error_message_factory(SUBCOMMAND)
 
 
-def clear_node_instance(auth, node, validate=True):
+def clear_node_instance_data(auth, node, validate=True):
     if validate:
         # attempting to clean clean nodes is *probably* a bug in the caller
         node_data = osrest.ironic_node(auth, node)
@@ -156,10 +156,11 @@ def main(argv=None):
         try:
             for inst_id in unbound_instances:
                 node = node_instance_map[inst_id]
+                node_id = node['uuid']
                 if node['provision_state'] == 'available':
-                    clear_node_instance(auth, node['uuid'])
+                    clear_node_instance_data(auth, node_id)
                 else:
-                    osrest.ironic_node_set_state(auth, node, 'deleted')
+                    osrest.ironic_node_set_state(auth, node_id, 'deleted')
         except Exception as e:
             if slack:
                 error = '{} while trying to clean instances; check logs for traceback'.format(str(e))
