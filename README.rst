@@ -16,17 +16,19 @@ Collection of various tools to keep things ship-shape. Not particularly bright t
 
   ``conflict-macs {info, delete}``
 
+3. Undead Instances
+
+  ``undead-instances {info, delete}``
+
+  Nova instances that have been put to rest but still cling to Ironic nodes, preventing the next generation from being...ensouled? Checks for the inconsistency and fixed it.
+
+4. IPMI Retry
+
+  ``ipmi-retry {info, reset}``
+
+  Resets Ironic nodes in error state with a known, common error. Records those resets on the node metadata (``extra`` field) and refuses after a magic number of attempts.
+
 Common options:
 
 * ``--slack <json-options>`` - if provided, used to post notifications to Slack
 * ``--osrc <rc-file>`` - alternate way to feed in the OS authentication vars
-
------
-
-Puppet with a bag of hammers::
-
-  package { 'bag-o-hammers':
-      provider => pip,
-      name     => hammers,
-      ensure   => 0.1.3,
-  }
