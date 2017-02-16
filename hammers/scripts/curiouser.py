@@ -14,6 +14,7 @@ from hammers import osapi, osrest
 from hammers.slack import Slackbot
 
 OS_ENV_PREFIX = 'OS_'
+SUBCOMMAND = 'curiouser'
 
 
 def main(argv=None):
@@ -61,13 +62,22 @@ def main(argv=None):
         if n['provision_state'] == 'error' and not n['maintenance']
     ]
 
+    if not errored_nodes:
+        if args.verbose:
+            print('All good.')
+        return
+
+    message = ['Ironic nodes in "error" provision state, not in maintenance']
+    message.extend(
+        '• `{}`, last error: {}'.format(n['uuid'], n.get('last_error'))
+        for n
+        in errored_nodes
+    )
+    message = '\n'.join(message)
+    
+    print(message.replace('•', '*'))
     if slack:
-        'to do'
-    else:
-        if errored_nodes:
-            print('Ironic nodes in "error" provision state, not in maintenance:')
-        for n in errored_nodes:
-            print('* {}, last error: {}'.format(n['uuid'], n.get('last_error')))
+        slack.post(SUBCOMMAND, message, color='xkcd:red')
 
 
 if __name__ == '__main__':
