@@ -1,7 +1,7 @@
 # fragment
   $slack_json_loc = '/root/scripts/slack.json'
   $osrc_loc = '/root/adminrc'
-  $hammers_ver = '#####'
+  $hammers_ver = '0.1.6'
 
   file { '/usr/bin/pip-python':
     ensure => 'link',
@@ -40,19 +40,19 @@
       command => "/usr/bin/conflict-macs delete --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-conflict_macs",
       user    => 'root',
       minute  => 20,
-      hour    => */3,
+      hour    => '*/3',
   }
   cron { 'undead_instances':
       require => Package["bag-o-hammers"],
       command => "/usr/bin/undead-instances delete --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-undead_instances",
       user    => 'root',
       minute  => 21,
-      hour    => */3,
+      hour    => '*/3',
   }
-  cron { 'ipmi_retry':
+  cron { 'retry_ipmi':
       require => Package["bag-o-hammers"],
-      command => "/usr/bin/ipmi-retry reset --dry-run --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-ipmi_retry",
+      command => "/usr/bin/retry-ipmi reset --dry-run --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-retry_ipmi",
       user    => 'root',
       minute  => 22,
-      hour    => */3,
+      hour    => '*/3',
   }

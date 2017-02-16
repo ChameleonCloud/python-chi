@@ -16,15 +16,15 @@ Collection of various tools to keep things ship-shape. Not particularly bright t
 
   ``conflict-macs {info, delete}``
 
-3. Undead Instances
+3. Undead Instances clinging to nodes
 
   ``undead-instances {info, delete}``
 
   Nova instances that have been put to rest but still cling to Ironic nodes, preventing the next generation from being...ensouled? Checks for the inconsistency and fixed it.
 
-4. IPMI Retry
+4. Retry cleaning up after IPMI errors
 
-  ``ipmi-retry {info, reset}``
+  ``retry-ipmi {info, reset}``
 
   Resets Ironic nodes in error state with a known, common error. Records those resets on the node metadata (``extra`` field) and refuses after a magic number of attempts.
 
