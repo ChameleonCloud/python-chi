@@ -1,0 +1,3 @@
+*.py[cod]
+.python-version
+.ipynb_checkpoints/
