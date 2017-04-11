@@ -8,6 +8,7 @@ import os
 import secrets
 import sys
 import time
+import urllib.parse
 
 from dateutil import tz
 
@@ -167,6 +168,153 @@ class BlazarClient(object):
         return getattr(self._bc, attr)
 
 
+class Lease(object):
+    def __init__(self, keystone_session, **lease_kwargs):
+        self.session = keystone_session
+        self.blazar = BlazarClient('1', self.session)
+        self.servers = []
+        self.lease = None
+
+        lease_kwargs.setdefault('node_type', 'compute')
+        self.lease_kwargs = lease_create_nodetype(**lease_kwargs)
+        self.lease = self.blazar.lease.create(**self.lease_kwargs)
+        self.id = self.lease['id']
+        self.name = self.lease['name']
+        # print('created lease {}'.format(self.id))
+
+    def __repr__(self):
+        netloc = urllib.parse.urlsplit(self.session.auth.auth_url).netloc
+        if netloc.endswith(':5000'):
+            # drop if default port
+            netloc = netloc[:-5]
+        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, netloc, self.id)
+
+    def __enter__(self):
+        if self.lease is None:
+            # don't support reuse in multiple with's.
+            raise RuntimeError('Lease context manager not reentrant')
+        self.wait()
+        return self
+
+    def __exit__(self, *exc):
+        for server in self.servers:
+            server.delete()
+        self.delete()
+
+    def refresh(self):
+        self.lease = self.blazar.lease.get(self.id)
+
+    @property
+    def status(self):
+        self.refresh()
+        return self.lease['action'], self.lease['status']
+
+    @property
+    def ready(self):
+        return self.status == ('START', 'COMPLETE')
+
+    def wait(self):
+        for _ in range(15):
+            time.sleep(10)
+            if self.ready:
+                break
+        else:
+            raise RuntimeError('timeout, lease failed to start')
+
+    def delete(self):
+        self.blazar.lease.delete(self.id)
+        self.lease = None
+
+    def create_server(self, *sargs, **skwargs):
+        server = Server(self, *sargs, **skwargs)
+        self.servers.append(server)
+        return server
+
+
+class Server(object):
+    def __init__(self, lease, key='default', image=DEFAULT_IMAGE):
+        self.lease = lease
+        self.session = self.lease.session
+        self.nova = NovaClient('2', session=self.session)
+        self.ip = None
+        self._fip = None
+
+        self.image = resolve_image_idname(self.nova, image)
+        self.server_kwargs = instance_create_args(self.lease.lease, key=key, image=self.image)
+        self.server = self.nova.servers.create(**self.server_kwargs)
+        self.id = self.server.id
+        self.name = self.server.name
+        # print('created instance {}'.format(self.server.id))
+
+    def __repr__(self):
+        netloc = urllib.parse.urlsplit(self.session.auth.auth_url).netloc
+        if netloc.endswith(':5000'):
+            # drop if default port
+            netloc = netloc[:-5]
+        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, netloc, self.id)
+
+    def refresh(self):
+        now = time.monotonic()
+        try:
+            lr = self._last_refresh
+        except AttributeError:
+            pass # expected failure on first pass
+        else:
+            # limit refreshes to once/sec.
+            if now - lr < 1:
+                return
+
+        self.server.get()
+        self._last_refresh = now
+
+    @property
+    def status(self):
+        self.refresh()
+        return self.server.status
+
+    @property
+    def ready(self):
+        return self.status == 'ACTIVE'
+
+    @property
+    def error(self):
+        return self.status == 'ERROR'
+
+    def wait(self):
+        # check a couple for fast failures
+        for _ in range(3):
+            time.sleep(10)
+            if self.error:
+                raise RuntimeError(self.server.fault)
+        time.sleep(5 * 60)
+        for _ in range(100):
+            time.sleep(10)
+            if self.ready:
+                break
+            if self.error:
+                raise RuntimeError(self.server.fault)
+        else:
+            raise RuntimeError('timeout, server failed to start')
+        print('server active')
+
+    def associate_floating_ip(self):
+        created, self._fip = get_create_floatingip(self.nova)
+        self.server.add_floating_ip(self._fip)
+        self.ip = self._fip.ip
+        return self.ip
+
+    def delete(self):
+        if self._fip:
+            self._fip.delete()
+        self.server.delete()
+
+    def run(self, cmd):
+        pass
+
+    def sudo(self, cmd):
+        pass
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -195,56 +343,63 @@ def main(argv=None):
         )
         return -1
 
-    nc = NovaClient('2', session=sess)
-    bc = BlazarClient('1', session=sess)
-
-    lease_kwargs = lease_create_nodetype(node_type=args.node_type)
-    lease = bc.lease.create(**lease_kwargs)
-    lease_id = lease['id']
-
-    print('created lease {}'.format(lease_id))
-
-    for _ in range(10):
-        time.sleep(10)
-        lease = bc.lease.get(lease_id)
-        if lease['action'] == 'START' and lease['status'] == 'COMPLETE':
-            break
-    else:
-        raise RuntimeError('timeout, lease failed to start')
-
-    image = resolve_image_idname(nc, DEFAULT_IMAGE)
-    server_kwargs = instance_create_args(lease, key=args.key_name, image=image)
-    server = nc.servers.create(**server_kwargs)
-
-    print('created instance {}'.format(server.id))
-    # check a couple for fast failures
-    for _ in range(3):
-        time.sleep(10)
-        server.get()
-        if server.status == 'ERROR':
-            raise RuntimeError(server.fault)
-    time.sleep(5 * 60)
-    for _ in range(100):
-        time.sleep(10)
-        server.get()
-        if server.status == 'ERROR':
-            raise RuntimeError(server.fault)
-        if server.status == 'ACTIVE':
-            break
-    else:
-        raise RuntimeError('timeout, server failed to start')
-    print('server active')
-
-    created, fip = get_create_floatingip(nc)
-    server.add_floating_ip(fip)
-    print('bound ip {ip} to server. \'ssh cc@{ip}\' available'.format(ip=fip.ip))
-
-    input('Press enter to terminate lease/server.')
-
-    fip.delete()
-    server.delete()
-    bc.lease.delete(lease_id)
-
+    with Lease(sess, node_type=args.node_type) as lease:
+        print('started lease {}'.format(lease))
+        server = lease.create_server(key=args.key_name)
+        server.wait()
+        print('started server {}'.format(server))
+        server.associate_floating_ip()
+        print('bound ip {ip} to server. \'ssh cc@{ip}\' available'.format(ip=server.ip))
+        input('Press enter to terminate lease/server.')
+        # server.delete()
+    #
+    #
+    # lease_kwargs = lease_create_nodetype(node_type=args.node_type)
+    # lease = bc.lease.create(**lease_kwargs)
+    # lease_id = lease['id']
+    #
+    # print('created lease {}'.format(lease_id))
+    #
+    # for _ in range(10):
+    #     time.sleep(10)
+    #     lease = bc.lease.get(lease_id)
+    #     if lease['action'] == 'START' and lease['status'] == 'COMPLETE':
+    #         break
+    # else:
+    #     raise RuntimeError('timeout, lease failed to start')
+    #
+    # image = resolve_image_idname(nc, DEFAULT_IMAGE)
+    # server_kwargs = instance_create_args(lease, key=args.key_name, image=image)
+    # server = nc.servers.create(**server_kwargs)
+    #
+    # print('created instance {}'.format(server.id))
+    # # check a couple for fast failures
+    # for _ in range(3):
+    #     time.sleep(10)
+    #     server.get()
+    #     if server.status == 'ERROR':
+    #         raise RuntimeError(server.fault)
+    # time.sleep(5 * 60)
+    # for _ in range(100):
+    #     time.sleep(10)
+    #     server.get()
+    #     if server.status == 'ERROR':
+    #         raise RuntimeError(server.fault)
+    #     if server.status == 'ACTIVE':
+    #         break
+    # else:
+    #     raise RuntimeError('timeout, server failed to start')
+    # print('server active')
+    #
+    # created, fip = get_create_floatingip(nc)
+    # server.add_floating_ip(fip)
+    # print('bound ip {ip} to server. \'ssh cc@{ip}\' available'.format(ip=fip.ip))
+    #
+    # input('Press enter to terminate lease/server.')
+    #
+    # fip.delete()
+    # server.delete()
+    # bc.lease.delete(lease_id)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
