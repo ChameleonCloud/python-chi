@@ -5,7 +5,7 @@ import keystoneauth1 as ksa
 import keystoneauth1.loading
 import keystoneauth1.session
 
-from hammers import osapi
+from hammers.osapi import load_osrc
 
 
 OS_ENV_PREFIX = 'OS_'
@@ -42,20 +42,25 @@ def auth_from_rc(rc):
     return auth
 
 
-def session_from_args(args):
+def session_from_vars(os_vars):
+    return ksa.session.Session(auth=auth_from_rc(os_vars))
+
+
+def session_from_args(args, rc=False):
     """
     Combine the provided args with the environment vars and produce a Keystone
-    session for use by clients.
+    session for use by clients. Optionally return the RC dictionary with the OS
+    vars used to construct the session.
     """
     os_vars = {k: os.environ[k] for k in os.environ if k.startswith(OS_ENV_PREFIX)}
     if args.osrc:
-        os_vars.update(osapi.load_osrc(args.osrc))
+        os_vars.update(load_osrc(args.osrc))
     try:
-        return ksa.session.Session(auth=auth_from_rc(os_vars))
+        session = ksa.session.Session(auth=auth_from_rc(os_vars))
     except ksa.exceptions.auth_plugins.MissingRequiredOptions as e:
-        print(
-            'Missing required OS values in env/rcfile ({})'
-            .format(str(e)),
-            file=sys.stderr
-        )
-        return -1
+        raise RuntimeError('Missing required OS values in env/rcfile ({})'.format(str(e)))
+
+    if rc:
+        return session, os_vars
+    else:
+        return session

@@ -104,19 +104,24 @@ class Lease(object):
         self.servers = []
         self.lease = None
 
-        self._preexisting = lease_kwargs.get('_preexisting', False)
+        lease_kwargs.setdefault('_preexisting', False)
+        self._preexisting = lease_kwargs.pop('_preexisting')
+
+        lease_kwargs.setdefault('_no_clean', False)
+        self._noclean = lease_kwargs.pop('_no_clean')
 
         if self._preexisting:
             self.id = lease_kwargs['_id']
             self.refresh()
-            self.name = self.lease['name']
         else:
             lease_kwargs.setdefault('node_type', 'compute')
             self._lease_kwargs = lease_create_nodetype(**lease_kwargs)
             self.lease = self.blazar.lease.create(**self._lease_kwargs)
             self.id = self.lease['id']
-            self.name = self.lease['name']
-            # print('created lease {}'.format(self.id))
+
+        self.name = self.lease['name']
+        self.reservation = self.lease['reservations'][0]['id']
+        # print('created lease {}'.format(self.id))
 
     @classmethod
     def from_existing(cls, keystone_session, id):
@@ -136,7 +141,10 @@ class Lease(object):
         self.wait()
         return self
 
-    def __exit__(self, *exc):
+    def __exit__(self, exc_type, exc, exc_tb):
+        if exc is not None and self._noclean:
+            print('Lease existing uncleanly (noclean = True).')
+
         for server in self.servers:
             server.delete()
         if not self._preexisting:
