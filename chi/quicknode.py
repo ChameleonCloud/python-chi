@@ -26,12 +26,14 @@ def main(argv=None):
         help='SSH keypair name on OS used to create an instance.')
     parser.add_argument('--image', type=str, default='CC-CentOS7',
         help='Name or ID of image to launch.')
+    parser.add_argument('--no-clean', action='store_true',
+        help='Do not clean up on failure.')
 
     args = parser.parse_args()
     session = auth.session_from_args(args)
 
     print_nolf('Lease: creating...')
-    with Lease(session, node_type=args.node_type) as lease:
+    with Lease(session, node_type=args.node_type, _no_clean=args.no_clean) as lease:
         print('started {}'.format(lease))
 
         print_nolf('Server: creating...')

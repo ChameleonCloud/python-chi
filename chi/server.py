@@ -10,7 +10,7 @@ from .util import random_base32
 DEFAULT_IMAGE = '0f216b1f-7841-451b-8971-d383364e01a6' # CC-CentOS7 as of 4/6/17
 
 
-def instance_create_args(lease, name=None, image=DEFAULT_IMAGE, key=None):
+def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None):
     if name is None:
         name = 'instance-{}'.format(random_base32(6))
 
@@ -20,7 +20,7 @@ def instance_create_args(lease, name=None, image=DEFAULT_IMAGE, key=None):
         'image': image,
         # 'reservation_id': lease['reservations'][0]['id'],
         'scheduler_hints': {
-            'reservation': lease['reservations'][0]['id'],
+            'reservation': reservation,
         },
         # 'nics': '', # automatically binds one, not needed unless want non-default?
         'key_name': key,
@@ -55,7 +55,7 @@ class Server(object):
         self._fip = None
 
         self.image = resolve_image_idname(self.nova, image)
-        self.server_kwargs = instance_create_args(self.lease.lease, key=key, image=self.image)
+        self.server_kwargs = instance_create_args(self.lease.reservation, key=key, image=self.image)
         self.server = self.nova.servers.create(**self.server_kwargs)
         self.id = self.server.id
         self.name = self.server.name
@@ -123,8 +123,6 @@ class Server(object):
             self._fip.delete()
         self.server.delete()
 
-    def run(self, cmd):
-        pass
-
-    def sudo(self, cmd):
-        pass
+    def rebuild(self, idname):
+        self.image = resolve_image_idname(self.nova, idname)
+        self.server.rebuild(self.image)
