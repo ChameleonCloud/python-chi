@@ -248,7 +248,7 @@ def main(argv=None):
             resetter.reset()
         except TooManyResets as e:
             too_many.append(nid)
-        except:
+        except Exception as e:
             if slack:
                 error = '{}; check logs'.format(str(e))
                 slack.post(SUBCOMMAND, error, color='xkcd:red')
