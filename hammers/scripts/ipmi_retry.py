@@ -143,7 +143,7 @@ class NodeResetter(object):
             raise TooManyResets('maximum resets reached')
 
         if not self.dry_run:
-            self._reset()
+            self.tracker.mark()
 
         for n in range(3):
             # try a few times because quickly sending a state transition and
@@ -151,7 +151,7 @@ class NodeResetter(object):
             time.sleep(n + 1)
             try:
                 if not self.dry_run:
-                    self.tracker.mark()
+                    self._reset()
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 409:
                     continue # retry
