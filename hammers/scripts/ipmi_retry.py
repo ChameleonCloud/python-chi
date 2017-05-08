@@ -267,7 +267,12 @@ def main(argv=None):
             message.append('\nAbstained (already at limit)')
             message.extend(' • `{}`'.format(*r) for r in reset_ok)
 
-        color = 'xkcd:orange' if too_many else 'xkcd:chartreuse'
+        color = 'xkcd:chartreuse'
+        if args.dry_run:
+            color = 'xkcd:yellow'
+            message.append('dry run, no changes actually made.')
+        if too_many:
+            color = 'xkcd:orange'
 
         message = '\n'.join(message)
         slack.post(SUBCOMMAND, message, color=color)
