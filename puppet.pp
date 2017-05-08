@@ -1,7 +1,7 @@
 # fragment
   $slack_json_loc = '/root/scripts/slack.json'
   $osrc_loc = '/root/adminrc'
-  $hammers_ver = '0.1.6'
+  $hammers_ver = '0.1.8'
 
   file { '/usr/bin/pip-python':
     ensure => 'link',
@@ -51,7 +51,7 @@
   }
   cron { 'retry_ipmi':
       require => Package["bag-o-hammers"],
-      command => "/usr/bin/retry-ipmi reset --dry-run --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-retry_ipmi",
+      command => "/usr/bin/retry-ipmi reset --osrc $osrc_loc --slack $slack_json_loc 2>&1 | /usr/bin/logger -t chameleon-chi-hammers-retry_ipmi",
       user    => 'root',
       minute  => 22,
       hour    => '*/3',
