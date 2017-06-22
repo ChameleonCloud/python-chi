@@ -1,0 +1,12 @@
+Fabric3
+mysqlclient
+paramiko
+-e git+https://github.com/openstack/python-blazarclient#egg=master
+python-glanceclient
+python-novaclient>=7.1.0,<8.0.0 # still with floating ip management
+requests
+
+# dev/deploy
+invoke
+twine
+wheel

@@ -15,7 +15,9 @@ from ccmanage.ssh import RemoteControl
 from ccmanage.util import random_base32
 
 
-print_nolf = functools.partial(print, end='', flush=True)
+PY3 = sys.version_info.major >= 3
+if not PY3:
+    raise RuntimeError('Python 2 not supported.')
 
 
 def run(command, **kwargs):
@@ -38,7 +40,7 @@ def get_local_rev(path):
     return head
 
 
-def do_build(ip, variant='base'):
+def do_build(ip, repodir, variant='base'):
     remote = RemoteControl(ip=ip)
     print('waiting for remote to start')
     remote.wait()
@@ -50,7 +52,7 @@ def do_build(ip, variant='base'):
     print(out)
 
     # push to remote
-    proc = run(f'git push --all ssh://cc@{ip}/~/build.git', cwd='CC-Ubuntu16.04', env={
+    proc = run('git push --all ssh://cc@{ip}/~/build.git'.format(ip=ip), cwd=repodir, env={
         'GIT_SSH_COMMAND': 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no',
     })
     print(proc.stdout)
@@ -59,27 +61,29 @@ def do_build(ip, variant='base'):
         raise RuntimeError()
 
     # checkout local rev on remote
-    head = get_local_rev('CC-Ubuntu16.04')
+    head = get_local_rev(repodir)
     remote.run('rm -rf ~/build', quiet=True)
     remote.run('git clone ~/build.git ~/build', quiet=True)
     with fapi.cd('/home/cc/build'):
-        remote.run(f'git -c advice.detachedHead=false checkout {head}')
+        remote.run('git -c advice.detachedHead=false checkout {head}'.format(head=head))
         remote.run('ls -a')
 
+    out = io.StringIO()
+
     # install build reqs
-    remote.run('sudo bash ~/build/install-reqs.sh', pty=True, quiet=True)
+    remote.run('sudo bash ~/build/install-reqs.sh', pty=True, capture_buffer_size=10000, stdout=out)
 
     # do build
     out = io.StringIO()
     with fapi.cd('/home/cc/build/'):
     #     out = fapi.run('bash create-image.sh', pty=False, quiet=True)
-        remote.run(f'bash create-image.sh {variant}', pty=True, capture_buffer_size=10000, stdout=out)
+        remote.run('python create-image.py {variant}'.format(variant=variant), pty=True, capture_buffer_size=10000, stdout=out)
 
     with open('build.log', 'w') as f:
         print(f.write(out.getvalue()))
 
     out.seek(0)
-    ibi = f'[{ip}] out: Image built in '
+    ibi = '[{ip}] out: Image built in '.format(ip=ip)
     for line in out:
         if not line.startswith(ibi):
             continue
@@ -88,7 +92,7 @@ def do_build(ip, variant='base'):
     else:
         raise RuntimeError("didn't find output file in logs.")
     print(output_file)
-    checksum = remote.run(f'md5sum {output_file}').split()[0].strip()
+    checksum = remote.run('md5sum {output_file}'.format(output_file=output_file)).split()[0].strip()
 
     return {
         'image_loc': output_file,
@@ -102,7 +106,7 @@ def do_upload(ip, rc, image_rev, image_loc):
 
     with fcm.shell_env(**rc):#, fapi.cd('/home/cc/build'):
         out = remote.run(('glance image-create '
-                       '--name "CC-Ubuntu16.04-{}" '
+                       '--name "image-{}" '
                        '--disk-format qcow2 '
                        '--container-format bare '
                        '--file {}').format(image_rev, image_loc))
@@ -130,27 +134,29 @@ def main(argv=None):
     parser.add_argument('--node-type', type=str, default='compute')
     parser.add_argument('--key-name', type=str, default='default',
         help='SSH keypair name on OS used to create an instance.')
-    parser.add_argument('--image', type=str, default='CC-CentOS7',
+    parser.add_argument('--builder-image', type=str, default='CC-CentOS7',
         help='Name or ID of image to launch.')
     parser.add_argument('--no-clean', action='store_true',
         help='Do not clean up on failure.')
+    parser.add_argument('build_repo', type=str,
+        help='Path of repo to push and build.')
 
     args = parser.parse_args()
     session, rc = auth.session_from_args(args, rc=True)
 
-    print_nolf('Lease: creating...')
+    print('Lease: creating...')
     with Lease(session, node_type=args.node_type, _no_clean=args.no_clean) as lease:
-        print('started {}'.format(lease))
+        print(' - started {}'.format(lease))
 
-        print_nolf('Server: creating...')
-        server = lease.create_server(key=args.key_name, image=args.image)
-        print_nolf('building...')
+        print('Server: creating...')
+        server = lease.create_server(key=args.key_name, image=args.builder_image)
+        print(' - building...')
         server.wait()
-        print_nolf('started {}...'.format(server))
+        print(' - started {}...'.format(server))
         server.associate_floating_ip()
-        print('bound ip {} to server.'.format(server.ip))
+        print(' - bound ip {} to server.'.format(server.ip))
 
-        build_results = do_build(server.ip)
+        build_results = do_build(server.ip, args.build_repo)
         glance_results = do_upload(
             server.ip,
             rc,
@@ -169,7 +175,7 @@ def main(argv=None):
 
         input('pausing.')
 
-        print_nolf('Tearing down...')
+        print('Tearing down...')
     print('done.')
 
 

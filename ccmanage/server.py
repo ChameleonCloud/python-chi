@@ -1,8 +1,9 @@
 import time
 import urllib.parse
 
+from glanceclient.client import Client as GlanceClient
+from glanceclient.exc import NotFound
 from novaclient.client import Client as NovaClient
-from novaclient.exceptions import NotFound
 
 from .util import random_base32
 
@@ -39,11 +40,17 @@ def get_create_floatingip(novaclient):
     return created, fip
 
 
-def resolve_image_idname(novaclient, idname):
+def resolve_image_idname(glanceclient, idname):
     try:
-        return novaclient.images.find(id=idname)
+        return glanceclient.images.get(image_id=idname)
     except NotFound:
-        return novaclient.images.find(name=idname)
+        images = list(glanceclient.images.list(filters={'name': idname}))
+        if len(images) < 1:
+            raise RuntimeError('no images found matching name or ID "{}"'.format(idname))
+        elif len(images) > 1:
+            raise RuntimeError('multiple images found matching name "{}"'.format(idname))
+        else:
+            return images[0]
 
 
 class Server(object):
@@ -51,10 +58,11 @@ class Server(object):
         self.lease = lease
         self.session = self.lease.session
         self.nova = NovaClient('2', session=self.session)
+        self.glance = GlanceClient('2', session=self.session)
         self.ip = None
         self._fip = None
 
-        self.image = resolve_image_idname(self.nova, image)
+        self.image = resolve_image_idname(self.glance, image)
         self.server_kwargs = instance_create_args(self.lease.reservation, key=key, image=self.image)
         self.server = self.nova.servers.create(**self.server_kwargs)
         self.id = self.server.id
@@ -124,5 +132,5 @@ class Server(object):
         self.server.delete()
 
     def rebuild(self, idname):
-        self.image = resolve_image_idname(self.nova, idname)
+        self.image = resolve_image_idname(self.glance, idname)
         self.server.rebuild(self.image)

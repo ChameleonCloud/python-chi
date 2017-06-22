@@ -28,17 +28,25 @@ NODE_TYPES = {
     'arm64',
 }
 
+DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
 
-def lease_create_args(name=None, start='now', length=60*60*24, nodes=1, resource_properties=''):
+
+def lease_create_args(name=None, start='now', length=None, end=None, nodes=1, resource_properties=''):
     if name is None:
         name = 'lease-{}'.format(random_base32(6))
 
     if start == 'now':
         start = datetime.datetime.now(tz=tz.tzutc()) + datetime.timedelta(seconds=70)
-    if isinstance(length, numbers.Number):
-        length = datetime.timedelta(seconds=length)
 
-    end = start + length
+    if length is None and end is None:
+        length = DEFAULT_LEASE_LENGTH
+    elif length is not None and end is not None:
+        raise ValueError("provide either 'length' or 'end', not both")
+
+    if end is None:
+        if isinstance(length, numbers.Number):
+            length = datetime.timedelta(seconds=length)
+        end = start + length
 
     if resource_properties:
         resource_properties = json.dumps(resource_properties)
@@ -67,7 +75,7 @@ def lease_create_nodetype(*args, **kwargs):
         raise ValueError('no node_type specified')
     if node_type not in NODE_TYPES:
         raise ValueError('unknown node_type ("{}")'.format(node_type))
-    kwargs['resource_properties'] = ['=', '$node_type', node_type]
+    # kwargs['resource_properties'] = ['=', '$node_type', node_type]
     return lease_create_args(*args, **kwargs)
 
 
@@ -144,6 +152,7 @@ class Lease(object):
     def __exit__(self, exc_type, exc, exc_tb):
         if exc is not None and self._noclean:
             print('Lease existing uncleanly (noclean = True).')
+            return
 
         for server in self.servers:
             server.delete()

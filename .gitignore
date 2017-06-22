@@ -60,7 +60,7 @@ target/
 
 # IPython Notebook (must opt-in notebooks)
 .ipynb_checkpoints/
-*.ipynb
+Untitled*.ipynb
 
 # pyenv
 .python-version
