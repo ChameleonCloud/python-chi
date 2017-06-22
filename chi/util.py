@@ -1,5 +1,5 @@
 import base64
-import secrets
+from . import secrets
 
 
 def random_base32(n_bytes):
