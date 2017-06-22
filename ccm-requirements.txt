@@ -1,5 +1,4 @@
 Fabric3
-mysqlclient
 paramiko
 -e git+https://github.com/openstack/python-blazarclient#egg=master
 python-glanceclient

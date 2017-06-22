@@ -3,7 +3,6 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import itertools
 
-import MySQLdb
 
 __all__ = ['MySqlShim']
 
@@ -13,6 +12,10 @@ class MySqlShim(object):
     limit = 1000
 
     def __init__(self, **connect_args):
+        # lazy load so to avoid installing the Python
+        # package which also requires the MySQL headers...
+        import MySQLdb
+
         self.db = MySQLdb.connect(**connect_args)
         self.cursor = self.db.cursor()
 
