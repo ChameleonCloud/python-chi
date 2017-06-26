@@ -140,6 +140,48 @@ def neutron_port_delete(auth, port):
     return response
 
 
+def keystone_project(auth, id):
+    response = requests.get(
+        url=auth.endpoint('identityv3') + '/projects/{}'.format(id),
+        headers={'X-Auth-Token': auth.token},
+    )
+    response.raise_for_status()
+    project = response.json()['project']
+    return project
+
+
+def keystone_projects(auth, **params):
+    """
+    Example params: 'name', 'enabled', or stuff from
+    https://developer.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#list-projects
+    """
+    response = requests.get(
+        url=auth.endpoint('identityv3') + '/projects'.format(id),
+        headers={'X-Auth-Token': auth.token},
+        params=params,
+    )
+    response.raise_for_status()
+    projects = response.json()['projects']
+    projects = {p['id']: p for p in projects}
+    return projects
+
+
+def keystone_project_lookup(auth, name_or_id):
+    try:
+        return keystone_project(auth, name_or_id)
+    except requests.HTTPError:
+        pass # failed lookup assuming it was an id, must be a name?
+
+    projects = keystone_projects(auth, name=name_or_id)
+    if len(projects) < 1:
+        raise RuntimeError('no projects found')
+    elif len(projects) > 1:
+        raise RuntimeError('multiple projects matched provided name')
+
+    id, project = projects.popitem()
+    return project
+
+
 def keystone_user(auth, id):
     response = requests.get(
         url=auth.endpoint('identityv3') + '/users/{}'.format(id),
