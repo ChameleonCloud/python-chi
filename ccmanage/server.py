@@ -11,11 +11,11 @@ from .util import random_base32
 DEFAULT_IMAGE = '0f216b1f-7841-451b-8971-d383364e01a6' # CC-CentOS7 as of 4/6/17
 
 
-def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None):
+def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, net_ids=None, **extra):
     if name is None:
         name = 'instance-{}'.format(random_base32(6))
 
-    return {
+    server_args = {
         'name': name,
         'flavor': 'baremetal',
         'image': image,
@@ -23,9 +23,22 @@ def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None):
         'scheduler_hints': {
             'reservation': reservation,
         },
-        # 'nics': '', # automatically binds one, not needed unless want non-default?
         'key_name': key,
     }
+
+    if net_ids is None:
+        # automatically binds "the one" unless there's more than one
+        server_args['nics'] = None
+    else:
+        # Not sure what fields are actually required and what they're called.
+        # novaclient (and Nova HTTP API) docs seem vague. the command at
+        # https://github.com/ChameleonCloud/horizon/blob/stable/liberty/openstack_dashboard/dashboards/project/instances/workflows/create_instance.py#L943
+        # appears to POST a JSON akin to
+        # {"server": {..., "networks": [{"uuid": "e8c33574-5423-436c-a45b-5bab78071b8a"}] ...}, "os:scheduler_hints": ...},
+        server_args['nics'] = [{"net-id": netid, "v4-fixed-ip": ""} for netid in net_ids]
+
+    server_args.update(extra)
+    return server_args
 
 
 def get_create_floatingip(novaclient):
@@ -54,7 +67,7 @@ def resolve_image_idname(glanceclient, idname):
 
 
 class Server(object):
-    def __init__(self, lease, key='default', image=DEFAULT_IMAGE):
+    def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
         self.lease = lease
         self.session = self.lease.session
         self.nova = NovaClient('2', session=self.session)
@@ -63,7 +76,7 @@ class Server(object):
         self._fip = None
 
         self.image = resolve_image_idname(self.glance, image)
-        self.server_kwargs = instance_create_args(self.lease.reservation, key=key, image=self.image)
+        self.server_kwargs = instance_create_args(self.lease.reservation, key=key, image=self.image, **extra)
         self.server = self.nova.servers.create(**self.server_kwargs)
         self.id = self.server.id
         self.name = self.server.name
