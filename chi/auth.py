@@ -19,6 +19,29 @@ def add_arguments(parser):
         help='OpenStack parameters file that overrides envvars.')
 
 
+def check_make_equal(m, k1, k2):
+    """
+    Checks that keys `k1` and `k2` in mutable mapping `m` are equal. If they
+    differ, a ``ValueError`` is raised. If one is missing, it is set to the
+    value of the other. If both are missing, nothing happens.
+
+    No value is returned, `m` is modified in-place.
+    """
+    try:
+        if m[k1] == m[k2]:
+            return
+        else:
+            raise ValueError('values differ for keys {!r} and {!r}'.format(k1, k2))
+    except KeyError:
+        # one or both of them isn't there
+        if k1 in m:
+            m[k2] = m[k1]
+        elif k2 in m:
+            m[k1] = m[k2]
+        #else:
+            #both missing.../shrug
+
+
 def auth_from_rc(rc):
     """
     Generates a Keystone Auth object from an OS parameter dictionary.  Dict
@@ -30,7 +53,12 @@ def auth_from_rc(rc):
     * loader option name:      auth-url
     * loader argument name:    auth_url
     """
-    assert all(key.startswith(OS_ENV_PREFIX) for key in rc)
+    if not all(key.startswith(OS_ENV_PREFIX) for key in rc):
+        raise ValueError('unknown options without OS_ prefix')
+
+    check_make_equal(rc, 'OS_PROJECT_NAME', 'OS_TENANT_NAME')
+    check_make_equal(rc, 'OS_PROJECT_ID', 'OS_TENANT_ID')
+
     rc_opt_keymap = {key[3:].lower().replace('_', '-'): key for key in rc}
     loader = ksa.loading.get_plugin_loader('password')
     credentials = {}
