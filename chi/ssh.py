@@ -1,5 +1,6 @@
 import collections
 import errno
+import os
 import socket
 import time
 
@@ -9,7 +10,8 @@ import paramiko
 
 fapi.env.warn_only = True
 fapi.env.use_ssh_config = True
-# fapi.env.abort_on_prompts = True
+fapi.env.abort_on_prompts = True
+fapi.env.key_filename = os.environ.get('SSH_KEY', None)
 
 
 expected_wait_errors = (
@@ -35,8 +37,9 @@ def dotdotdot(*args, **kwargs):
 
 
 def wait(host, username, callback='dots'):
-    error_counts = {exc_type: 0 for exc_type in expected_wait_errors}
-    sub_errors = 0
+    # error_counts = {exc_type: 0 for exc_type in expected_wait_errors}
+    # sub_errors = 0
+    error_counts = collections.Counter()
     if callback == 'dots':
         callback = dotdotdot
     elif callback is None:
@@ -45,8 +48,10 @@ def wait(host, username, callback='dots'):
         if not isinstance(callback, collections.Callable):
             raise ValueError("callback isn't callable.")
 
+    key_filename = fapi.env.key_filename
+
     for attempt in range(150):
-        client = paramiko.SSHClient()
+        client = paramiko.SSHClient(key_filename=key_filename)
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         try:
             client.connect(host, username=username, timeout=10)
@@ -72,20 +77,25 @@ def wait(host, username, callback='dots'):
         #         raise RuntimeError('timed out too much')
         except paramiko.AuthenticationException as e:
             # while the ssh service starting, it can accept connections but auth isn't fully set.
+            error_counts['paramiko.AuthenticationException'] += 1
             pass
         except paramiko.SSHException as e:
             # local interruptions?
+            error_counts['paramiko.SSHException'] += 1
             pass
         except paramiko.ssh_exception.NoValidConnectionsError as e:
             # server might be down while starting
+            error_counts['paramiko.ssh_exception.NoValidConnectionsError'] += 1
             pass
         except socket.timeout as e:
             # if the floating IP is still kinda floating and not getting routed.
+            error_counts['socket.timeout'] += 1
             pass
         except OSError as e:
             # filter so only capturing errno.ENETUNREACH
             if e.errno != errno.ENETUNREACH:
                 raise
+            error_counts['ENETUNREACH'] += 1
         else:
             print('<wait over>')
             break
@@ -94,6 +104,8 @@ def wait(host, username, callback='dots'):
 
         callback(attempt)
         time.sleep(10)
+    else:
+        raise RuntimeError('failed to connect to {}@{}: {}'.format(username, host, error_counts))
 
 
 class RemoteControl(object):
