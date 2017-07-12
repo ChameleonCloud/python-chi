@@ -4,9 +4,21 @@ from __future__ import print_function, absolute_import, unicode_literals
 import datetime
 import getpass
 import logging
+import os
 import re
 
 import requests
+
+
+OS_ENV_PREFIX = 'OS_'
+
+
+def add_arguments(parser):
+    """
+    Inject our args into the user's parser
+    """
+    parser.add_argument('--osrc', type=str,
+        help='OpenStack parameters file that overrides envvars.')
 
 
 def load_osrc(fn, get_pass=False):
@@ -45,15 +57,32 @@ def load_osrc(fn, get_pass=False):
 class Auth(object):
     L = logging.getLogger(__name__ + '.Auth')
 
-    required_os_vars = [
+    required_os_vars = {
         'OS_USERNAME',
         'OS_PASSWORD',
         'OS_TENANT_NAME',
         'OS_AUTH_URL',
-    ]
+    }
+
+    @classmethod
+    def from_env_or_args(cls, *, args=None, env=True):
+        """
+        Combine the provided *args* (if provided) with the environment vars
+        (if *env*, default true) and produce an Auth object for use by REST
+        functions.
+        """
+        os_vars = {}
+        if env:
+            os_vars = {k: os.environ[k] for k in os.environ if k.startswith(OS_ENV_PREFIX)}
+        if args and args.osrc:
+            os_vars.update(load_osrc(args.osrc))
+        return cls(os_vars)
 
     def __init__(self, rc):
         self.rc = rc
+        missing_vars = self.required_os_vars - set(rc)
+        if missing_vars:
+            raise RuntimeError('Missing required OS values: {}'.format(missing_vars))
         self.authenticate()
 
     def authenticate(self):
