@@ -8,11 +8,12 @@ from fabric import api as fapi
 from fabric import network as fnet
 import paramiko
 
-fapi.env.warn_only = True
-fapi.env.use_ssh_config = True
 fapi.env.abort_on_prompts = True
-fapi.env.key_filename = os.environ.get('SSH_KEY', None)
+fapi.env.disable_known_hosts = True # FIXME meh
+fapi.env.use_ssh_config = True
+fapi.env.warn_only = True
 
+fapi.env.key_filename = os.environ.get('SSH_KEY', None)
 
 expected_wait_errors = (
     # while the ssh service starting, it can accept connections but auth isn't fully set.
