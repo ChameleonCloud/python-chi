@@ -52,10 +52,15 @@ def wait(host, username, callback='dots'):
     key_filename = fapi.env.key_filename
 
     for attempt in range(150):
-        client = paramiko.SSHClient(key_filename=key_filename)
+        client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         try:
-            client.connect(host, username=username, timeout=10)
+            client.connect(
+                host,
+                username=username,
+                timeout=10,
+                key_filename=key_filename,
+            )
 
         # except expected_wait_errors as e:
         #     if isinstance(e, OSError):
