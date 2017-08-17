@@ -7,6 +7,8 @@ import logging
 import os
 import re
 
+from dateutil.parser import parse as dateparse
+from dateutil.tz import tzutc
 import requests
 
 
@@ -110,16 +112,16 @@ class Auth(object):
             )
 
         self._token = self.access['token']['id']
-        self.expiry = datetime.datetime.strptime(self.access['token']['expires'], '%Y-%m-%dT%H:%M:%SZ')
+        self.expiry = dateparse(self.access['token']['expires'])
 
         self.L.debug('New token "{}" expires in {:.2f} minutes'.format(
             self._token,
-            (self.expiry - datetime.datetime.utcnow()).total_seconds() / 60
+            (self.expiry - datetime.datetime.now(tz=tzutc())).total_seconds() / 60
         ))
 
     @property
     def token(self):
-        if (self.expiry - datetime.datetime.utcnow()).total_seconds() < 60:
+        if (self.expiry - datetime.datetime.now(tz=tzutc())).total_seconds() < 60:
             self.authenticate()
 
         return self._token
