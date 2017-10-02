@@ -22,8 +22,10 @@ OS_ENV_PREFIX = 'OS_'
 SUBCOMMAND = 'ipmi-retry'
 
 ERROR_MATCHERS = [re.compile(r) for r in [
-    '^Failed to tear down. Error: Failed to set node power state to power off.',
-    '^Failed to tear down. Error: IPMI call failed: power status.',
+    r'^Failed to tear down\. Error: Failed to set node power state to power off\.',
+    r'^Failed to tear down\. Error: IPMI call failed: power status\.',
+    # below is when node is in maintenance, which we're avoiding...
+    # r"^During sync_power_state, max retries exceeded for node [0-9a-f\-]+, node state power (on|off) does not match expected state 'power (on|off)'\.",
 ]]
 
 _thats_crazy = error_message_factory(SUBCOMMAND)
