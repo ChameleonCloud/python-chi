@@ -11,6 +11,12 @@ from .util import random_base32
 DEFAULT_IMAGE = '0f216b1f-7841-451b-8971-d383364e01a6' # CC-CentOS7 as of 4/6/17
 
 
+class ServerError(RuntimeError):
+    def __init__(self, msg, server):
+        super().__init__(msg)
+        self.server = server
+
+
 def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, net_ids=None, **extra):
     if name is None:
         name = 'instance-{}'.format(random_base32(6))
@@ -121,14 +127,14 @@ class Server(object):
         for _ in range(3):
             time.sleep(10)
             if self.error:
-                raise RuntimeError(self.server.fault)
+                raise ServerError(self.server.fault, self.server)
         time.sleep(5 * 60)
         for _ in range(100):
             time.sleep(10)
             if self.ready:
                 break
             if self.error:
-                raise RuntimeError(self.server.fault)
+                raise ServerError(self.server.fault, self.server)
         else:
             raise RuntimeError('timeout, server failed to start')
         # print('server active')

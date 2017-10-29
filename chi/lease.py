@@ -9,7 +9,7 @@ from dateutil import tz
 from blazarclient.client import Client as _BlazarClient # installed from github
 # from heatclient.client import Client as HeatClient
 
-from .server import Server
+from .server import Server, ServerError
 from .util import random_base32
 
 
@@ -92,11 +92,18 @@ class BlazarClient(object):
         self._create_client()
 
     def _create_client(self):
-        self._bc = _BlazarClient(
-            self._version,
-            blazar_url=self._session.get_endpoint(service_type='reservation'),
-            auth_token=self._session.get_token(),
-        )
+        try:
+            self._bc = _BlazarClient(
+                self._version,
+                blazar_url=self._session.get_endpoint(service_type='reservation'),
+                auth_token=self._session.get_token(),
+            )
+        except TypeError: # probably a newer version that wants session
+            self._bc = _BlazarClient(
+                self._version,
+                session=self._session,
+            )
+
         self._client_age = time.monotonic()
 
     def __getattr__(self, attr):
@@ -107,10 +114,23 @@ class BlazarClient(object):
 
 class Lease(object):
     def __init__(self, keystone_session, **lease_kwargs):
+        '''
+        Arguments
+        ---------
+
+        Keyword Arguments
+        -----------------
+        sequester : bool
+            If the context manager catches that an instance failed to start,
+            it will not delete the lease, but rather extend it and rename it
+            with the ID of the instance that failed.
+        '''
         self.session = keystone_session
         self.blazar = BlazarClient('1', self.session)
         self.servers = []
         self.lease = None
+
+        self._sequester = lease_kwargs.pop('sequester', False)
 
         lease_kwargs.setdefault('_preexisting', False)
         self._preexisting = lease_kwargs.pop('_preexisting')
@@ -154,8 +174,20 @@ class Lease(object):
             print('Lease existing uncleanly (noclean = True).')
             return
 
-        for server in self.servers:
-            server.delete()
+        if isinstance(exc, ServerError) and self._sequester:
+            print('Instance failed to start, sequestering lease')
+            self.blazar.lease.update(
+                lease_id=self.id,
+                name='sequester-error-instance-{}'.format(exc.server.id),
+                prolong_for='6d',
+            )
+            return
+
+        # instances are deleted with the lease anyways. this just provides a way
+        # to crash if the lease already ended.
+        # for server in self.servers:
+        #     server.delete()
+
         if not self._preexisting:
             # don't auto-delete pre-existing leases
             self.delete()
