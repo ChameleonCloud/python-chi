@@ -102,6 +102,7 @@ class BlazarClient(object):
             self._bc = _BlazarClient(
                 self._version,
                 session=self._session,
+                service_type='reservation',
             )
 
         self._client_age = time.monotonic()
