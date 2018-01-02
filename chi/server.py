@@ -3,6 +3,7 @@ import urllib.parse
 
 from glanceclient.client import Client as GlanceClient
 from glanceclient.exc import NotFound
+from neutronclient.v2_0.client import Client as NeutronClient
 from novaclient.client import Client as NovaClient
 
 from .util import random_base32
@@ -47,14 +48,34 @@ def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, 
     return server_args
 
 
-def get_create_floatingip(novaclient):
+def get_public_network(neutronclient):
+    nets = neutronclient.list_networks()['networks']
+    for net in nets:
+        if net['router:external'] != True:
+            continue
+        pubnet_id = net['id']
+        break
+    else:
+        raise RuntimeError("couldn't find public net")
+    return pubnet_id
+
+
+def create_floatingip(neutronclient):
+    pubnet_id = get_public_network(neutronclient)
+    body = {'floatingip': {'floating_network_id': pubnet_id}}
+    floatingip = neutronclient.create_floatingip(body)['floatingip']
+    return floatingip
+
+
+def get_create_floatingip(neutronclient):
+    '''Gets or creates a free floating IP to use'''
     created = False
-    ips = novaclient.floating_ips.list()
-    unbound = (ip for ip in ips if ip.instance_id is None)
+    ips = neutronclient.list_floatingips()['floatingips']
+    unbound = (ip for ip in ips if ip['port_id'] is None)
     try:
         fip = next(unbound)
     except StopIteration:
-        fip = novaclient.floating_ips.create('ext-net')
+        fip = create_floatingip(neutronclient)
         created = True
     return created, fip
 
@@ -76,6 +97,7 @@ class Server(object):
     def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
         self.lease = lease
         self.session = self.lease.session
+        self.neutron = NeutronClient(session=self.session)
         self.nova = NovaClient('2', session=self.session)
         self.glance = GlanceClient('2', session=self.session)
         self.ip = None
@@ -140,9 +162,9 @@ class Server(object):
         # print('server active')
 
     def associate_floating_ip(self):
-        created, self._fip = get_create_floatingip(self.nova)
-        self.server.add_floating_ip(self._fip)
-        self.ip = self._fip.ip
+        created, self._fip = get_create_floatingip(self.neutron)
+        self.ip = self._fip['floating_ip_address']
+        self.server.add_floating_ip(self.ip)
         return self.ip
 
     def delete(self):

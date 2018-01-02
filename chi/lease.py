@@ -1,6 +1,7 @@
 import datetime
 import json
 import numbers
+import sys
 import time
 import urllib.parse
 
@@ -74,7 +75,8 @@ def lease_create_nodetype(*args, **kwargs):
     except KeyError:
         raise ValueError('no node_type specified')
     if node_type not in NODE_TYPES:
-        raise ValueError('unknown node_type ("{}")'.format(node_type))
+        print('warning: unknown node_type ("{}")'.format(node_type), file=sys.stderr)
+        # raise ValueError('unknown node_type ("{}")'.format(node_type))
     kwargs['resource_properties'] = ['=', '$node_type', node_type]
     return lease_create_args(*args, **kwargs)
 
