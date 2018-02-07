@@ -60,6 +60,14 @@ def get_public_network(neutronclient):
     return pubnet_id
 
 
+def get_networkid_byname(neutronclient, name):
+    nets = neutronclient.list_networks()['networks']
+    for net in nets:
+        if net['name'] == name:
+            return net['id']
+    raise RuntimeError("couldn't find net with name '{}'".format(name))
+
+
 def create_floatingip(neutronclient):
     pubnet_id = get_public_network(neutronclient)
     body = {'floatingip': {'floating_network_id': pubnet_id}}
@@ -104,7 +112,17 @@ class Server(object):
         self._fip = None
 
         self.image = resolve_image_idname(self.glance, image)
-        self.server_kwargs = instance_create_args(self.lease.reservation, key=key, image=self.image, **extra)
+        try:
+            net_name = extra.pop('net_name')
+        except KeyError:
+            net_ids = None
+        else:
+            net_ids = [get_networkid_byname(self.neutron, net_name)]
+
+        self.server_kwargs = instance_create_args(
+            self.lease.reservation, key=key, image=self.image, net_ids=net_ids,
+            **extra
+        )
         self.server = self.nova.servers.create(**self.server_kwargs)
         self.id = self.server.id
         self.name = self.server.name
