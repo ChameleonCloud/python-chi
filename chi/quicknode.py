@@ -28,6 +28,8 @@ def main(argv=None):
         help='Name or ID of image to launch.')
     parser.add_argument('--no-clean', action='store_true',
         help='Do not clean up on failure.')
+    parser.add_argument('--net-name', type=str, default='sharednet1',
+        help='Name of network to connect to.')
 
     args = parser.parse_args()
     session = auth.session_from_args(args)
@@ -37,7 +39,7 @@ def main(argv=None):
         print('started {}'.format(lease))
 
         print_nolf('Server: creating...')
-        server = lease.create_server(key=args.key_name, image=args.image)
+        server = lease.create_server(key=args.key_name, image=args.image, net_name=args.net_name)
         print_nolf('building...')
         server.wait()
         print_nolf('started {}...'.format(server))

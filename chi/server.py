@@ -112,11 +112,10 @@ class Server(object):
         self._fip = None
 
         self.image = resolve_image_idname(self.glance, image)
-        try:
-            net_name = extra.pop('net_name')
-        except KeyError:
-            net_ids = None
-        else:
+
+        net_ids = extra.pop('net_ids', None)
+        net_name = extra.pop('net_name', None)
+        if net_ids is None and net_name is not None:
             net_ids = [get_networkid_byname(self.neutron, net_name)]
 
         self.server_kwargs = instance_create_args(
