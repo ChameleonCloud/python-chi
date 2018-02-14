@@ -30,6 +30,8 @@ def main(argv=None):
         help='Do not clean up on failure.')
     parser.add_argument('--net-name', type=str, default='sharednet1',
         help='Name of network to connect to.')
+    parser.add_argument('--no-floatingip', action='store_true',
+        help='Skip assigning a floating IP.')
 
     args = parser.parse_args()
     session = auth.session_from_args(args)
@@ -43,10 +45,14 @@ def main(argv=None):
         print_nolf('building...')
         server.wait()
         print_nolf('started {}...'.format(server))
-        server.associate_floating_ip()
-        print('bound ip {} to server.'.format(server.ip))
-        input('\n\'ssh cc@{}\' available.\nPress enter to terminate lease and server.'.format(server.ip))
-        print_nolf('Tearing down...')
+        if args.no_floatingip:
+            input('Press enter to terminate lease and server.')
+        else:
+            server.associate_floating_ip()
+            print('bound ip {} to server.'.format(server.ip))
+            input('\n\'ssh cc@{}\' available.\nPress enter to terminate lease and server.'
+                .format(server.ip))
+            print_nolf('Tearing down...')
     print('done.')
 
 
