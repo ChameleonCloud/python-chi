@@ -184,25 +184,6 @@ class Server(object):
         try:
             self.server.add_floating_ip(self.ip)
         except AttributeError:
-            # print('addresses:\n',
-            #     [addr
-            #     for addr
-            #     in itertools.chain(*self.server.addresses.values())
-            #     if addr['OS-EXT-IPS:type'] == 'fixed']
-            # )
-            # target_address = next(
-            #     addr
-            #     for addr
-            #     in itertools.chain(*self.server.addresses.values())
-            #     if addr['OS-EXT-IPS:type'] == 'fixed'
-            # )
-            # target_mac = target_address['OS-EXT-IPS-MAC:mac_addr']
-            # target_port = self.neutron.list_ports(mac=target_mac, device_owner='compute:None')['ports'][0]['id']
-            # self.neutron.update_floatingip(self._fip['id'], body={
-            #     "floatingip": {
-            #         "port_id": target_port,
-            #     }
-            # })
             # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
             ports = self.neutron.list_ports(**{'device_id': self.id}).get('ports')
             fip_target = {
