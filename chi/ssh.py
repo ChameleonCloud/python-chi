@@ -13,7 +13,7 @@ fapi.env.disable_known_hosts = True # FIXME meh
 fapi.env.use_ssh_config = True
 fapi.env.warn_only = True
 
-fapi.env.key_filename = os.environ.get('SSH_KEY', None)
+fapi.env.key_filename = os.environ.get('SSH_KEY_FILE', None)
 
 expected_wait_errors = (
     # while the ssh service starting, it can accept connections but auth isn't fully set.
