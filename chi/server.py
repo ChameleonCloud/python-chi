@@ -102,6 +102,8 @@ def resolve_image_idname(glanceclient, idname):
 
 
 class Server(object):
+    """
+    """
     def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
         self.lease = lease
         self.session = self.lease.session

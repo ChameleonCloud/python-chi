@@ -1,3 +1,6 @@
+"""
+Lease management
+"""
 import datetime
 import json
 import numbers
