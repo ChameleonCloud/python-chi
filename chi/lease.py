@@ -16,6 +16,8 @@ from blazarclient.client import Client as _BlazarClient # installed from github
 from .server import Server, ServerError
 from .util import random_base32
 
+__all__ = ['lease_create_args', 'lease_create_nodetype', 'Lease',
+           'BlazarClient']
 
 BLAZAR_TIME_FORMAT = '%Y-%m-%d %H:%M'
 NODE_TYPES = {
@@ -35,7 +37,25 @@ NODE_TYPES = {
 DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
 
 
-def lease_create_args(name=None, start='now', length=None, end=None, nodes=1, resource_properties=''):
+def lease_create_args(name=None, start='now', length=None, end=None,
+        nodes=1, resource_properties=''):
+    """
+    Generates the nested object that needs to be sent to the Blazar client
+    to create the lease. Provides useful defaults for Chameleon.
+
+    :param str name: name of lease. If ``None``, generates a random name.
+    :param str/datetime start: when to start lease as a
+        :py:class:`datetime.datetime` object, or if the string ``'now'``,
+        starts in about a minute.
+    :param length: length of time as a :py:class:`datetime.timedelta` object or
+        number of seconds as a number. Defaults to 1 day.
+    :param datetime.datetime end: when to end the lease. Provide only this or
+        `length`, not both.
+    :param int nodes: number of nodes to reserve.
+    :param resource_properties: object that is JSON-encoded and sent as the
+        ``resource_properties`` value to Blazar. Commonly used to specify
+        node types.
+    """
     if name is None:
         name = 'lease-{}'.format(random_base32(6))
 
@@ -73,6 +93,13 @@ def lease_create_args(name=None, start='now', length=None, end=None, nodes=1, re
 
 
 def lease_create_nodetype(*args, **kwargs):
+    """
+    Wrapper for :py:func:`lease_create_args` that adds the
+    ``resource_properties`` payload to specify node type.
+
+    :param str node_type: Node type to filter by, ``compute``, et al.
+    :raises ValueError: if there is no `node_type` named argument.
+    """
     try:
         node_type = kwargs.pop('node_type')
     except KeyError:
@@ -86,7 +113,7 @@ def lease_create_nodetype(*args, **kwargs):
 
 class BlazarClient(object):
     """
-    Current BlazarClient doesn't support sessions, just a token, so it
+    Older BlazarClients didn't support sessions, just a token, so it
     behaves poorly after its token expires. This is a thin wrapper that
     recreates the real client every X minutes to avoid expiration.
     """
@@ -119,18 +146,31 @@ class BlazarClient(object):
 
 
 class Lease(object):
-    def __init__(self, keystone_session, **lease_kwargs):
-        '''
-        Arguments
-        ---------
+    '''
+    Creates and manages a lease, optionally with a context manager (``with``).
 
-        Keyword Arguments
-        -----------------
-        sequester : bool
-            If the context manager catches that an instance failed to start,
-            it will not delete the lease, but rather extend it and rename it
-            with the ID of the instance that failed.
-        '''
+    .. code-block:: python
+
+        with Lease(session, node_type='compute') as lease:
+            instance = lease.create_server()
+            ...
+
+    When using the context manager, on entering it will wait for the lease
+    to launch, then on exiting it will delete the lease, which in-turn
+    also deletes the instances launched with it.
+
+    :param keystone_session: session object
+    :param bool sequester: If the context manager catches that an instance
+        failed to start, it will not delete the lease, but rather extend it
+        and rename it with the ID of the instance that failed.
+    :param bool _no_clean: Don't delete the lease at the end of a context
+        manager
+    :param lease_kwargs: Parameters passed through to
+        :py:func:`lease_create_nodetype` and in turn
+        :py:func:`lease_create_args`
+    '''
+
+    def __init__(self, keystone_session, **lease_kwargs):
         self.session = keystone_session
         self.blazar = BlazarClient('1', self.session)
         self.servers = []
@@ -159,6 +199,10 @@ class Lease(object):
 
     @classmethod
     def from_existing(cls, keystone_session, id):
+        """
+        Attach to an existing lease by ID. When using in conjunction with the
+        context manager, it will *not* delete the lease at the end.
+        """
         return cls(keystone_session, _preexisting=True, _id=id)
 
     def __repr__(self):
@@ -199,18 +243,23 @@ class Lease(object):
             self.delete()
 
     def refresh(self):
+        """Updates the lease data"""
         self.lease = self.blazar.lease.get(self.id)
 
     @property
     def status(self):
+        """Returns the action/status of the lease as a tuple."""
         self.refresh()
         return self.lease['action'], self.lease['status']
 
     @property
     def ready(self):
+        """Returns True if the lease has started."""
         return self.status == ('START', 'COMPLETE')
 
     def wait(self):
+        """Blocks for up to 150 seconds, waiting for the lease to be ready.
+        Raises a RuntimeError if it times out."""
         for _ in range(15):
             time.sleep(10)
             if self.ready:
@@ -219,10 +268,14 @@ class Lease(object):
             raise RuntimeError('timeout, lease failed to start')
 
     def delete(self):
+        """Deletes the lease"""
         self.blazar.lease.delete(self.id)
         self.lease = None
 
     def create_server(self, *sargs, **skwargs):
+        """Generates instances using the resource of the lease. Arguments
+        are passed to :py:class:`ccmanage.server.Server` and returns same
+        object."""
         server = Server(self, *sargs, **skwargs)
         self.servers.append(server)
         return server

@@ -9,7 +9,7 @@ from novaclient.client import Client as NovaClient
 from .util import random_base32
 
 
-DEFAULT_IMAGE = '0f216b1f-7841-451b-8971-d383364e01a6' # CC-CentOS7 as of 4/6/17
+DEFAULT_IMAGE = 'CC-CentOS7'
 
 
 class ServerError(RuntimeError):
@@ -103,6 +103,7 @@ def resolve_image_idname(glanceclient, idname):
 
 class Server(object):
     """
+    Launches an instance on a lease.
     """
     def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
         self.lease = lease
