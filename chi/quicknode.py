@@ -18,7 +18,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     auth.add_arguments(parser)
     parser.add_argument('--node-type', type=str, default='compute')
