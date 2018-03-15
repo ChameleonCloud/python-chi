@@ -8,7 +8,7 @@ import sys
 
 
 from . import auth
-from .lease import Lease
+from .lease import Lease, NODE_TYPES
 
 
 print_nolf = functools.partial(print, end='', flush=True)
@@ -24,9 +24,13 @@ def main(argv=None):
     )
 
     auth.add_arguments(parser)
-    parser.add_argument('--node-type', type=str, default='compute')
+    parser.add_argument('--node-type', type=str, default='compute_haswell',
+        help='Node type to launch. May be custom or likely one of: {}'.format(
+            ', '.join("'{}'".format(nt) for nt in NODE_TYPES)
+        ))
     parser.add_argument('--key-name', type=str, default='default',
-        help='SSH keypair name on OS used to create an instance.')
+        help='SSH keypair name on OS used to create an instance. Must exist '
+             'in Nova')
     parser.add_argument('--image', type=str, default='CC-CentOS7',
         help='Name or ID of image to launch.')
     parser.add_argument('--no-clean', action='store_true',
