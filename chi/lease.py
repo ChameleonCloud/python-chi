@@ -27,7 +27,7 @@ NODE_TYPES = {
     'storage',
     'storage_hierarchy',
     'gpu_p100',
-    'gpu_p100_nvlink'
+    'gpu_p100_nvlink',
     'gpu_k80',
     'gpu_m40',
     'fpga',
