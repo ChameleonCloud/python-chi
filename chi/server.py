@@ -204,9 +204,17 @@ class Server(object):
         return self.ip
 
     def delete(self):
-        if self._fip:
-            self._fip.delete()
         self.server.delete()
+        # wait for deletion complete
+        for _ in range(30):
+            time.sleep(60)
+            try:
+                self.server.get()
+            except Exception as e:
+                if "HTTP 404" in str(e):
+                    return
+        else:
+            raise RuntimeError('timeout, server failed to terminate')    
 
     def rebuild(self, idname):
         self.image = resolve_image_idname(self.glance, idname)

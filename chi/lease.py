@@ -235,10 +235,11 @@ class Lease(object):
             )
             return
 
-        # instances are deleted with the lease anyways. this just provides a way
-        # to crash if the lease already ended.
-        # for server in self.servers:
-        #     server.delete()
+        # if lease exists, delete instances
+        current_lease = self.blazar.lease.get(self.id)
+        if current_lease:
+            for server in self.servers:
+                server.delete()
 
         if not self._preexisting:
             # don't auto-delete pre-existing leases
