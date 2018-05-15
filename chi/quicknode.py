@@ -1,6 +1,8 @@
 """
 Fire up a single node on Chameleon to do something with.
 """
+from __future__ import absolute_import, print_function, unicode_literals
+
 import argparse
 import functools
 import os
