@@ -117,7 +117,7 @@ def wait(host, username, callback='dots'):
 
 
 class RemoteControl(object):
-    def __init__(self, *, ip=None, server=None, user='cc'):
+    def __init__(self, ip=None, server=None, user='cc'):
         self.server = server
         self.user = user
         if ip is None:
