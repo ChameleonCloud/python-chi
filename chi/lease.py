@@ -6,6 +6,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import datetime
 import json
 import numbers
+import os
 import sys
 import time
 import urllib.parse
@@ -131,7 +132,8 @@ class BlazarClient(object):
         try:
             self._bc = _BlazarClient(
                 self._version,
-                blazar_url=self._session.get_endpoint(service_type='reservation'),
+                blazar_url=self._session.get_endpoint(service_type='reservation',
+                                                      region_name=os.environ.get('OS_REGION_NAME')),
                 auth_token=self._session.get_token(),
             )
         except TypeError: # probably a newer version that wants session
@@ -139,6 +141,7 @@ class BlazarClient(object):
                 self._version,
                 session=self._session,
                 service_type='reservation',
+                region_name=os.environ.get('OS_REGION_NAME'),
             )
 
         self._client_age = time.monotonic()

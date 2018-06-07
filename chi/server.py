@@ -1,3 +1,4 @@
+import os
 import time
 import urllib.parse
 
@@ -108,9 +109,9 @@ class Server(object):
     def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
         self.lease = lease
         self.session = self.lease.session
-        self.neutron = NeutronClient(session=self.session)
-        self.nova = NovaClient('2', session=self.session)
-        self.glance = GlanceClient('2', session=self.session)
+        self.neutron = NeutronClient(session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
+        self.nova = NovaClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
+        self.glance = GlanceClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
         self.ip = None
         self._fip = None
 
