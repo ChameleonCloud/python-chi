@@ -256,14 +256,22 @@ class Lease(object):
 
     @property
     def status(self):
-        """Returns the action/status of the lease as a tuple."""
+        """Refreshes and returns the status of the lease."""
         self.refresh()
-        return self.lease['action'], self.lease['status']
+        # NOTE(priteau): Temporary compatibility with old and new lease status
+        if self.lease.get('action') is not None:
+            return self.lease['action'], self.lease['status']
+        else:
+            return self.lease['status']
 
     @property
     def ready(self):
         """Returns True if the lease has started."""
-        return self.status == ('START', 'COMPLETE')
+        # NOTE(priteau): Temporary compatibility with old and new lease status
+        if self.lease.get('action') is not None:
+            return self.status == ('START', 'COMPLETE')
+        else:
+            return self.status == 'ACTIVE'
 
     def wait(self):
         """Blocks for up to 150 seconds, waiting for the lease to be ready.
