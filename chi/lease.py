@@ -288,10 +288,11 @@ class Lease(object):
         self.blazar.lease.delete(self.id)
         self.lease = None
 
-    def create_server(self, *sargs, **skwargs):
+    def create_server(self, *server_args, **server_kwargs):
         """Generates instances using the resource of the lease. Arguments
         are passed to :py:class:`ccmanage.server.Server` and returns same
         object."""
-        server = Server(self, *sargs, **skwargs)
+        server_kwargs.setdefault('lease', self)
+        server = Server(self.session, *server_args, **server_kwargs)
         self.servers.append(server)
         return server

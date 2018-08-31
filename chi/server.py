@@ -106,30 +106,36 @@ class Server(object):
     """
     Launches an instance on a lease.
     """
-    def __init__(self, lease, key='default', image=DEFAULT_IMAGE, **extra):
-        self.lease = lease
-        self.session = self.lease.session
+    def __init__(self, session, id=None, lease=None, key='default', image=DEFAULT_IMAGE, **extra):
+        self.session = session
+
         self.neutron = NeutronClient(session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
         self.nova = NovaClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
         self.glance = GlanceClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
+        self.image = resolve_image_idname(self.glance, image)
+
         self.ip = None
         self._fip = None
-
-        self.image = resolve_image_idname(self.glance, image)
 
         net_ids = extra.pop('net_ids', None)
         net_name = extra.pop('net_name', None)
         if net_ids is None and net_name is not None:
             net_ids = [get_networkid_byname(self.neutron, net_name)]
 
-        self.server_kwargs = instance_create_args(
-            self.lease.reservation, key=key, image=self.image, net_ids=net_ids,
-            **extra
-        )
-        self.server = self.nova.servers.create(**self.server_kwargs)
+        if id is not None:
+            self.server = self.nova.servers.get(id)
+        else if lease is not None:
+            server_kwargs = instance_create_args(
+                lease.reservation, key=key, image=self.image, net_ids=net_ids,
+                **extra
+            )
+            self.server = self.nova.servers.create(**server_kwargs)
+            # print('created instance {}'.format(self.server.id))
+        else:
+            raise ValueError("Missing required argument: 'id' or 'lease' required.")
+
         self.id = self.server.id
         self.name = self.server.name
-        # print('created instance {}'.format(self.server.id))
 
     def __repr__(self):
         netloc = urllib.parse.urlsplit(self.session.auth.auth_url).netloc
@@ -215,7 +221,7 @@ class Server(object):
                 if "HTTP 404" in str(e):
                     return
         else:
-            raise RuntimeError('timeout, server failed to terminate')    
+            raise RuntimeError('timeout, server failed to terminate')
 
     def rebuild(self, idname):
         self.image = resolve_image_idname(self.glance, idname)
