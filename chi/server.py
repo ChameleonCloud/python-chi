@@ -116,6 +116,10 @@ class Server(object):
 
         self.ip = None
         self._fip = None
+        self._fip_created = False
+
+        extra.setdefault('_no_clean', False)
+        self._noclean = extra.pop('_no_clean')
 
         net_ids = extra.pop('net_ids', None)
         net_name = extra.pop('net_name', None)
@@ -143,6 +147,18 @@ class Server(object):
             # drop if default port
             netloc = netloc[:-5]
         return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, netloc, self.id)
+
+    def __enter__(self):
+        self.wait()
+        return self
+
+    def __exit__(self, exc_type, exc, exc_tb):
+        if exc is not None and self._noclean:
+            print('Instance existing uncleanly (noclean = True).')
+            return
+
+        self.disassociate_floating_ip()
+        self.delete()
 
     def refresh(self):
         now = time.monotonic()
@@ -175,13 +191,15 @@ class Server(object):
         # check a couple for fast failures
         for _ in range(3):
             time.sleep(10)
+            if self.ready:
+                return
             if self.error:
                 raise ServerError(self.server.fault, self.server)
         time.sleep(5 * 60)
         for _ in range(100):
             time.sleep(10)
             if self.ready:
-                break
+                return
             if self.error:
                 raise ServerError(self.server.fault, self.server)
         else:
@@ -190,6 +208,7 @@ class Server(object):
 
     def associate_floating_ip(self):
         created, self._fip = get_create_floatingip(self.neutron)
+        self._fip_created = created
         self.ip = self._fip['floating_ip_address']
         try:
             self.server.add_floating_ip(self.ip)
@@ -209,6 +228,18 @@ class Server(object):
                 }
             })
         return self.ip
+
+    def disassociate_floating_ip(self):
+        if self.ip is None:
+            return
+
+        self.server.remove_floating_ip(self.ip)
+        if self._fip_created:
+            self.neutron.delete_floatingip(self._fip['id'])
+
+        self.ip = None
+        self._fip = None
+        self._fip_created = False
 
     def delete(self):
         self.server.delete()
