@@ -117,6 +117,7 @@ class Server(object):
         self.ip = None
         self._fip = None
         self._fip_created = False
+        self._preexisting = False
 
         extra.setdefault('_no_clean', False)
         self._noclean = extra.pop('_no_clean')
@@ -127,6 +128,7 @@ class Server(object):
             net_ids = [get_networkid_byname(self.neutron, net_name)]
 
         if id is not None:
+            self._preexisting = True
             self.server = self.nova.servers.get(id)
         elif lease is not None:
             server_kwargs = instance_create_args(
@@ -158,7 +160,8 @@ class Server(object):
             return
 
         self.disassociate_floating_ip()
-        self.delete()
+        if not self._preexisting:
+            self.delete()
 
     def refresh(self):
         now = time.monotonic()
