@@ -1,0 +1,4 @@
+# Pip local package files
+*.egg-info
+# Virtualenv
+venv/
