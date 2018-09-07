@@ -7,7 +7,7 @@ class Session(session.Session):
     Creates a Keystone session object for use in OpenStack clients.
     Defaults to using environment variables discovered.
     '''
-    def __init__(self, project_name):
+    def __init__(self, project_name, **kwargs):
         auth_url = getenv('OS_URL')
         token = getenv('OS_TOKEN')
 
@@ -15,8 +15,9 @@ class Session(session.Session):
         auth = v3.Token(auth_url=auth_url, token=token,
                         project_name=project_name,
                         project_domain_name='default')
+        kwargs.setdefault('auth', auth)
 
-        super().__init__(self, auth)
+        super().__init__(**kwargs)
 
     def with_region(self, region_name):
         return adapter.Adapter(session=self, region_name=region_name)

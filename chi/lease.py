@@ -141,7 +141,7 @@ class Lease(object):
 
     def __init__(self, keystone_session, **lease_kwargs):
         self.session = keystone_session
-        self.blazar = BlazarClient('1', self.session)
+        self.blazar = BlazarClient('1', service_type='reservation', session=self.session)
         self.servers = []
         self.lease = None
 
