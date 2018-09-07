@@ -14,7 +14,6 @@ import urllib.parse
 from dateutil import tz
 
 from blazarclient.client import Client as _BlazarClient # installed from github
-# from heatclient.client import Client as HeatClient
 
 from .server import Server, ServerError
 from .util import random_base32
