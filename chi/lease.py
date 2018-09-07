@@ -141,7 +141,8 @@ class Lease(object):
 
     def __init__(self, keystone_session, **lease_kwargs):
         self.session = keystone_session
-        self.blazar = BlazarClient('1', service_type='reservation', session=self.session)
+        self.blazar = BlazarClient('1', service_type='reservation',
+                                        session=self.session)
         self.servers = []
         self.lease = None
 
@@ -175,11 +176,8 @@ class Lease(object):
         return cls(keystone_session, _preexisting=True, _id=id)
 
     def __repr__(self):
-        netloc = urllib.parse.urlsplit(self.session.auth.auth_url).netloc
-        if netloc.endswith(':5000'):
-            # drop if default port
-            netloc = netloc[:-5]
-        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, netloc, self.id)
+        region = self.session.region_name
+        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, region, self.id)
 
     def __enter__(self):
         if self.lease is None:
