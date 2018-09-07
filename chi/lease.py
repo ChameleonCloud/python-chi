@@ -13,13 +13,12 @@ import urllib.parse
 
 from dateutil import tz
 
-from blazarclient.client import Client as _BlazarClient # installed from github
+from blazarclient.client import Client as BlazarClient
 
 from .server import Server, ServerError
 from .util import random_base32
 
-__all__ = ['lease_create_args', 'lease_create_nodetype', 'Lease',
-           'BlazarClient']
+__all__ = ['lease_create_args', 'lease_create_nodetype', 'Lease']
 
 BLAZAR_TIME_FORMAT = '%Y-%m-%d %H:%M'
 NODE_TYPES = {
@@ -113,42 +112,6 @@ def lease_create_nodetype(*args, **kwargs):
         # raise ValueError('unknown node_type ("{}")'.format(node_type))
     kwargs['resource_properties'] = ['=', '$node_type', node_type]
     return lease_create_args(*args, **kwargs)
-
-
-class BlazarClient(object):
-    """
-    Older BlazarClients didn't support sessions, just a token, so it
-    behaves poorly after its token expires. This is a thin wrapper that
-    recreates the real client every X minutes to avoid expiration.
-    """
-    def __init__(self, version, session):
-        self._version = version
-        self._session = session
-        self._client_age = None
-        self._create_client()
-
-    def _create_client(self):
-        try:
-            self._bc = _BlazarClient(
-                self._version,
-                blazar_url=self._session.get_endpoint(service_type='reservation',
-                                                      region_name=os.environ.get('OS_REGION_NAME')),
-                auth_token=self._session.get_token(),
-            )
-        except TypeError: # probably a newer version that wants session
-            self._bc = _BlazarClient(
-                self._version,
-                session=self._session,
-                service_type='reservation',
-                region_name=os.environ.get('OS_REGION_NAME'),
-            )
-
-        self._client_age = time.monotonic()
-
-    def __getattr__(self, attr):
-        if time.monotonic() - self._client_age > 20*60:
-            self._create_client()
-        return getattr(self._bc, attr)
 
 
 class Lease(object):
