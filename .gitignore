@@ -1,3 +1,5 @@
+# PyTest
+.pytest_cache/
 # Tox
 .tox/
 # Pip local package files
