@@ -9,7 +9,6 @@ import numbers
 import os
 import sys
 import time
-import urllib.parse
 
 from dateutil import tz
 
