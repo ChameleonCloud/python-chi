@@ -6,13 +6,15 @@ from os import getenv
 _overrides = {}
 _defaults = {}
 _keys = [
-    'auth_url',     # THe OpenStack Keystone authentication URL
-    'key_filename', # The path to the SSH private key
-    'key_name',     # The OpenStack SSH key name
-    'image',        # The OpenStack image name
-    'project_name', # The OpenStack project name
-    'region_name',  # The OpenStack region name
-    'token',        # A valid OpenStack auth token
+    'auth_url',
+    'key_filename',         # The path to the SSH public key
+    'key_name',
+    'interface',
+    'image',
+    'private_key_filename', # The path to the SSH private key
+    'project_name',
+    'region_name',
+    'token',                # A valid OpenStack auth token
 ]
 
 # Automatically set context from environment.
@@ -38,4 +40,6 @@ def session():
                     project_name=get('project_name'),
                     project_domain_name='default')
     sess = Session(auth=auth)
-    return Adapter(session=sess, region_name=get('region_name'))
+    return Adapter(session=sess,
+                   interface=get('interface'),
+                   region_name=get('region_name'))

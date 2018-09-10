@@ -1,12 +1,17 @@
 import os
-import time
-import urllib.parse
+from datetime import datetime
+from time import sleep
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 
 from glanceclient.client import Client as GlanceClient
 from glanceclient.exc import NotFound
 from neutronclient.v2_0.client import Client as NeutronClient
 from novaclient.client import Client as NovaClient
 
+from .keypair import Keypair
 from .util import random_base32
 
 
@@ -106,7 +111,7 @@ class Server(object):
     """
     Launches an instance on a lease.
     """
-    def __init__(self, session, id=None, lease=None, key='default', image=DEFAULT_IMAGE, **extra):
+    def __init__(self, session, id=None, lease=None, key=None, image=DEFAULT_IMAGE, **extra):
         self.session = session
 
         self.neutron = NeutronClient(session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
@@ -131,6 +136,9 @@ class Server(object):
             self._preexisting = True
             self.server = self.nova.servers.get(id)
         elif lease is not None:
+            if key is None:
+                key = Keypair(self.session).key_name
+
             server_kwargs = instance_create_args(
                 lease.reservation, key=key, image=self.image, net_ids=net_ids,
                 **extra
@@ -164,14 +172,14 @@ class Server(object):
             self.delete()
 
     def refresh(self):
-        now = time.monotonic()
+        now = datetime.now()
         try:
             lr = self._last_refresh
         except AttributeError:
             pass # expected failure on first pass
         else:
             # limit refreshes to once/sec.
-            if now - lr < 1:
+            if (now - lr).total_seconds() < 1:
                 return
 
         self.server.get()
@@ -193,14 +201,14 @@ class Server(object):
     def wait(self):
         # check a couple for fast failures
         for _ in range(3):
-            time.sleep(10)
+            sleep(10)
             if self.ready:
                 return
             if self.error:
                 raise ServerError(self.server.fault, self.server)
-        time.sleep(5 * 60)
+        sleep(5 * 60)
         for _ in range(100):
-            time.sleep(10)
+            sleep(10)
             if self.ready:
                 return
             if self.error:
@@ -248,7 +256,7 @@ class Server(object):
         self.server.delete()
         # wait for deletion complete
         for _ in range(30):
-            time.sleep(60)
+            sleep(60)
             try:
                 self.server.get()
             except Exception as e:
