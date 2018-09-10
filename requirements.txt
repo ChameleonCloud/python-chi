@@ -1,0 +1,7 @@
+fabric
+keystoneauth1
+paramiko
+python-blazarclient
+python-glanceclient
+python-neutronclient
+python-novaclient

@@ -1,4 +1,7 @@
+# Tox
+.tox/
 # Pip local package files
 *.egg-info
-# Virtualenv
-venv/
+# Build/install files
+__pycache__/*
+*.pyc
