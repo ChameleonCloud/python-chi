@@ -13,6 +13,7 @@ _keys = [
     'keypair_private_key', # The path to the SSH private key
     'keypair_public_key',  # The path to the SSH public key
     'project_name',
+    'project_domain_name',
     'region_name',
     'token',                # A valid OpenStack auth token
 ]
@@ -25,7 +26,9 @@ for key in _keys:
 
 def reset():
     global _overrides
+    global _session
     _overrides = {}
+    _session = None
 
 def set(key, value):
     global _overrides
@@ -46,7 +49,7 @@ def session():
         auth = v3.Token(auth_url=get('auth_url'),
                         token=get('token'),
                         project_name=get('project_name'),
-                        project_domain_name='default')
+                        project_domain_name=get('project_domain_name'))
         sess = Session(auth=auth)
         _session = Adapter(session=sess,
                            interface=get('interface'),
