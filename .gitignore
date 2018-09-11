@@ -5,5 +5,5 @@
 # Pip local package files
 *.egg-info
 # Build/install files
-__pycache__/*
-*.pyc
+__pycache__/
+**/*.pyc
