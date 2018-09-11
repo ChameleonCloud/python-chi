@@ -12,7 +12,7 @@ class Remote(object):
             ip = server.ip
 
         self.connection = Connection(ip, user=user, connect_kwargs={
-            'key_filename': context.get('private_key_filename')
+            'key_filename': context.get('keypair_private_key')
         })
 
     def run(self, *args, **kwargs):

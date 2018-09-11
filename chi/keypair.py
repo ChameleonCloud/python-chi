@@ -16,7 +16,7 @@ def key_pair_name(fingerprint):
 
 class Keypair(object):
     def __init__(self, session, **kwargs):
-        key_filename = kwargs.get('key_filename', context.get('key_filename'))
+        key_filename = kwargs.get('keypair_public_key', context.get('keypair_public_key'))
 
         self.session = session
         self.nova = NovaClient('2', session=session)

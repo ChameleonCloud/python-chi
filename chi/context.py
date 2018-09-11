@@ -7,11 +7,11 @@ _overrides = {}
 _defaults = {}
 _keys = [
     'auth_url',
-    'key_filename',         # The path to the SSH public key
     'key_name',
     'interface',
     'image',
-    'private_key_filename', # The path to the SSH private key
+    'keypair_private_key', # The path to the SSH private key
+    'keypair_public_key',  # The path to the SSH public key
     'project_name',
     'region_name',
     'token',                # A valid OpenStack auth token
