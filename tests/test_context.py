@@ -40,7 +40,3 @@ def test_session():
     assert auth_plugin.project_domain_name == 'PROJECT_DOMAIN_NAME'
     assert session.interface == 'INTERFACE'
     assert session.region_name == 'REGION_NAME'
-
-def test_session_memoization():
-    session = chi.session()
-    assert session == chi.session(), "should have memoized previous session"

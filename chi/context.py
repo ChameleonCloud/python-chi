@@ -17,8 +17,6 @@ _keys = [
     'region_name',
     'token',                # A valid OpenStack auth token
 ]
-# A memoized Keystone session
-_session = None
 
 # Automatically set context from environment.
 for key in _keys:
@@ -44,14 +42,11 @@ def get(key, default=None):
     return _overrides.get(key, _defaults.get(key, default))
 
 def session():
-    global _session
-    if _session is None:
-        auth = v3.Token(auth_url=get('auth_url'),
-                        token=get('token'),
-                        project_name=get('project_name'),
-                        project_domain_name=get('project_domain_name'))
-        sess = Session(auth=auth)
-        _session = Adapter(session=sess,
-                           interface=get('interface'),
-                           region_name=get('region_name'))
-    return _session
+    auth = v3.Token(auth_url=get('auth_url'),
+                    token=get('token'),
+                    project_name=get('project_name'),
+                    project_domain_name=get('project_domain_name'))
+    sess = Session(auth=auth)
+    return Adapter(session=sess,
+                   interface=get('interface'),
+                   region_name=get('region_name'))
