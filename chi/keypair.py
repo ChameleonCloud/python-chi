@@ -1,3 +1,6 @@
+"""
+Keypair management
+"""
 import base64
 import hashlib
 
@@ -12,13 +15,15 @@ def ssh_fingerprint(key):
     return fingerprint
 
 def key_pair_name(fingerprint):
-    return 'jupyter-{}'.format(fingerprint)
+    return 'keypair-{}'.format(fingerprint)
 
 class Keypair(object):
-    def __init__(self, session, **kwargs):
-        key_filename = kwargs.get('keypair_public_key', context.get('keypair_public_key'))
+    def __init__(self, **kwargs):
+        kwargs.setdefault('session', context.session())
 
-        self.session = session
+        key_filename = kwargs.get('keypair_public_key', context.get('keypair_public_key'))
+        session = kwargs.get('session')
+
         self.nova = NovaClient('2', session=session)
 
         with open(key_filename) as f:

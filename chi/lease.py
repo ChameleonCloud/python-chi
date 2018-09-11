@@ -14,6 +14,7 @@ from dateutil import tz
 
 from blazarclient.client import Client as BlazarClient
 
+from . import context
 from .server import Server, ServerError
 from .util import random_base32
 
@@ -40,7 +41,7 @@ DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
 
 
 def lease_create_args(name=None, start='now', length=None, end=None,
-        nodes=1, resource_properties=''):
+                      nodes=1, resource_properties=''):
     """
     Generates the nested object that needs to be sent to the Blazar client
     to create the lease. Provides useful defaults for Chameleon.
@@ -133,32 +134,34 @@ class Lease(object):
         and rename it with the ID of the instance that failed.
     :param bool _no_clean: Don't delete the lease at the end of a context
         manager
-    :param lease_kwargs: Parameters passed through to
+    :param kwargs: Parameters passed through to
         :py:func:`lease_create_nodetype` and in turn
         :py:func:`lease_create_args`
     '''
 
-    def __init__(self, keystone_session, **lease_kwargs):
-        self.session = keystone_session
+    def __init__(self, **kwargs):
+        kwargs.setdefault('session', context.session())
+
+        self.session = kwargs.pop('session')
         self.blazar = BlazarClient('1', service_type='reservation',
                                         session=self.session)
         self.servers = []
         self.lease = None
 
-        self._sequester = lease_kwargs.pop('sequester', False)
+        self._sequester = kwargs.pop('sequester', False)
 
-        lease_kwargs.setdefault('_preexisting', False)
-        self._preexisting = lease_kwargs.pop('_preexisting')
+        kwargs.setdefault('_preexisting', False)
+        self._preexisting = kwargs.pop('_preexisting')
 
-        lease_kwargs.setdefault('_no_clean', False)
-        self._noclean = lease_kwargs.pop('_no_clean')
+        kwargs.setdefault('_no_clean', False)
+        self._noclean = kwargs.pop('_no_clean')
 
         if self._preexisting:
-            self.id = lease_kwargs['_id']
+            self.id = kwargs['_id']
             self.refresh()
         else:
-            lease_kwargs.setdefault('node_type', DEFAULT_NODE_TYPE)
-            self._lease_kwargs = lease_create_nodetype(**lease_kwargs)
+            kwargs.setdefault('node_type', DEFAULT_NODE_TYPE)
+            self._lease_kwargs = lease_create_nodetype(**kwargs)
             self.lease = self.blazar.lease.create(**self._lease_kwargs)
             self.id = self.lease['id']
 
@@ -167,12 +170,12 @@ class Lease(object):
         # print('created lease {}'.format(self.id))
 
     @classmethod
-    def from_existing(cls, keystone_session, id):
+    def from_existing(cls, id):
         """
         Attach to an existing lease by ID. When using in conjunction with the
         context manager, it will *not* delete the lease at the end.
         """
-        return cls(keystone_session, _preexisting=True, _id=id)
+        return cls(_preexisting=True, _id=id)
 
     def __repr__(self):
         region = self.session.region_name
@@ -252,6 +255,6 @@ class Lease(object):
         are passed to :py:class:`ccmanage.server.Server` and returns same
         object."""
         server_kwargs.setdefault('lease', self)
-        server = Server(self.session, *server_args, **server_kwargs)
+        server = Server(*server_args, **server_kwargs)
         self.servers.append(server)
         return server

@@ -7,6 +7,7 @@ from glanceclient.exc import NotFound
 from neutronclient.v2_0.client import Client as NeutronClient
 from novaclient.client import Client as NovaClient
 
+from . import context
 from .keypair import Keypair
 from .util import random_base32
 
@@ -20,7 +21,7 @@ class ServerError(RuntimeError):
         self.server = server
 
 
-def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, net_ids=None, **extra):
+def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, net_ids=None, **kwargs):
     if name is None:
         name = 'instance-{}'.format(random_base32(6))
 
@@ -46,7 +47,7 @@ def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, 
         # {"server": {..., "networks": [{"uuid": "e8c33574-5423-436c-a45b-5bab78071b8a"}] ...}, "os:scheduler_hints": ...},
         server_args['nics'] = [{"net-id": netid, "v4-fixed-ip": ""} for netid in net_ids]
 
-    server_args.update(extra)
+    server_args.update(kwargs)
     return server_args
 
 
@@ -107,12 +108,14 @@ class Server(object):
     """
     Launches an instance on a lease.
     """
-    def __init__(self, session, id=None, lease=None, key=None, image=DEFAULT_IMAGE, **extra):
-        self.session = session
+    def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE, **kwargs):
+        kwargs.setdefault('session', context.session())
 
-        self.neutron = NeutronClient(session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
-        self.nova = NovaClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
-        self.glance = GlanceClient('2', session=self.session, region_name=os.environ.get('OS_REGION_NAME'))
+        self.session = kwargs.pop('session')
+
+        self.neutron = NeutronClient(session=self.session)
+        self.nova = NovaClient('2', session=self.session)
+        self.glance = GlanceClient('2', session=self.session)
         self.image = resolve_image_idname(self.glance, image)
 
         self.ip = None
@@ -120,11 +123,11 @@ class Server(object):
         self._fip_created = False
         self._preexisting = False
 
-        extra.setdefault('_no_clean', False)
-        self._noclean = extra.pop('_no_clean')
+        kwargs.setdefault('_no_clean', False)
+        self._noclean = kwargs.pop('_no_clean')
 
-        net_ids = extra.pop('net_ids', None)
-        net_name = extra.pop('net_name', None)
+        net_ids = kwargs.pop('net_ids', None)
+        net_name = kwargs.pop('net_name', 'sharednet1')
         if net_ids is None and net_name is not None:
             net_ids = [get_networkid_byname(self.neutron, net_name)]
 
@@ -133,11 +136,11 @@ class Server(object):
             self.server = self.nova.servers.get(id)
         elif lease is not None:
             if key is None:
-                key = Keypair(self.session).key_name
+                key = Keypair().key_name
 
             server_kwargs = instance_create_args(
                 lease.reservation, key=key, image=self.image, net_ids=net_ids,
-                **extra
+                **kwargs
             )
             self.server = self.nova.servers.create(**server_kwargs)
             # print('created instance {}'.format(self.server.id))
