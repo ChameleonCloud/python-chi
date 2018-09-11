@@ -1,10 +1,6 @@
 import os
 from datetime import datetime
 from time import sleep
-try:
-    from urllib.parse import urlparse
-except ImportError:
-    from urlparse import urlparse
 
 from glanceclient.client import Client as GlanceClient
 from glanceclient.exc import NotFound
@@ -152,11 +148,7 @@ class Server(object):
         self.name = self.server.name
 
     def __repr__(self):
-        netloc = urllib.parse.urlsplit(self.session.auth.auth_url).netloc
-        if netloc.endswith(':5000'):
-            # drop if default port
-            netloc = netloc[:-5]
-        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, netloc, self.id)
+        return '<{} \'{}\' ({})>'.format(self.__class__.__name__, self.name, self.id)
 
     def __enter__(self):
         self.wait()
