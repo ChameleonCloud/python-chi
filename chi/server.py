@@ -213,6 +213,9 @@ class Server(object):
         # print('server active')
 
     def associate_floating_ip(self):
+        if self.ip is not None:
+            return self.ip
+
         created, self._fip = get_create_floatingip(self.neutron)
         self._fip_created = created
         self.ip = self._fip['floating_ip_address']
