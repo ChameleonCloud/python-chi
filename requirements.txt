@@ -1,4 +1,5 @@
 fabric
+gnocchiclient
 keystoneauth1
 paramiko
 python-blazarclient
