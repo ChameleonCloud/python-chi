@@ -13,7 +13,12 @@ def glance():
     return GlanceClient('2', session=session())
 
 def gnocchi():
-    return GnocchiClient(session_options={'auth': session().session.auth})
+    sess = session()
+    session_options = dict(auth=sess.session.auth)
+    adapter_options = dict(interface=sess.interface,
+                           region_name=sess.region_name)
+    return GnocchiClient(adapter_options=adapter_options,
+                         session_options=session_options)
 
 def neutron():
     return NeutronClient(session=session())
