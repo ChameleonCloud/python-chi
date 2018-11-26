@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+v0.2.1
+------
+
+* Update classifiers to comply with whitelist
+* Update changelog and remove version
+
 v0.2.0
 ------
 
