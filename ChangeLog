@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+v0.2.0
+------
+
+* Prepare for packaging on pypi
 * Extend Connection as subclass
 * Fix Gnocchi library instantiation
 * Gracefully handle double-associating IP
