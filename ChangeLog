@@ -1,6 +1,23 @@
 CHANGES
 =======
 
+* Extend Connection as subclass
+* Fix Gnocchi library instantiation
+* Gracefully handle double-associating IP
+* Fix typo with variable
+* Expose clients, don't make session singleton
+* Loosen python version dependencies
+* Better exclusion of pytest caches
+* Add more tests for context
+* Override strict host checking
+* Use implicit session via context
+* Fix issues with compat when printing server
+* Change variable names
+* Simplify SSH connection functionality
+* Pass openstack env to tests
+* Remove VERSION file
+* Update AUTHORS
+* Add more starting tests
 * Adding context management, basic test
 * Update setup
 * Add region name to lease string rep

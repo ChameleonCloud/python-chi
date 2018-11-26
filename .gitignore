@@ -1,9 +1,13 @@
 # PyTest
 .pytest_cache/
+
 # Tox
 .tox/
+
 # Pip local package files
 *.egg-info
+
 # Build/install files
 __pycache__/
+dist/
 **/*.pyc
