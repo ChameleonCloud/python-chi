@@ -13,10 +13,11 @@ import time
 from dateutil import tz
 
 from blazarclient.client import Client as BlazarClient
+from neutronclient.v2_0.client import Client as NeutronClient
 
 from . import context
 from .server import Server, ServerError
-from .util import random_base32
+from .util import get_public_network, random_base32
 
 __all__ = ['lease_create_args', 'lease_create_nodetype', 'Lease']
 
@@ -38,10 +39,14 @@ NODE_TYPES = {
 }
 DEFAULT_NODE_TYPE = 'compute_haswell'
 DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
+DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
 
 
-def lease_create_args(name=None, start='now', length=None, end=None,
-                      nodes=1, resource_properties=''):
+def lease_create_args(neutronclient,
+                      name=None, start='now', end=None, length=None,
+                      nodes=1, node_resource_properties=None,
+                      fips=0, networks=0, 
+                      network_resource_properties=DEFAULT_NETWORK_RESOURCE_PROPERTIES):
     """
     Generates the nested object that needs to be sent to the Blazar client
     to create the lease. Provides useful defaults for Chameleon.
@@ -59,9 +64,6 @@ def lease_create_args(name=None, start='now', length=None, end=None,
         ``resource_properties`` value to Blazar. Commonly used to specify
         node types.
     """
-    if name is None:
-        name = 'lease-{}'.format(random_base32(6))
-
     if start == 'now':
         start = datetime.datetime.now(tz=tz.tzutc()) + datetime.timedelta(seconds=70)
 
@@ -75,24 +77,46 @@ def lease_create_args(name=None, start='now', length=None, end=None,
             length = datetime.timedelta(seconds=length)
         end = start + length
 
-    if resource_properties:
-        resource_properties = json.dumps(resource_properties)
+    reservations = []
+    
+    if nodes > 0:
+        if node_resource_properties:
+            node_resource_properties = json.dumps(node_resource_properties)
+        
+        reservations += [{
+            'resource_type': 'physical:host',
+            'resource_properties': node_resource_properties or '',
+            'hypervisor_properties': '',
+            'min': str(nodes), 'max': str(nodes),
+        }]
+    
+    if fips > 0:
+        reservations += [{
+            'resource_type': 'virtual:floatingip',
+            'network_id': get_public_network(neutronclient),
+            'amount': fips
+        }]
+        
+    if networks > 0:
+        if network_resource_properties:
+            network_resource_properties = json.dumps(network_resource_properties)
+            
+        reservations += [
+            {
+                'resource_type': 'network',
+                'resource_properties': network_resource_properties or '',
+                'network_name': f'{prefix}-net{idx}',
+            }
+            for idx in range(networks)
+        ]
 
-    reservations = [{
-        'resource_type': 'physical:host',
-        'resource_properties': resource_properties,
-        'hypervisor_properties': '',
-        'min': str(nodes), 'max': str(nodes),
-    }]
-
-    query = {
+    return {
         'name': name,
         'start': start.strftime(BLAZAR_TIME_FORMAT),
         'end': end.strftime(BLAZAR_TIME_FORMAT),
         'reservations': reservations,
         'events': [],
     }
-    return query
 
 
 def lease_create_nodetype(*args, **kwargs):
@@ -110,7 +134,7 @@ def lease_create_nodetype(*args, **kwargs):
     if node_type not in NODE_TYPES:
         print('warning: unknown node_type ("{}")'.format(node_type), file=sys.stderr)
         # raise ValueError('unknown node_type ("{}")'.format(node_type))
-    kwargs['resource_properties'] = ['=', '$node_type', node_type]
+    kwargs['node_resource_properties'] = ['==', '$node_type', node_type]
     return lease_create_args(*args, **kwargs)
 
 
@@ -145,8 +169,11 @@ class Lease(object):
         self.session = kwargs.pop('session')
         self.blazar = BlazarClient('1', service_type='reservation',
                                         session=self.session)
-        self.servers = []
+        self.neutron = NeutronClient(session=self.session)
+        
         self.lease = None
+        
+        self._servers = {}
 
         self._sequester = kwargs.pop('sequester', False)
 
@@ -155,19 +182,24 @@ class Lease(object):
 
         kwargs.setdefault('_no_clean', False)
         self._noclean = kwargs.pop('_no_clean')
+        
+        prefix = kwargs.pop('prefix', '')
+        rand = random_base32(6)
+        self.prefix = f'{prefix}-{rand}' if prefix else rand
+        
+        kwargs.setdefault('name', self.prefix)
 
         if self._preexisting:
             self.id = kwargs['_id']
             self.refresh()
         else:
             kwargs.setdefault('node_type', DEFAULT_NODE_TYPE)
-            self._lease_kwargs = lease_create_nodetype(**kwargs)
+            self._lease_kwargs = lease_create_nodetype(self.neutron, **kwargs)
             self.lease = self.blazar.lease.create(**self._lease_kwargs)
             self.id = self.lease['id']
 
         self.name = self.lease['name']
-        self.reservation = self.lease['reservations'][0]['id']
-        # print('created lease {}'.format(self.id))
+        self.reservations = self.lease['reservations']
 
     @classmethod
     def from_existing(cls, id):
@@ -215,6 +247,13 @@ class Lease(object):
     def refresh(self):
         """Updates the lease data"""
         self.lease = self.blazar.lease.get(self.id)
+        
+    @property
+    def node_reservation(self):        
+        return next(iter([
+            r['id'] for r in (self.reservations or [])
+            if r['resource_type'] == 'physical:host'
+        ]), None)
 
     @property
     def status(self):
@@ -234,6 +273,25 @@ class Lease(object):
             return self.status == ('START', 'COMPLETE')
         else:
             return self.status == 'ACTIVE'
+        
+    @property
+    def servers(self):
+        return self._servers.values()
+    
+    
+    @property
+    def binding(self):
+        return {
+            key: {
+                'address': value.ip,
+                'auth': {
+                    'user': 'cc',
+                    'private_key': context.get('keypair_private_key')
+                }
+            }
+            for key, value in self._servers.items()
+        }
+    
 
     def wait(self):
         """Blocks for up to 150 seconds, waiting for the lease to be ready.
@@ -245,16 +303,20 @@ class Lease(object):
         else:
             raise RuntimeError('timeout, lease failed to start')
 
+            
     def delete(self):
         """Deletes the lease"""
         self.blazar.lease.delete(self.id)
         self.lease = None
 
+        
     def create_server(self, *server_args, **server_kwargs):
         """Generates instances using the resource of the lease. Arguments
         are passed to :py:class:`ccmanage.server.Server` and returns same
         object."""
         server_kwargs.setdefault('lease', self)
+        server_name = server_kwargs.pop('name', len(self.servers))
+        server_kwargs.setdefault('name', f'{self.prefix}-{server_name}')
         server = Server(*server_args, **server_kwargs)
-        self.servers.append(server)
+        self._servers[server_name] = server
         return server

@@ -9,7 +9,7 @@ from novaclient.client import Client as NovaClient
 
 from . import context
 from .keypair import Keypair
-from .util import random_base32
+from .util import get_public_network, random_base32
 
 
 DEFAULT_IMAGE = 'CC-CentOS7'
@@ -49,18 +49,6 @@ def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, 
 
     server_args.update(kwargs)
     return server_args
-
-
-def get_public_network(neutronclient):
-    nets = neutronclient.list_networks()['networks']
-    for net in nets:
-        if net['router:external'] != True:
-            continue
-        pubnet_id = net['id']
-        break
-    else:
-        raise RuntimeError("couldn't find public net")
-    return pubnet_id
 
 
 def get_networkid_byname(neutronclient, name):
@@ -137,9 +125,8 @@ class Server(object):
         elif lease is not None:
             if key is None:
                 key = Keypair().key_name
-
             server_kwargs = instance_create_args(
-                lease.reservation, key=key, image=self.image, net_ids=net_ids,
+                lease.node_reservation, key=key, image=self.image, net_ids=net_ids,
                 **kwargs
             )
             self.server = self.nova.servers.create(**server_kwargs)
