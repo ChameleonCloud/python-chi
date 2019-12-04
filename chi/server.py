@@ -21,15 +21,14 @@ class ServerError(RuntimeError):
         self.server = server
 
 
-def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, key=None, net_ids=None, **kwargs):
+def instance_create_args(reservation, name=None, image=DEFAULT_IMAGE, flavor=None, key=None, net_ids=None, **kwargs):
     if name is None:
         name = 'instance-{}'.format(random_base32(6))
 
     server_args = {
         'name': name,
-        'flavor': 'baremetal',
+        'flavor': flavor,
         'image': image,
-        # 'reservation_id': lease['reservations'][0]['id'],
         'scheduler_hints': {
             'reservation': reservation,
         },
@@ -92,6 +91,15 @@ def resolve_image_idname(glanceclient, idname):
             return images[0]
 
 
+def resolve_flavor(novaclient, flavor_name):
+    flavor = next((f for f in novaclient.flavors.list() if f.name == flavor_name), None)
+
+    if not flavor:
+        raise RuntimeError('no flavor found matching name "{}"'.format(flavor_name))
+    
+    return flavor
+
+
 class Server(object):
     """
     Launches an instance on a lease.
@@ -105,6 +113,7 @@ class Server(object):
         self.nova = NovaClient('2', session=self.session)
         self.glance = GlanceClient('2', session=self.session)
         self.image = resolve_image_idname(self.glance, image)
+        self.flavor = resolve_flavor(self.nova, 'baremetal')
 
         self.ip = None
         self._fip = None
@@ -126,11 +135,11 @@ class Server(object):
             if key is None:
                 key = Keypair().key_name
             server_kwargs = instance_create_args(
-                lease.node_reservation, key=key, image=self.image, net_ids=net_ids,
+                lease.node_reservation, image=self.image, flavor=self.flavor,
+                key=key, net_ids=net_ids,
                 **kwargs
             )
             self.server = self.nova.servers.create(**server_kwargs)
-            # print('created instance {}'.format(self.server.id))
         else:
             raise ValueError("Missing required argument: 'id' or 'lease' required.")
 
