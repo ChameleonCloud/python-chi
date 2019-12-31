@@ -6,22 +6,27 @@ from novaclient.client import Client as NovaClient
 
 from .context import reset, set, get, session
 
+
 def blazar():
-    return BlazarClient('1', service_type='reservation', session=session())
+    return BlazarClient("1", service_type="reservation", session=session())
+
 
 def glance():
-    return GlanceClient('2', session=session())
+    return GlanceClient("2", session=session())
+
 
 def gnocchi():
     sess = session()
     session_options = dict(auth=sess.session.auth)
-    adapter_options = dict(interface=sess.interface,
-                           region_name=sess.region_name)
-    return GnocchiClient(adapter_options=adapter_options,
-                         session_options=session_options)
+    adapter_options = dict(interface=sess.interface, region_name=sess.region_name)
+    return GnocchiClient(
+        adapter_options=adapter_options, session_options=session_options
+    )
+
 
 def neutron():
     return NeutronClient(session=session())
 
+
 def nova():
-    return NovaClient('2', session=session())
+    return NovaClient("2", session=session())

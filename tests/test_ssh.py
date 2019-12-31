@@ -1,11 +1,13 @@
 from chi.ssh import Remote
 
-LOCALHOST = '127.0.0.1'
+LOCALHOST = "127.0.0.1"
+
 
 def test_get():
     r = Remote(ip=LOCALHOST)
     assert r.host == LOCALHOST
-    assert r.user == 'cc'
+    assert r.user == "cc"
+
 
 def test_get_from_server():
     class FakeServer:
@@ -14,4 +16,4 @@ def test_get_from_server():
 
     r = Remote(server=FakeServer())
     assert r.host == LOCALHOST
-    assert r.user == 'cc'
+    assert r.user == "cc"

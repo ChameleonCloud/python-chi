@@ -19,34 +19,41 @@ from . import context
 from .server import Server, ServerError
 from .util import get_public_network, random_base32
 
-__all__ = ['lease_create_args', 'lease_create_nodetype', 'Lease']
+__all__ = ["lease_create_args", "lease_create_nodetype", "Lease"]
 
-BLAZAR_TIME_FORMAT = '%Y-%m-%d %H:%M'
+BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 NODE_TYPES = {
-    'compute_haswell',
-    'compute_skylake',
-    'compute_haswell_ib',
-    'storage',
-    'storage_hierarchy',
-    'gpu_p100',
-    'gpu_p100_nvlink',
-    'gpu_k80',
-    'gpu_m40',
-    'fpga',
-    'lowpower_xeon',
-    'atom',
-    'arm64',
+    "compute_haswell",
+    "compute_skylake",
+    "compute_haswell_ib",
+    "storage",
+    "storage_hierarchy",
+    "gpu_p100",
+    "gpu_p100_nvlink",
+    "gpu_k80",
+    "gpu_m40",
+    "fpga",
+    "lowpower_xeon",
+    "atom",
+    "arm64",
 }
-DEFAULT_NODE_TYPE = 'compute_haswell'
+DEFAULT_NODE_TYPE = "compute_haswell"
 DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
 DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
 
 
-def lease_create_args(neutronclient,
-                      name=None, start='now', end=None, length=None,
-                      nodes=1, node_resource_properties=None,
-                      fips=0, networks=0, 
-                      network_resource_properties=DEFAULT_NETWORK_RESOURCE_PROPERTIES):
+def lease_create_args(
+    neutronclient,
+    name=None,
+    start="now",
+    end=None,
+    length=None,
+    nodes=1,
+    node_resource_properties=None,
+    fips=0,
+    networks=0,
+    network_resource_properties=DEFAULT_NETWORK_RESOURCE_PROPERTIES,
+):
     """
     Generates the nested object that needs to be sent to the Blazar client
     to create the lease. Provides useful defaults for Chameleon.
@@ -64,7 +71,7 @@ def lease_create_args(neutronclient,
         ``resource_properties`` value to Blazar. Commonly used to specify
         node types.
     """
-    if start == 'now':
+    if start == "now":
         start = datetime.datetime.now(tz=tz.tzutc()) + datetime.timedelta(seconds=70)
 
     if length is None and end is None:
@@ -78,44 +85,49 @@ def lease_create_args(neutronclient,
         end = start + length
 
     reservations = []
-    
+
     if nodes > 0:
         if node_resource_properties:
             node_resource_properties = json.dumps(node_resource_properties)
-        
-        reservations += [{
-            'resource_type': 'physical:host',
-            'resource_properties': node_resource_properties or '',
-            'hypervisor_properties': '',
-            'min': str(nodes), 'max': str(nodes),
-        }]
-    
+
+        reservations += [
+            {
+                "resource_type": "physical:host",
+                "resource_properties": node_resource_properties or "",
+                "hypervisor_properties": "",
+                "min": str(nodes),
+                "max": str(nodes),
+            }
+        ]
+
     if fips > 0:
-        reservations += [{
-            'resource_type': 'virtual:floatingip',
-            'network_id': get_public_network(neutronclient),
-            'amount': fips
-        }]
-        
+        reservations += [
+            {
+                "resource_type": "virtual:floatingip",
+                "network_id": get_public_network(neutronclient),
+                "amount": fips,
+            }
+        ]
+
     if networks > 0:
         if network_resource_properties:
             network_resource_properties = json.dumps(network_resource_properties)
-            
+
         reservations += [
             {
-                'resource_type': 'network',
-                'resource_properties': network_resource_properties or '',
-                'network_name': f'{prefix}-net{idx}',
+                "resource_type": "network",
+                "resource_properties": network_resource_properties or "",
+                "network_name": f"{prefix}-net{idx}",
             }
             for idx in range(networks)
         ]
 
     return {
-        'name': name,
-        'start': start.strftime(BLAZAR_TIME_FORMAT),
-        'end': end.strftime(BLAZAR_TIME_FORMAT),
-        'reservations': reservations,
-        'events': [],
+        "name": name,
+        "start": start.strftime(BLAZAR_TIME_FORMAT),
+        "end": end.strftime(BLAZAR_TIME_FORMAT),
+        "reservations": reservations,
+        "events": [],
     }
 
 
@@ -128,18 +140,18 @@ def lease_create_nodetype(*args, **kwargs):
     :raises ValueError: if there is no `node_type` named argument.
     """
     try:
-        node_type = kwargs.pop('node_type')
+        node_type = kwargs.pop("node_type")
     except KeyError:
-        raise ValueError('no node_type specified')
+        raise ValueError("no node_type specified")
     if node_type not in NODE_TYPES:
         print('warning: unknown node_type ("{}")'.format(node_type), file=sys.stderr)
         # raise ValueError('unknown node_type ("{}")'.format(node_type))
-    kwargs['node_resource_properties'] = ['==', '$node_type', node_type]
+    kwargs["node_resource_properties"] = ["==", "$node_type", node_type]
     return lease_create_args(*args, **kwargs)
 
 
 class Lease(object):
-    '''
+    """
     Creates and manages a lease, optionally with a context manager (``with``).
 
     .. code-block:: python
@@ -161,45 +173,46 @@ class Lease(object):
     :param kwargs: Parameters passed through to
         :py:func:`lease_create_nodetype` and in turn
         :py:func:`lease_create_args`
-    '''
+    """
 
     def __init__(self, **kwargs):
-        kwargs.setdefault('session', context.session())
+        kwargs.setdefault("session", context.session())
 
-        self.session = kwargs.pop('session')
-        self.blazar = BlazarClient('1', service_type='reservation',
-                                        session=self.session)
+        self.session = kwargs.pop("session")
+        self.blazar = BlazarClient(
+            "1", service_type="reservation", session=self.session
+        )
         self.neutron = NeutronClient(session=self.session)
-        
+
         self.lease = None
-        
+
         self._servers = {}
 
-        self._sequester = kwargs.pop('sequester', False)
+        self._sequester = kwargs.pop("sequester", False)
 
-        kwargs.setdefault('_preexisting', False)
-        self._preexisting = kwargs.pop('_preexisting')
+        kwargs.setdefault("_preexisting", False)
+        self._preexisting = kwargs.pop("_preexisting")
 
-        kwargs.setdefault('_no_clean', False)
-        self._noclean = kwargs.pop('_no_clean')
-        
-        prefix = kwargs.pop('prefix', '')
+        kwargs.setdefault("_no_clean", False)
+        self._noclean = kwargs.pop("_no_clean")
+
+        prefix = kwargs.pop("prefix", "")
         rand = random_base32(6)
-        self.prefix = f'{prefix}-{rand}' if prefix else rand
-        
-        kwargs.setdefault('name', self.prefix)
+        self.prefix = f"{prefix}-{rand}" if prefix else rand
+
+        kwargs.setdefault("name", self.prefix)
 
         if self._preexisting:
-            self.id = kwargs['_id']
+            self.id = kwargs["_id"]
             self.refresh()
         else:
-            kwargs.setdefault('node_type', DEFAULT_NODE_TYPE)
+            kwargs.setdefault("node_type", DEFAULT_NODE_TYPE)
             self._lease_kwargs = lease_create_nodetype(self.neutron, **kwargs)
             self.lease = self.blazar.lease.create(**self._lease_kwargs)
-            self.id = self.lease['id']
+            self.id = self.lease["id"]
 
-        self.name = self.lease['name']
-        self.reservations = self.lease['reservations']
+        self.name = self.lease["name"]
+        self.reservations = self.lease["reservations"]
 
     @classmethod
     def from_existing(cls, id):
@@ -211,26 +224,28 @@ class Lease(object):
 
     def __repr__(self):
         region = self.session.region_name
-        return '<{} \'{}\' on {} ({})>'.format(self.__class__.__name__, self.name, region, self.id)
+        return "<{} '{}' on {} ({})>".format(
+            self.__class__.__name__, self.name, region, self.id
+        )
 
     def __enter__(self):
         if self.lease is None:
             # don't support reuse in multiple with's.
-            raise RuntimeError('Lease context manager not reentrant')
+            raise RuntimeError("Lease context manager not reentrant")
         self.wait()
         return self
 
     def __exit__(self, exc_type, exc, exc_tb):
         if exc is not None and self._noclean:
-            print('Lease existing uncleanly (noclean = True).')
+            print("Lease existing uncleanly (noclean = True).")
             return
 
         if isinstance(exc, ServerError) and self._sequester:
-            print('Instance failed to start, sequestering lease')
+            print("Instance failed to start, sequestering lease")
             self.blazar.lease.update(
                 lease_id=self.id,
-                name='sequester-error-instance-{}'.format(exc.server.id),
-                prolong_for='6d',
+                name="sequester-error-instance-{}".format(exc.server.id),
+                prolong_for="6d",
             )
             return
 
@@ -247,51 +262,55 @@ class Lease(object):
     def refresh(self):
         """Updates the lease data"""
         self.lease = self.blazar.lease.get(self.id)
-        
+
     @property
-    def node_reservation(self):        
-        return next(iter([
-            r['id'] for r in (self.reservations or [])
-            if r['resource_type'] == 'physical:host'
-        ]), None)
+    def node_reservation(self):
+        return next(
+            iter(
+                [
+                    r["id"]
+                    for r in (self.reservations or [])
+                    if r["resource_type"] == "physical:host"
+                ]
+            ),
+            None,
+        )
 
     @property
     def status(self):
         """Refreshes and returns the status of the lease."""
         self.refresh()
         # NOTE(priteau): Temporary compatibility with old and new lease status
-        if self.lease.get('action') is not None:
-            return self.lease['action'], self.lease['status']
+        if self.lease.get("action") is not None:
+            return self.lease["action"], self.lease["status"]
         else:
-            return self.lease['status']
+            return self.lease["status"]
 
     @property
     def ready(self):
         """Returns True if the lease has started."""
         # NOTE(priteau): Temporary compatibility with old and new lease status
-        if self.lease.get('action') is not None:
-            return self.status == ('START', 'COMPLETE')
+        if self.lease.get("action") is not None:
+            return self.status == ("START", "COMPLETE")
         else:
-            return self.status == 'ACTIVE'
-        
+            return self.status == "ACTIVE"
+
     @property
     def servers(self):
         return self._servers.values()
-    
-    
+
     @property
     def binding(self):
         return {
             key: {
-                'address': value.ip,
-                'auth': {
-                    'user': 'cc',
-                    'private_key': context.get('keypair_private_key')
-                }
+                "address": value.ip,
+                "auth": {
+                    "user": "cc",
+                    "private_key": context.get("keypair_private_key"),
+                },
             }
             for key, value in self._servers.items()
         }
-    
 
     def wait(self):
         """Blocks for up to 150 seconds, waiting for the lease to be ready.
@@ -301,22 +320,20 @@ class Lease(object):
             if self.ready:
                 break
         else:
-            raise RuntimeError('timeout, lease failed to start')
+            raise RuntimeError("timeout, lease failed to start")
 
-            
     def delete(self):
         """Deletes the lease"""
         self.blazar.lease.delete(self.id)
         self.lease = None
 
-        
     def create_server(self, *server_args, **server_kwargs):
         """Generates instances using the resource of the lease. Arguments
         are passed to :py:class:`ccmanage.server.Server` and returns same
         object."""
-        server_kwargs.setdefault('lease', self)
-        server_name = server_kwargs.pop('name', len(self.servers))
-        server_kwargs.setdefault('name', f'{self.prefix}-{server_name}')
+        server_kwargs.setdefault("lease", self)
+        server_name = server_kwargs.pop("name", len(self.servers))
+        server_kwargs.setdefault("name", f"{self.prefix}-{server_name}")
         server = Server(*server_args, **server_kwargs)
         self._servers[server_name] = server
         return server
