@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+v0.2.5
+------
+
+* Add support for username/password authentication
+* Update release notes
 * Add mailmap
 * Release 0.2.4
 
