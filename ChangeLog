@@ -1,12 +1,25 @@
 CHANGES
 =======
 
+v0.2.4
+------
+
+* Move packages from options to files
+* Make README valid
+
+v0.2.3
+------
+
+* Explicitly mark chi as package
+
 v0.2.2
 ------
 
+* v0.2.2
 * Add support for docs
 * Fix 'missing flavor' error
 * Support for complex leases
+* v0.2.1
 
 v0.2.1
 ------
