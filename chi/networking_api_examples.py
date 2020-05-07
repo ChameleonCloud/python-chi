@@ -8,16 +8,16 @@ from chi.util import get_public_network
 #neutron = chi.neutron()
 
 def get_network_by_name(name):
-    #print(json.dumps(neutron.list_networks()['networks'], indent=2)) 
     network=None
     for n in chi.neutron().list_networks()['networks']:
         if n['name'] == name:
             if network != None:
-                print("Found multiple networks with name " + str(name))
-                return
+                raise RuntimeError('Found multiple networks with name ' + str(name))
             network = n
-    
-    #print(json.dumps(network, indent=2))
+            
+    if network == None:
+        raise RuntimeError('Network not found. name: ' + str(name))
+        
     return network
 
 def get_router_by_name(name):
@@ -26,11 +26,12 @@ def get_router_by_name(name):
     for r in chi.neutron().list_routers()['routers']:
         if r['name'] == name:
             if router != None:
-                print("Found multiple routers with name " + str(name))
-                return
+                raise RuntimeError('Found multiple routers with name ' + str(name))
             router = r
     
-    #print(json.dumps(network, indent=2))
+    if router == None:
+        raise RuntimeError('Router not found. name: ' + str(name))
+    
     return router
 
 def get_subnet_by_name(name):
@@ -39,11 +40,12 @@ def get_subnet_by_name(name):
     for s in chi.neutron().list_subnets()['subnets']:
         if s['name'] == name:
             if subnet != None:
-                print("Found multiple subnets with name " + str(name))
-                return
+                raise RuntimeError('Found multiple subnets with name ' + str(name))
             subnet = s
-    
-    #print(json.dumps(network, indent=2))
+             
+    if subnet == None:
+        raise RuntimeError('Subnet not found. name: ' + str(name))
+                                
     return subnet
 
 def create_network(network_name, of_controller_ip, of_controller_port, vswitch_name, provider):
@@ -66,13 +68,13 @@ def create_network(network_name, of_controller_ip, of_controller_port, vswitch_n
     network = chi.neutron().create_network(body=body_sample)
     return network
 
-def add_subnet(subnet_name, network_name):
+def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
     network=get_network_by_name(name=network_name)
     network_id=network['id']
     #print(network_id)
 
     #Add Subnet
-    body_create_subnet = {'subnets': [{'cidr': '192.168.42.0/24',
+    body_create_subnet = {'subnets': [{'cidr': cidr,
                                        'ip_version': 4, 
                                        'network_id': network_id,
                                        'name': subnet_name,
@@ -101,11 +103,21 @@ def create_router(router_name, network_name):
     return router
 
 def attach_router_to_subnet(router_name, subnet_name):
-    router = get_router_by_name(name=router_name)
-    router_id = router['id']
-    
-    subnet = get_subnet_by_name(name=subnet_name)
-    subnet_id = subnet['id']
+    try:
+        router = get_router_by_name(name=router_name)
+        router_id = router['id']
+    except Exception as e:
+        import sys
+        raise type(e)(str(e) +
+                      ', Failed to get router %s. Does it exist?' % router_name).with_traceback(sys.exc_info()[2])                                
+                                
+    try:
+        subnet = get_subnet_by_name(name=subnet_name)
+        subnet_id = subnet['id']
+    except Exception as e:
+        import sys
+        raise type(e)(str(e) +
+                      ', Failed to get subnet %s. Does it exist?' % subnet_name).with_traceback(sys.exc_info()[2])      
     
     body = {}
     body['subnet_id'] = subnet_id 

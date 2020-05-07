@@ -119,7 +119,8 @@ def get_lease(lease_name):
         lease = leases[0]    
         return lease
     else:
-        print("Error: Found " + str(len(leases)) + " leases with name " + str(lease_name) + ". Expected 1")
+        raise RuntimeError("Error: Found " + str(len(leases)) + " leases with name " + str(lease_name) + ". Expected 1")
+
         
 def delete_lease_by_id(lease_id):
     chi.blazar().lease.delete(lease_id)

@@ -45,7 +45,7 @@ def get_server_by_name(name):
 def get_free_floating_ip():
     '''Gets or creates a free floating IP to use'''
     ips = chi.neutron().list_floatingips()['floatingips']
-    print (ips)
+    #print (ips)
     unbound = (ip for ip in ips if ip['port_id'] is None)
     try:
         fip = next(unbound)
@@ -96,12 +96,18 @@ def get_specific_floating_ip(ip_str):
 def create_server(server_name, reservation_id, key_name, network_name='sharednet1', count=1, image_name='CC-CentOS7', flavor_name='baremetal'):
     # Get flavor
     flavor = get_flavor_by_name(name=flavor_name)
+    if not flavor:
+        raise RuntimeError('no flavor found matching name "{}"'.format(flavor_name))
     
     #Get image
     image = get_image_by_name(name=image_name)
-   
+    if not image:
+        raise RuntimeError('no flavor found matching name "{}"'.format(image_name))
+    
     #Get network
     network = get_network_by_name(name=network_name)
+    if not network:
+        raise RuntimeError('no flavor found matching name "{}"'.format(network_name))
     network_id = network['id']
    
     server = chi.nova().servers.create(name=server_name,
