@@ -21,9 +21,23 @@ def add_node_reservation(reservation_list, count=1, node_type="compute_haswell")
         "max": count
     })
 
-def add_network_reservation(reservation_list, network_name="myNet",
+def add_network_reservation(reservation_list, 
+                            network_name,
                             network_description="", 
+                            of_controller_ip=None, 
+                            of_controller_port=None, 
+                            vswitch_name=None, 
                             physical_network="physnet1"):
+
+    if of_controller_ip != None and of_controller_port != None:
+        description = description + 'OFController=' + of_controller_ip + ':' + of_controller_port 
+        
+    if vswitch_name != None and of_controller_ip != None and of_controller_port != None:
+        description = description + ','
+    
+    if vswitch_name != None:
+        description = description + 'VSwitchName=' + vswitch_name
+
     reservation_list.append({
         "resource_type": "network",
         "network_name": network_name,
@@ -43,7 +57,7 @@ def add_fip_reservation(reservation_list, count=1):
     })    
     
     
-def reserve_node_simple(lease_name,node_type="compute_haswell",count=1):
+def reserve_node(lease_name,node_type="compute_haswell",count=1):
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -59,8 +73,13 @@ def reserve_node_simple(lease_name,node_type="compute_haswell",count=1):
                                 start=start_date,
                                 end=end_date,
                                 reservations=reservation_list, events=[])
-    
-def reserve_network_simple(lease_name,network_name="net",count=1):
+
+def reserve_network(lease_name,
+                    network_name,
+                    of_controller_ip=None, 
+                    of_controller_port=None, 
+                    vswitch_name=None, 
+                    physical_network="physnet1"):
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -69,13 +88,19 @@ def reserve_network_simple(lease_name,network_name="net",count=1):
     
     # Build list of reservations (in this case there is only one reservation)
     reservation_list = []
-    add_network_reservation(reservation_list, network_name=network_name)
+    add_network_reservation(reservation_list, 
+                            network_name=network_name,
+                            of_controller_ip=of_controller_ip, 
+                            of_controller_port=of_controller_port, 
+                            vswitch_name=vswitch_name, 
+                            physical_network=physical_network)
     
     # Create the lease
     lease = chi.blazar().lease.create(name=lease_name, 
                                 start=start_date,
                                 end=end_date,
                                 reservations=reservation_list, events=[])
+        
     
 def reserve_floating_ip(lease_name,count=1):
     # Set start/end date for lease
@@ -113,7 +138,7 @@ def reserve_multiple_resources(lease_name):
                                 end=end_date,
                                 reservations=reservation_list, events=[])
     
-def get_lease(lease_name):
+def get_lease_by_name(lease_name):
     leases = list(filter(lambda lease: lease['name'] == lease_name, chi.blazar().lease.list()))
     if len(leases) == 1:
         lease = leases[0]    

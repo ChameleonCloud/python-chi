@@ -3,10 +3,6 @@ import json
 import os
 from chi.util import get_public_network
 
-#nova = chi.nova()
-#blazar = chi.blazar()
-#neutron = chi.neutron()
-
 def get_network_by_name(name):
     network=None
     for n in chi.neutron().list_networks()['networks']:
@@ -21,7 +17,6 @@ def get_network_by_name(name):
     return network
 
 def get_router_by_name(name):
-    #print(json.dumps(neutron.list_routers()['networks'], indent=2)) 
     router=None
     for r in chi.neutron().list_routers()['routers']:
         if r['name'] == name:
@@ -35,7 +30,6 @@ def get_router_by_name(name):
     return router
 
 def get_subnet_by_name(name):
-    #print(json.dumps(neutron.list_networks()['networks'], indent=2)) 
     subnet=None
     for s in chi.neutron().list_subnets()['subnets']:
         if s['name'] == name:
@@ -48,7 +42,7 @@ def get_subnet_by_name(name):
                                 
     return subnet
 
-def create_network(network_name, of_controller_ip, of_controller_port, vswitch_name, provider):
+def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1"):
     description=''
     if of_controller_ip != None and of_controller_port != None:
         description = description + 'OFController=' + of_controller_ip + ':' + of_controller_port 
@@ -66,12 +60,11 @@ def create_network(network_name, of_controller_ip, of_controller_port, vswitch_n
                               }}
 
     network = chi.neutron().create_network(body=body_sample)
-    return network
+    return network['network']
 
 def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
     network=get_network_by_name(name=network_name)
     network_id=network['id']
-    #print(network_id)
 
     #Add Subnet
     body_create_subnet = {'subnets': [{'cidr': cidr,
