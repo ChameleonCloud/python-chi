@@ -58,6 +58,19 @@ def add_fip_reservation(reservation_list, count=1):
     
     
 def reserve_node(lease_name,node_type="compute_haswell",count=1):
+    ''' 
+    This is the description of the library function for reserve_node from the api in reservation_api_examples.py.
+    
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    node_type : str
+        Description of parameter `node_type` 
+    count : int
+        Description of parameter `count` 
+    '''
+    
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -80,6 +93,24 @@ def reserve_network(lease_name,
                     of_controller_port=None, 
                     vswitch_name=None, 
                     physical_network="physnet1"):
+    ''' 
+    This is the description of the library function for reserve_network from the api in reservation_api_examples.py.
+    
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    network_name : str
+        Description of parameter `network_name`
+    of_controller_ip : str
+        Description of parameter `of_controller_ip`
+    of_controller_port : str
+        Description of parameter `of_controller_port`
+    vswitch_name: str
+        Description of parameter `vswitch_name`
+    physical_network: str
+        Description of parameter `physical_network`
+    '''
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -103,6 +134,17 @@ def reserve_network(lease_name,
         
     
 def reserve_floating_ip(lease_name,count=1):
+    ''' 
+    This is the description of the library function for reserve_floating_ip from the api in reservation_api_examples.py.
+    
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    count : int
+        Description of parameter `count` 
+    '''
+    
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -151,6 +193,15 @@ def delete_lease_by_id(lease_id):
     chi.blazar().lease.delete(lease_id)
         
 def delete_lease_by_name(lease_name):
+    ''' 
+    This is the description of the library function for delete_lease_by_name from the api in reservation_api_examples.py.
+    
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    '''
+    
     lease = list(filter(lambda lease: lease['name'] == lease_name, chi.blazar().lease.list()))
     if len(lease) == 1:
         lease_id = lease[0]['id']
