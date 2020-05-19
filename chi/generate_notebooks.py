@@ -11,69 +11,82 @@ from chi.reservation_api_examples import *
 from chi.networking_api_examples import *
 
 from chi.reservation_api_examples_generate_notebook import *
+from chi.generate_notebooks_config import *
 
 import nbformat as nbf
 
-CWD='/home/pruth/work/working'
 
-notebook_list = [ { 'title':          'Python Module: Reserve Node',
-                    'function':       'reserve_node',
-                    'related_modules':[ 'reserve_floating_ip', 'reserve_network', 'delete_lease' ],
-                    'include_code':   [ 'add_node_reservation'],
-                    'examples':       [ 'reserve_node_notebook'],
-                    'notebook_file':  'reserve_node_notebook.ipynb'},
-                 
-                 { 'title':          'Python Module: Reserve Floating IP',
-                    'function':       'reserve_floating_ip',
-                    'related_modules':[ 'reserve_node', 'reserve_network', 'delete_lease' ],
-                    'include_code':   [ 'add_fip_reservation'],
-                    'examples':       [ 'reserve_floating_ip_notebook'],
-                    'notebook_file':  'reserve_floating_ip.ipynb'},
-                 
-                 { 'title':          'Python Module: Reserve Network',
-                    'function':       'reserve_network',
-                    'related_modules':[ 'reserve_floating_ip', 'reserve_node', 'delete_lease' ],
-                    'include_code':   [ 'add_network_reservation'],
-                    'examples':       [ 'reserve_network_notebook'],
-                    'notebook_file':  'reserve_network.ipynb'},
-                 
-                 { 'title':          'Python Module: Delete Lease',
-                    'function':       'delete_lease_by_name',
-                    'related_modules':[ 'reserve_node' ],
-                    'include_code':   [ 'delete_lease_by_id' ],
-                    'examples':       [ 'delete_lease_notebook'],
-                    'notebook_file':  'delete_lease.ipynb'},
-                ]
+
+def get_group_subfolder(group_name):
+    for group in notebooks_config['groups']:
+        if group['name'] == group_name:
+            return group['subfolder']
+
+def get_abs_notebook_path(notebook):
+    return notebooks_config['base_folder'] + '/' + get_group_subfolder(notebook['group'])+ '/' + notebook['notebook_file']
+
+def get_rel_notebook_path(notebook):
+    return './' + get_group_subfolder(notebook['group'])+ '/' + notebook['notebook_file']
+
 
 def run_generate_all_notebooks():
-    for n in notebook_list:
-        function = n['function']
+    
+    for module in notebooks_config['modules']:
+        function = module['function']
         print('processing ' + function)
     
         sections={}
         #Build sections structure for current notebook
-        sections['title']=get_title(n)
-        sections['description']=get_description(n)
-        sections['related_modules']=get_related_modules(n)
-        #sections['arguments']=get_arguments(n)
-        sections['code']=get_code(n)
-        sections['examples']=get_examples(n)
+        sections['title']=get_title(module)
+        sections['description']=get_description(module)
+        sections['related_modules']=get_related_modules(module)
+        #sections['arguments']=get_arguments(module)
+        sections['code']=get_code(module)
+        sections['examples']=get_examples(module)
     
         #Generate notebook
         nb = generate_notebook(sections)
         
         #Write notebook file
-        write_notebook(nb, CWD+'/'+n['notebook_file'])
+        #write_notebook(nb, CWD + '/' + notebook_group_subfolders[n['group']] + '/' + n['notebook_file'])
+        write_notebook(nb,get_rel_notebook_path(module))
+        
+    #Generate Index Notebook
+    index_notebook = generate_index()
+    write_notebook(index_notebook,notebooks_config['base_folder']+'/index.ipynb')
+    
+def generate_index():
+    nb = nbf.v4.new_notebook()
+
+    #nb['metadata']['kernelspec'] ={
+    #                                "argv": ["python3", "-m", "IPython.kernel",
+    #                                "-f", "{connection_file}"],
+    #                                "display_name": "Python 3",
+    #                                "language": "python"
+    #                                }
+
+    nb['cells'] = [nbf.v4.new_markdown_cell('## List of all Chameleon Python Tutorials and Modules\n')]
+    
+    for group in notebooks_config['groups']:
+        cell_str = '#### ' + group['name'] + "\n"
+        for notebook in notebooks_config['modules']:
+            if group['name'] == notebook['group']:
+                cell_str += '- [' + notebook['title'] + '](' + get_rel_notebook_path(notebook) + ')\n'
+        nb['cells'].append(nbf.v4.new_markdown_cell(cell_str))
+
+    #print(json.dumps(nb, indent=2))
+    return nb
 
 def generate_notebook(sections):
     nb = nbf.v4.new_notebook()
 
-    nb['metadata']['kernelspec'] ={
-                                    "argv": ["python3", "-m", "IPython.kernel",
-                                    "-f", "{connection_file}"],
-                                    "display_name": "Python 3",
-                                    "language": "python"
-                                    }
+    #nb['metadata']['kernelspec'] ={
+    #                                "argv": ["python3", "-m", "IPython.kernel",
+    #                                "-f", "{connection_file}"],
+    #                                "display_name": "Python 3",
+    #                                "language": "python"
+    #                                }
+
     
     nb['cells'] = [nbf.v4.new_markdown_cell(sections['title']),
                    nbf.v4.new_markdown_cell(sections['description']),
@@ -136,12 +149,11 @@ def get_arguments(notebook):
 def get_related_modules(notebook):
 
     output = '### Related Modules\n'
-    
-    modules = notebook['related_modules']
-    for module in modules:
-        for notebook in notebook_list:
-            if notebook['function'] == module:
-                output += '- [Module on '+notebook['function']+'](./'+notebook['notebook_file']+')\n'
+        
+    for related_module in notebook['related_modules']:
+        for module in notebooks_config['modules']:
+            if module['function'] == related_module:
+                output += '- ['+module['title']+'](' + get_rel_notebook_path(notebook) +')\n'
         
     return output
 
@@ -174,6 +186,14 @@ def get_code(notebook):
 
 def write_notebook(nb, file_name):
     print('write notebook: ' + file_name)
+    
+    if not os.path.exists(os.path.dirname(file_name)):
+        try:
+            os.makedirs(os.path.dirname(file_name))
+        except OSError as exc: 
+            if exc.errno != errno.EEXIST:
+                raise
+    
     f = open(file_name, "w")
     f.write(json.dumps(nb, indent=2))
     f.close()

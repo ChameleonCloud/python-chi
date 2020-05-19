@@ -13,6 +13,14 @@ from dateutil import tz
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 
 def add_node_reservation(reservation_list, count=1, node_type="compute_haswell"):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     reservation_list.append({
         "resource_type": "physical:host",
         "resource_properties": json.dumps(["==", "$node_type", node_type]),
@@ -22,13 +30,21 @@ def add_node_reservation(reservation_list, count=1, node_type="compute_haswell")
     })
 
 def add_network_reservation(reservation_list, 
-                            network_name,
+                          network_name,
                             network_description="", 
                             of_controller_ip=None, 
                             of_controller_port=None, 
                             vswitch_name=None, 
                             physical_network="physnet1"):
-
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+  
     if of_controller_ip != None and of_controller_port != None:
         description = description + 'OFController=' + of_controller_ip + ':' + of_controller_port 
         
@@ -47,6 +63,14 @@ def add_network_reservation(reservation_list,
     })
     
 def add_fip_reservation(reservation_list, count=1):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     #Get public network id (needed to reserve networks)
     public_network_id = get_public_network(chi.neutron())
 
@@ -162,6 +186,14 @@ def reserve_floating_ip(lease_name,count=1):
                                 reservations=reservation_list, events=[])
     
 def reserve_multiple_resources(lease_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     # Set start/end date for lease
     # Start one minute into future to avoid Blazar thinking lease is in past
     # due to rounding to closest minute.
@@ -181,6 +213,14 @@ def reserve_multiple_resources(lease_name):
                                 reservations=reservation_list, events=[])
     
 def get_lease_by_name(lease_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     leases = list(filter(lambda lease: lease['name'] == lease_name, chi.blazar().lease.list()))
     if len(leases) == 1:
         lease = leases[0]    
@@ -190,6 +230,14 @@ def get_lease_by_name(lease_name):
 
         
 def delete_lease_by_id(lease_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     chi.blazar().lease.delete(lease_id)
         
 def delete_lease_by_name(lease_name):
@@ -212,5 +260,13 @@ def delete_lease_by_name(lease_name):
         print("Error: Found " + str(len(lease)) + " leases with name " + str(lease_name) + ". Expected 1")
 
 def get_floating_ip_by_reservation_id(reservation_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     chi.blazar().lease.list()
     

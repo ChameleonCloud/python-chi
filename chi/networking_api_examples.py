@@ -4,6 +4,14 @@ import os
 from chi.util import get_public_network
 
 def get_network_by_name(name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     network=None
     for n in chi.neutron().list_networks()['networks']:
         if n['name'] == name:
@@ -17,6 +25,14 @@ def get_network_by_name(name):
     return network
 
 def get_router_by_name(name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     router=None
     for r in chi.neutron().list_routers()['routers']:
         if r['name'] == name:
@@ -30,6 +46,14 @@ def get_router_by_name(name):
     return router
 
 def get_subnet_by_name(name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     subnet=None
     for s in chi.neutron().list_subnets()['subnets']:
         if s['name'] == name:
@@ -43,6 +67,14 @@ def get_subnet_by_name(name):
     return subnet
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1"):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     description=''
     if of_controller_ip != None and of_controller_port != None:
         description = description + 'OFController=' + of_controller_ip + ':' + of_controller_port 
@@ -63,6 +95,14 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     return network['network']
 
 def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     network=get_network_by_name(name=network_name)
     network_id=network['id']
 
@@ -78,6 +118,14 @@ def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
 
     
 def create_router(router_name, network_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
 
     public_net=get_network_by_name(name='public')
     public_net_id=public_net['id']
@@ -96,6 +144,14 @@ def create_router(router_name, network_name):
     return router
 
 def attach_router_to_subnet(router_name, subnet_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     try:
         router = get_router_by_name(name=router_name)
         router_id = router['id']
@@ -118,12 +174,28 @@ def attach_router_to_subnet(router_name, subnet_name):
     
 
 def detach_router_by_id(router_id, subnet_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     body = {}
     body['subnet_id'] = subnet_id 
     return chi.neutron().remove_interface_router(router_id,body)
 
 
 def detach_router_by_name(router_name, subnet_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     router=get_router_by_name(name=router_name)
     router_id=router['id']
     #print(router_id)
@@ -139,9 +211,25 @@ def detach_router_by_name(router_name, subnet_name):
 
 
 def delete_router_by_id(router_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     return chi.neutron().delete_router(router_id)
 
 def delete_router_by_name(router_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     router=get_router_by_name(name=router_name)
     router_id=router['id']
     #print(router_id)
@@ -149,9 +237,25 @@ def delete_router_by_name(router_name):
 
 #Delete Subnet
 def delete_subnet_by_id(subnet_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     chi.neutron().delete_subnet(subnet_id)
 
 def delete_subnet_by_name(subnet_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
 
     subnet = get_subnet_by_name(subnet_name)
     subnet_id = subnet['id']
@@ -159,12 +263,28 @@ def delete_subnet_by_name(subnet_name):
     
 
 def delete_network_by_name(network_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     network = get_network_by_name(network_name)
     network_id = network['id']
 
     chi.neutron().delete_network(network_id)
     
 def nuke_network(network_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     network = get_network_by_name(network_name)
     network_id = network['id']
     print('next network')
@@ -209,6 +329,14 @@ def nuke_network(network_name):
     
 
 def chi_wizard_create_network(name, of_controller_ip=None,of_controller_port = None): 
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     name_prefix=name
     network_name = name_prefix+'Net'
     vswitch_name = name_prefix+'VSwitch'
@@ -224,6 +352,14 @@ def chi_wizard_create_network(name, of_controller_ip=None,of_controller_port = N
     return network
 
 def chi_wizard_delete_network(name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
     name_prefix=name
     network_name = name_prefix+'Net'
     vswitch_name = name_prefix+'VSwitch'
