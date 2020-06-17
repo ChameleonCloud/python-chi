@@ -68,12 +68,20 @@ def get_subnet_by_name(name):
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1"):
     ''' 
-    TODO: Description needed
+    Create a network. For an OpenFlow network include the IP and port of an OpenFlow controller on Chameleon or accessible through the public Internet. Include a virtual switch name if you plan to add additional private VLANs to this switch. Additional VLANs can be connected using a dedicated port corisponding the the VLAN tag and can be conrolled using a valid OpenFlow controller.  
     
     Parameters
     ----------
-    arg1 : str
-        Description of parameter `arg1`.
+    network_name : str
+        The name of the new network.
+    of_controller_ip : str
+        The IP of the optional OpenFlow controller. The IP must be accessible on the public Internet.
+    of_controller_port : str
+        The port of the optional OpenFlow controller.
+    vswitch_name : str
+        The name of the virtual switch to use.
+    provider : str
+        The povider network to use when specifying stitchable VLANs (i.e. exogen). Default: 'physnet1'
     '''
     description=''
     if of_controller_ip != None and of_controller_port != None:
@@ -93,6 +101,30 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
 
     network = chi.neutron().create_network(body=body_sample)
     return network['network']
+
+def create_port(network_name, port_name, device_owner=None, router=None, server=None, fixed_ip=None, subnet=None, binding_profile=None, tags=None):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    network=get_network_by_name(name=network_name)
+    network_id=network['id']
+
+    #Add Subnet
+    body_create_subnet = {'subnets': [{'cidr': cidr,
+                                       'ip_version': 4, 
+                                       'network_id': network_id,
+                                       'name': subnet_name,
+                                      }]
+                          }
+    subnet = chi.neutron().create_subnet(body=body_create_subnet)
+    return subnet
+
+
 
 def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
     ''' 
@@ -117,29 +149,34 @@ def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
     return subnet
 
     
-def create_router(router_name, network_name):
+def create_router(router_name, gw_network_name=None):
     ''' 
-    TODO: Description needed
+    Create a router with or without a public gateway. 
     
     Parameters
     ----------
-    arg1 : str
-        Description of parameter `arg1`.
+    router_name : str
+        Name of the new router.
+    gw_network_name: str
+        Name of the external gateway network (i.e. the network that connects to the Internet). 
+        Chameleon gateway network is 'public'. Default: None
     '''
-
-    public_net=get_network_by_name(name='public')
-    public_net_id=public_net['id']
+    request = {}
+    if gw_network_name:
+        public_net=get_network_by_name(name=gw_network_name)
+        public_net_id=public_net['id']
     
-
-    #Create Router
-    request = {'router': {'name': router_name,
-                          'admin_state_up': True,
-                          'external_gateway_info': {"network_id": public_net_id},
-                         }}
-
-    network = get_network_by_name(network_name)
-    network_id = network['id']
-
+        #Create Router
+        request = {'router': {'name': router_name,
+                              'admin_state_up': True,
+                              'external_gateway_info': {"network_id": public_net_id},
+                             }}
+    else:
+        #Create Router without gateway
+        request = {'router': {'name': router_name,
+                              'admin_state_up': True,
+                             }}
+        
     router = chi.neutron().create_router(request)
     return router
 

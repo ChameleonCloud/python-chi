@@ -2,8 +2,46 @@
 
 
 
+def create_network_notebook():
+    ''' 
+       This is the description of this example of  in the notebook from the docstring in reservation_notebook_examples.py.
+    '''
+    import json
+    import chi
+    from chi.networking_api_examples import create_network
 
+    #Config with your project and site
+    chi.set('project_name', 'CH-816532') # Replace with your project name
+    chi.set('region_name', 'CHI@UC')     # Optional, defaults to 'CHI@UC'
 
+    network = create_network(network_name="pruthNet", 
+                             of_controller_ip=None, 
+                             of_controller_port=None, 
+                             vswitch_name="pruthVSwitch", 
+                             provider="physnet1")
+    
+    
+        
+
+    #Print the lease info
+    print(json.dumps(network, indent=2))
+
+def create_router_notebook():
+    ''' 
+       This is the description of this example of  in the notebook from the docstring in reservation_notebook_examples.py.
+    '''
+    import json
+    import chi
+    from chi.networking_api_examples import create_router
+
+    #Config with your project and site
+    chi.set('project_name', 'CH-816532') # Replace with your project name
+    chi.set('region_name', 'CHI@UC')     # Optional, defaults to 'CHI@UC'
+
+    router = create_router(router_name="pruth_router",gw_network_name='public')
+
+    #Print the lease info
+    print(json.dumps(router, indent=2))
 
 def reserve_node_notebook():
     ''' 

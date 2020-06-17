@@ -26,7 +26,7 @@ def get_abs_notebook_path(notebook):
     return notebooks_config['base_folder'] + '/' + get_group_subfolder(notebook['group'])+ '/' + notebook['notebook_file']
 
 def get_rel_notebook_path(notebook):
-    return './' + get_group_subfolder(notebook['group'])+ '/' + notebook['notebook_file']
+    return get_group_subfolder(notebook['group'])+ '/' + notebook['notebook_file']
 
 
 def run_generate_all_notebooks():
@@ -153,7 +153,7 @@ def get_related_modules(notebook):
     for related_module in notebook['related_modules']:
         for module in notebooks_config['modules']:
             if module['function'] == related_module:
-                output += '- ['+module['title']+'](' + get_rel_notebook_path(notebook) +')\n'
+                output += '- ['+module['title']+'](../' + get_rel_notebook_path(module) +')\n'
         
     return output
 

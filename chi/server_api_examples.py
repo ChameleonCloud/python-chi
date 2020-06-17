@@ -141,7 +141,7 @@ def get_specific_floating_ip(ip_str):
     
     return None
 
-def create_server(server_name, reservation_id, key_name, network_name='sharednet1', count=1, image_name='CC-CentOS7', flavor_name='baremetal'):
+def create_server(server_name, reservation_id, key_name, network_name='sharednet1', count=1, image_name='CC-CentOS7', flavor_name='baremetal',fixed_ip=''):
     ''' 
     TODO: Description needed
     
@@ -171,7 +171,7 @@ def create_server(server_name, reservation_id, key_name, network_name='sharednet
                        flavor=flavor,
                        scheduler_hints={'reservation': reservation_id},
                        key_name=key_name,
-                       nics=[{"net-id": network_id, "v4-fixed-ip": ""}],
+                       nics=[{"net-id": network_id, "v4-fixed-ip": fixed_ip}],
                        min_count=count,
                        max_count=count 
                        )
