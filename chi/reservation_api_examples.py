@@ -30,8 +30,7 @@ def add_node_reservation(reservation_list, count=1, node_type="compute_haswell")
     })
 
 def add_network_reservation(reservation_list, 
-                          network_name,
-                            network_description="", 
+                            network_name,
                             of_controller_ip=None, 
                             of_controller_port=None, 
                             vswitch_name=None, 
@@ -44,7 +43,7 @@ def add_network_reservation(reservation_list,
     arg1 : str
         Description of parameter `arg1`.
     '''
-  
+    description=""
     if of_controller_ip != None and of_controller_port != None:
         description = description + 'OFController=' + of_controller_ip + ':' + of_controller_port 
         
@@ -57,7 +56,7 @@ def add_network_reservation(reservation_list,
     reservation_list.append({
         "resource_type": "network",
         "network_name": network_name,
-        "network_description": network_description,
+        "network_description": description,
         "resource_properties": json.dumps(["==", "$physical_network", physical_network]),
         "network_properties": ""
     })
