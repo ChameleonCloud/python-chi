@@ -4,6 +4,9 @@
 # Tox
 .tox/
 
+# Pyenv
+.python-version
+
 # Pip local package files
 *.egg-info
 .eggs
