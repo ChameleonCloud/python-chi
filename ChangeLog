@@ -1,13 +1,17 @@
 CHANGES
 =======
 
+v0.3.0
+------
+
+* Added initial implementation of modular examples
+
 v0.2.5
 ------
 
 * Add support for username/password authentication
 * Update release notes
 * Add mailmap
-* Release 0.2.4
 
 v0.2.4
 ------
