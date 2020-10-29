@@ -1,8 +1,15 @@
 import os
 
+from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1 import loading
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
+from keystoneauth1 import session
 from oslo_config import cfg
+
+from . import jupyterhub
+
+import logging
+LOG = logging.getLogger(__name__)
 
 DEFAULT_AUTH_TYPE = 'v3token'
 CONF_GROUP = 'chi'
@@ -23,6 +30,27 @@ global_options = session_opts + adapter_opts + extra_opts
 
 _auth_plugin = None
 _session = None
+
+
+class SessionWithAccessTokenRefresh(session.Session):
+    def request(self, url, method, auth=None, **kwargs):
+        request_auth = auth or self.auth
+        is_authenticated = request_auth.get_auth_state() is not None
+        if (isinstance(request_auth, OidcAccessToken)
+            and not is_authenticated
+            and jupyterhub.is_jupyterhub_env()):
+            try:
+                # Before the authentication, refresh the token.
+                access_token = jupyterhub.refresh_access_token()
+                if access_token:
+                    request_auth.access_token = access_token
+            except Exception as e:
+                LOG.error('Failed to refresh access_token: %s', e)
+        return super().request(url, method, auth=auth, **kwargs)
+
+
+class SessionLoader(loading.session.Session):
+    plugin_class = SessionWithAccessTokenRefresh
 
 
 def _auth_plugins():
@@ -126,7 +154,7 @@ def session():
     global _session
     if not _session:
         auth = loading.load_auth_from_conf_options(cfg.CONF, CONF_GROUP)
-        sess = loading.load_session_from_conf_options(cfg.CONF, CONF_GROUP, auth=auth)
+        sess = SessionLoader().load_from_conf_options(cfg.CONF, CONF_GROUP, auth=auth)
         _session = loading.load_adapter_from_conf_options(cfg.CONF, CONF_GROUP, session=sess)
     return _session
 
