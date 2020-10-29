@@ -1,10 +1,18 @@
 CHANGES
 =======
 
+v0.4.0
+------
+
+* Refresh access_token prior to first request when using v3oidcaccesstoken method
+* Don't require OS clients on installation
+* Support all Keystone auth methods
+* Update LICENSE
+
 v0.3.0
 ------
 
-* Added initial implementation of modular examples
+* Added first commits for modular structure
 
 v0.2.5
 ------
