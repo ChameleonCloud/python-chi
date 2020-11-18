@@ -3,7 +3,7 @@ import json
 import os
 from chi.util import get_public_network
 
-def get_network_by_name(name):
+def get_network_id(name):
     ''' 
     TODO: Description needed
     
@@ -22,9 +22,9 @@ def get_network_by_name(name):
     if network == None:
         raise RuntimeError('Network not found. name: ' + str(name))
         
-    return network
+    return network['id']
 
-def get_router_by_name(name):
+def get_router_id(name):
     ''' 
     TODO: Description needed
     
@@ -43,9 +43,9 @@ def get_router_by_name(name):
     if router == None:
         raise RuntimeError('Router not found. name: ' + str(name))
     
-    return router
+    return router['id']
 
-def get_subnet_by_name(name):
+def get_subnet_id(name):
     ''' 
     TODO: Description needed
     
@@ -64,7 +64,29 @@ def get_subnet_by_name(name):
     if subnet == None:
         raise RuntimeError('Subnet not found. name: ' + str(name))
                                 
-    return subnet
+    return subnet['id']
+
+def get_port_id(name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    port=None
+    for p in chi.neutron().list_ports()['ports']:
+        if p['name'] == name:
+            if port != None:
+                raise RuntimeError('Found multiple ports with name ' + str(name))
+            port = p
+             
+    if port == None:
+        raise RuntimeError('Port not found. name: ' + str(name))
+                                
+    return port['id']
+
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1"):
     ''' 
@@ -102,7 +124,25 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     network = chi.neutron().create_network(body=body_sample)
     return network['network']
 
-def create_port(network_name, port_name, device_owner=None, router=None, server=None, fixed_ip=None, subnet=None, binding_profile=None, tags=None):
+def delete_network(network_id):
+    return chi.neutron().delete_network(network_id) 
+    pass
+
+def update_network(network_id):
+    pass
+
+def list_networks():
+    return chi.neutron().list_networks() 
+    
+
+def show_network(network_id):
+    return chi.neutron().show_network(network_id) 
+
+def show_network_by_name(network_name):
+    return show_network(get_network_id(network_name=network_name)) 
+
+
+def create_port(port_name, network_id, subnet_id=None, ip_address=None):
     ''' 
     TODO: Description needed
     
@@ -111,8 +151,125 @@ def create_port(network_name, port_name, device_owner=None, router=None, server=
     arg1 : str
         Description of parameter `arg1`.
     '''
-    network=get_network_by_name(name=network_name)
-    network_id=network['id']
+    network = show_network(network_id=network_id)
+    
+    #print(json.dumps(network, indent=2))
+    #print('network_id' + network_id + '\n')
+    #print(json.dumps(subnet, indent=2))
+    #print('subnet_id ' + subnet_id + '\n')
+
+    body_port={}
+    
+    port={}
+    port['name']=port_name
+    port['network_id']=network_id
+    
+    if subnet_id != None:
+        fixed_ip={}
+        fixed_ip['subnet_id']=subnet_id
+        if ip_address != None:
+            fixed_ip['ip_address']=ip_address
+        port['fixed_ips']=[ fixed_ip ]
+
+    body_port['port']=port 
+    
+    #body_port = {'port': {    'name': port_name,
+    #                          'network_id': network_id,
+    #                          'fixed_ips': [{
+    #                                            'ip_address': ip_address,
+    #                                            'subnet_id': subnet_id
+    #                                       }]
+    #
+    #                     }
+    #            }
+    
+    port = chi.neutron().create_port(body=body_port)
+    return port
+    
+def update_port(port_id, subnet_id=None, ip_address=None):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    #port=get_port_by_name(name=port_name)
+    #port_id=port['id']
+    #print(json.dumps(port, indent=2))
+    #print('port_id ' + port_id + '\n')
+    
+    #subnet=get_subnet_by_name(name=subnet_name)
+    #subnet_id=subnet['id']   
+    
+    #print(json.dumps(subnet, indent=2))
+    #print('subnet_id ' + subnet_id + '\n')
+    
+    #body_port={}
+    
+    #port={}
+    #port['name']='newName'
+        
+    #if subnet_name != None:
+    #    subnet=get_subnet_by_name(name=subnet_name)
+    #    subnet_id=subnet['id']   
+    #    
+    #    fixed_ip={}
+    #    fixed_ip['subnet_id']=subnet_id
+    #    if ip_address != None:
+    #        fixed_ip['ip_address']=ip_address
+    #    port['fixed_ips']=[ fixed_ip ]
+
+    body_port={ 'port': port }  
+
+
+    #Update port    
+    #body_port = {'port': {    'name': port_name,
+    #                                   "fixed_ips": [
+    #                                         {
+    #                                            #"ip_address": "192.168.111.4",
+    #                                            "subnet_id": subnet_id
+    #                                         }
+    #                                    ]
+    #                      }
+    #            }
+    port = chi.neutron().update_port(port=port_id,body=body_port)
+    return port['id']
+
+def delete_port(port_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    port = chi.neutron().delete_port(port=port_id)
+
+def list_ports():
+    return chi.neutron().list_ports() 
+
+def show_port(port_id):
+    return chi.neutron().show_port(port_id) 
+
+def show_port_by_name(port_name):
+    return show_port(get_port_id(port_name=port_name)) 
+    
+    
+    
+def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24'):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    #network=get_network_by_name(name=network_name)
+    #network_id=network['id']
 
     #Add Subnet
     body_create_subnet = {'subnets': [{'cidr': cidr,
@@ -124,29 +281,20 @@ def create_port(network_name, port_name, device_owner=None, router=None, server=
     subnet = chi.neutron().create_subnet(body=body_create_subnet)
     return subnet
 
+def delete_subnet(subnet_id):
+    return chi.neutron().delete_subnet(subnet_id) 
 
+def update_subnet(subnet_id):
+    pass
 
-def add_subnet(subnet_name, network_name, cidr='192.168.1.0/24'):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    network=get_network_by_name(name=network_name)
-    network_id=network['id']
+def list_subnets():
+    return chi.neutron().list_subnets() 
 
-    #Add Subnet
-    body_create_subnet = {'subnets': [{'cidr': cidr,
-                                       'ip_version': 4, 
-                                       'network_id': network_id,
-                                       'name': subnet_name,
-                                      }]
-                          }
-    subnet = chi.neutron().create_subnet(body=body_create_subnet)
-    return subnet
+def show_subnet(subnet_id):
+    return chi.neutron().show_subnet(subnet_id) 
+
+def show_subnet_by_name(subnet_name):
+    return show_subnet(get_subnet_id(subnet_name=subnet_name)) 
 
     
 def create_router(router_name, gw_network_name=None):
@@ -163,9 +311,8 @@ def create_router(router_name, gw_network_name=None):
     '''
     request = {}
     if gw_network_name:
-        public_net=get_network_by_name(name=gw_network_name)
-        public_net_id=public_net['id']
-    
+        public_net_id= get_network_id(name=gw_network_name)
+        
         #Create Router
         request = {'router': {'name': router_name,
                               'admin_state_up': True,
@@ -180,7 +327,24 @@ def create_router(router_name, gw_network_name=None):
     router = chi.neutron().create_router(request)
     return router
 
-def attach_router_to_subnet(router_name, subnet_name):
+def delete_router(router_id):
+    return chi.neutron().delete_router(router_id) 
+    pass
+
+def update_router(router_id):
+    pass
+
+def list_routers():
+    return chi.neutron().list_routers() 
+
+
+def show_router(router_id):
+    return chi.neutron().show_router(router_id) 
+
+def show_router_by_name(router_name):
+    return show_router(get_router_id(router_name=router_name)) 
+
+def add_route_to_router(router_id, cidr, nexthop):
     ''' 
     TODO: Description needed
     
@@ -189,28 +353,53 @@ def attach_router_to_subnet(router_name, subnet_name):
     arg1 : str
         Description of parameter `arg1`.
     '''
-    try:
-        router = get_router_by_name(name=router_name)
-        router_id = router['id']
-    except Exception as e:
-        import sys
-        raise type(e)(str(e) +
-                      ', Failed to get router %s. Does it exist?' % router_name).with_traceback(sys.exc_info()[2])                                
-                                
-    try:
-        subnet = get_subnet_by_name(name=subnet_name)
-        subnet_id = subnet['id']
-    except Exception as e:
-        import sys
-        raise type(e)(str(e) +
-                      ', Failed to get subnet %s. Does it exist?' % subnet_name).with_traceback(sys.exc_info()[2])      
     
-    body = {}
-    body['subnet_id'] = subnet_id 
+    body = { "router" : {
+                        "routes" : [ { "destination" : cidr, "nexthop" : nexthop } ]
+                        }
+           }
+    
+    return chi.neutron().add_extra_routes_to_router(router_id, body)
+
+def remove_routes_from_router(router_id, routes):
+    body = { "router" : {
+                       "routes" : routes
+                        }
+           }
+    
+    return chi.neutron().remove_extra_routes_from_router(router_id, body)
+
+def remove_route_from_router(router_id, cidr, nexthop):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    
+    body = { "router" : {
+                        "routes" : [ { "destination" : cidr, "nexthop" : nexthop } ]
+                        }
+           }
+    
+    return chi.neutron().remove_extra_routes_from_router(router_id, body)
+
+
+def add_port_to_router(router_id, port_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    body = { 'port_id' : port_id }
     return chi.neutron().add_interface_router(router_id, body)
     
-
-def detach_router_by_id(router_id, subnet_id):
+def add_port_to_router_by_name(router_name, subnet_name):
     ''' 
     TODO: Description needed
     
@@ -219,12 +408,53 @@ def detach_router_by_id(router_id, subnet_id):
     arg1 : str
         Description of parameter `arg1`.
     '''
-    body = {}
-    body['subnet_id'] = subnet_id 
+    router_id = get_router_id(name=router_name)
+    port_id = get_port_id(name=port_name)
+    
+    return add_port_to_router(router_id, subnet_id)
+
+
+def add_subnet_to_router(router_id, subnet_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    body = { 'subnet_id' : subnet_id }
+    return chi.neutron().add_interface_router(router_id, body)
+    
+def add_subnet_to_router_by_name(router_name, subnet_name):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    router_id = get_router_id(name=router_name)
+    subnet_id = get_subnet_id(name=subnet_name)
+    
+    return add_subnet_to_router(router_id, subnet_id)
+        
+    
+def remove_subnet_from_router(router_id, subnet_id):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    body = { 'subnet_id' : subnet_id }
     return chi.neutron().remove_interface_router(router_id,body)
 
 
-def detach_router_by_name(router_name, subnet_name):
+def remove_port_from_router(router_id, port_id):
     ''' 
     TODO: Description needed
     
@@ -233,85 +463,10 @@ def detach_router_by_name(router_name, subnet_name):
     arg1 : str
         Description of parameter `arg1`.
     '''
-    router=get_router_by_name(name=router_name)
-    router_id=router['id']
-    #print(router_id)
-                          
-    subnet = get_subnet_by_name(name=subnet_name)
-    subnet_id = subnet['id']
-
-    #body = {}
-    #body['subnet_id'] = subnet_id 
-    #return neutron.remove_interface_router(router_id,body)
-    return detach_router_by_id(router_id, subnet_id)
-    
+    body = { 'port_id' : port_id }
+    return chi.neutron().remove_interface_router(router_id,body)
 
 
-def delete_router_by_id(router_id):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    return chi.neutron().delete_router(router_id)
-
-def delete_router_by_name(router_name):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    router=get_router_by_name(name=router_name)
-    router_id=router['id']
-    #print(router_id)
-    return chi.neutron().delete_router(router_id)
-
-#Delete Subnet
-def delete_subnet_by_id(subnet_id):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    chi.neutron().delete_subnet(subnet_id)
-
-def delete_subnet_by_name(subnet_name):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-
-    subnet = get_subnet_by_name(subnet_name)
-    subnet_id = subnet['id']
-    chi.neutron().delete_subnet(subnet_id)
-    
-
-def delete_network_by_name(network_name):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    network = get_network_by_name(network_name)
-    network_id = network['id']
-
-    chi.neutron().delete_network(network_id)
     
 def nuke_network(network_name):
     ''' 
