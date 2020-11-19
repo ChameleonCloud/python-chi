@@ -1,4 +1,5 @@
 import os
+import time
 
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1 import loading
@@ -33,20 +34,47 @@ _session = None
 
 
 class SessionWithAccessTokenRefresh(session.Session):
-    def request(self, url, method, auth=None, **kwargs):
-        request_auth = auth or self.auth
-        is_authenticated = request_auth.get_auth_state() is not None
-        if (isinstance(request_auth, OidcAccessToken)
-            and not is_authenticated
+    # How many seconds before expiration should we try to refresh
+    REFRESH_THRESHOLD = 60  # seconds
+
+    def __init__(self, auth=None, **kwargs):
+        def get_access_token(_auth):
+            should_refresh = (
+                _auth._expires_at - time.time() < self.REFRESH_THRESHOLD)
+            if not _auth._access_token or should_refresh:
+                try:
+                    access_token, expires_at = jupyterhub.refresh_access_token()
+                    _auth._access_token = access_token
+                    _auth._expires_at = expires_at
+                except Exception as e:
+                    LOG.error('Failed to refresh access_token: %s', e)
+            return _auth._access_token
+
+        def set_access_token(_auth, access_token):
+            _auth._access_token = access_token
+
+        # Override the access_token property to support dynamically refreshing
+        # it if close to expiring. Uses the @property decorator, but called
+        # explicitly and overridden on the class (it must be on the class,
+        # as Python will bind this as a class descriptor.) It has to also
+        # provide a setter so auth.access_token = ... works.
+        #
+        # TODO(jason): this is definitely a hack :) -- but it's the best
+        # thing I could come up with, given how many places the code will need
+        # a fresh access token. The auth plugin is hard to override b/c it is
+        # being dynamically loaded via an entry point, and overriding on the
+        # Session.request function is not enough because there are many other
+        # points at which an authentication is performed (e.g., looking up an
+        # endpoint.)
+        if (auth and isinstance(auth, OidcAccessToken)
             and jupyterhub.is_jupyterhub_env()):
-            try:
-                # Before the authentication, refresh the token.
-                access_token = jupyterhub.refresh_access_token()
-                if access_token:
-                    request_auth.access_token = access_token
-            except Exception as e:
-                LOG.error('Failed to refresh access_token: %s', e)
-        return super().request(url, method, auth=auth, **kwargs)
+            auth._access_token = None
+            auth._expires_at = 0
+            # Monkey-patch access_token to be @property dynamic lookup
+            auth.__class__.access_token = (
+                property(get_access_token, set_access_token))
+
+        super().__init__(auth=auth, **kwargs)
 
 
 class SessionLoader(loading.session.Session):
