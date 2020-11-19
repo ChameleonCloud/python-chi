@@ -32,8 +32,9 @@ def refresh_access_token():
     """
     res = call_jupyterhub_api(ACCESS_TOKEN_ENDPOINT)
     access_token = res.get('access_token')
+    expires_at = res.get('expires_at')
 
     if not access_token:
         raise ValueError(f'Failed to get access token: {res}')
 
-    return access_token
+    return access_token, expires_at
