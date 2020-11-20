@@ -38,3 +38,15 @@ def neutron(session=None):
 def nova(session=None):
     from novaclient.client import Client as NovaClient
     return NovaClient('2', session=(session or session_factory()))
+
+
+def ironic(session=None):
+    from ironicclient import client as IronicClient
+    return IronicClient.get_client(
+        '1',
+        session=session,
+        region_name=getattr(session, 'region_name', None),
+        # Ironic client defaults to 1.9 currently,
+        # "latest" will be latest the API supports
+        os_ironic_api_version='latest'
+    )
