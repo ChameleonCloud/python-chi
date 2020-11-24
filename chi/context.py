@@ -167,10 +167,23 @@ def get(key):
     Raises:
         cfg.NoSuchOptError: if the parameter is not supported.
     """
+    global _auth_plugin
     if key in [o.dest for o in global_options]:
         return cfg.CONF[CONF_GROUP][key]
     else:
         return cfg.CONF[_auth_section(_auth_plugin)][key]
+
+
+def params():
+    """List all parameters currently set on the context.
+
+    Returns:
+        List[str]: a list of parameter names.
+    """
+    global _auth_plugin
+    keys = list(cfg.CONF[CONF_GROUP].keys())
+    keys.extend(list(cfg.CONF[_auth_section(_auth_plugin)].keys()))
+    return keys
 
 
 def session():

@@ -1,8 +1,8 @@
-from .context import reset, set, get, session
+from .context import reset, set, get, params, session
 
 
 __all__ = [
-    'reset', 'set', 'get', 'session',
+    'reset', 'set', 'get', 'params', 'session',
     'blazar', 'glance', 'gnocchi', 'neutron', 'nova'
 ]
 
