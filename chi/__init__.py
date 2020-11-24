@@ -50,3 +50,8 @@ def ironic(session=None):
         # "latest" will be latest the API supports
         os_ironic_api_version='latest'
     )
+
+
+def keystone(session=None):
+    from keystoneclient.v3.client import Client as KeystoneClient
+    return KeystoneClient(session=(session or session_factory()))
