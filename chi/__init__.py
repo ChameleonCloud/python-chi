@@ -54,4 +54,9 @@ def ironic(session=None):
 
 def keystone(session=None):
     from keystoneclient.v3.client import Client as KeystoneClient
-    return KeystoneClient(session=(session or session_factory()))
+    sess = session or session_factory()
+    # We have to set interface/region_name also on the Keystone client, as it
+    # does not smartly inherit the value sent in on a KSA Adapter instance.
+    return KeystoneClient(session=sess,
+        interface=getattr(sess, 'interface', None),
+        region_name=getattr(sess, 'region_name', None))
