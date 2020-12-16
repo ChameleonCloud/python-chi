@@ -1,13 +1,9 @@
-import os
 from datetime import datetime
 from time import sleep
 
-from glanceclient.client import Client as GlanceClient
 from glanceclient.exc import NotFound
-from neutronclient.v2_0.client import Client as NeutronClient
-from novaclient.client import Client as NovaClient
 
-from . import context
+from . import context, connection, glance, nova, neutron
 from .keypair import Keypair
 from .util import get_public_network, random_base32
 
@@ -86,18 +82,18 @@ def get_create_floatingip(neutronclient):
     return created, fip
 
 
-def resolve_image_idname(glanceclient, idname):
+def resolve_image_ref(glanceclient, image_ref):
     try:
-        return glanceclient.images.get(image_id=idname)
+        return glanceclient.images.get(image_id=image_ref)
     except NotFound:
-        images = list(glanceclient.images.list(filters={"name": idname}))
+        images = list(glanceclient.images.list(filters={"name": image_ref}))
         if len(images) < 1:
             raise RuntimeError(
-                'no images found matching name or ID "{}"'.format(idname)
+                'no images found matching name or ID "{}"'.format(image_ref)
             )
         elif len(images) > 1:
             raise RuntimeError(
-                'multiple images found matching name "{}"'.format(idname)
+                'multiple images found matching name "{}"'.format(image_ref)
             )
         else:
             return images[0]
@@ -119,13 +115,12 @@ class Server(object):
 
     def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE, **kwargs):
         kwargs.setdefault("session", context.session())
-
         self.session = kwargs.pop("session")
-
-        self.neutron = NeutronClient(session=self.session)
-        self.nova = NovaClient("2", session=self.session)
-        self.glance = GlanceClient("2", session=self.session)
-        self.image = resolve_image_idname(self.glance, image)
+        self.conn = connection(session=self.session)
+        self.neutron = neutron(session=self.session)
+        self.nova = nova(session=self.session)
+        self.glance = glance(session=self.session)
+        self.image = resolve_image_ref(self.glance, image)
         self.flavor = resolve_flavor(self.nova, "baremetal")
 
         self.ip = None
@@ -189,7 +184,7 @@ class Server(object):
             if (now - lr).total_seconds() < 1:
                 return
 
-        self.server.get()
+        self.server = self.conn.compute.get_sever(self.server)
         self._last_refresh = now
 
     @property
@@ -206,23 +201,7 @@ class Server(object):
         return self.status == "ERROR"
 
     def wait(self):
-        # check a couple for fast failures
-        for _ in range(3):
-            sleep(10)
-            if self.ready:
-                return
-            if self.error:
-                raise ServerError(self.server.fault, self.server)
-        sleep(5 * 60)
-        for _ in range(100):
-            sleep(10)
-            if self.ready:
-                return
-            if self.error:
-                raise ServerError(self.server.fault, self.server)
-        else:
-            raise RuntimeError("timeout, server failed to start")
-        # print('server active')
+        self.conn.compute.wait_for_server(self.server, wait=(60 * 20))
 
     def associate_floating_ip(self):
         if self.ip is not None:
@@ -231,33 +210,14 @@ class Server(object):
         created, self._fip = get_create_floatingip(self.neutron)
         self._fip_created = created
         self.ip = self._fip["floating_ip_address"]
-        try:
-            self.server.add_floating_ip(self.ip)
-        except AttributeError:
-            # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
-            ports = self.neutron.list_ports(**{"device_id": self.id}).get("ports")
-            fip_target = {
-                "port_id": ports[0]["id"],
-                "ip_addr": ports[0]["fixed_ips"][0]["ip_address"],
-            }
-            # https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/dashboards/project/instances/tables.py#L671
-            target_id = fip_target["port_id"]
-            self.neutron.update_floatingip(
-                self._fip["id"],
-                body={
-                    "floatingip": {
-                        "port_id": target_id,
-                        # 'fixed_ip_address': ip_address,
-                    }
-                },
-            )
+        self.conn.compute.add_floating_ip_to_server(self.server, self.ip)
         return self.ip
 
     def disassociate_floating_ip(self):
         if self.ip is None:
             return
 
-        self.server.remove_floating_ip(self.ip)
+        self.conn.compute.remove_floating_ip_from_server(self.server, self.ip)
         if self._fip_created:
             self.neutron.delete_floatingip(self._fip["id"])
 
@@ -266,18 +226,9 @@ class Server(object):
         self._fip_created = False
 
     def delete(self):
-        self.server.delete()
-        # wait for deletion complete
-        for _ in range(30):
-            sleep(60)
-            try:
-                self.server.get()
-            except Exception as e:
-                if "HTTP 404" in str(e):
-                    return
-        else:
-            raise RuntimeError("timeout, server failed to terminate")
+        self.conn.compute.delete_server(self.server)
+        self.conn.compute.wait_for_server(self.server, status='DELETED')
 
-    def rebuild(self, idname):
-        self.image = resolve_image_idname(self.glance, idname)
-        self.server.rebuild(self.image)
+    def rebuild(self, image_ref):
+        self.image = resolve_image_ref(self.glance, image_ref)
+        self.conn.compute.rebuild_server(self.server, image=self.image.id)
