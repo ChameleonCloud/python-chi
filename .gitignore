@@ -13,6 +13,7 @@
 
 # Build/install files
 __pycache__/
+build/
 dist/
 **/*.pyc
 
