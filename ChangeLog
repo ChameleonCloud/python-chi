@@ -1,18 +1,56 @@
 CHANGES
 =======
 
+v0.5.0
+------
+
+* Add support for building wheels
+* Add factory for OpenStackSDK connection handler
+
+v0.4.4
+------
+
+* Fixup setting interface/region\_name for KS client
+
+v0.4.3
+------
+
+* Add params() to list context params
+* Add Keystone client
+
+v0.4.2
+------
+
+* Add ironic client
+
+v0.4.1
+------
+
+* Fixup automatic access token refresh logic
+* Changelog update
+
 v0.4.0
 ------
 
-* Refresh access_token prior to first request when using v3oidcaccesstoken method
-* Don't require OS clients on installation
+* Remove Python 2.7 from tests
+* Refresh access\_token before auth request
+* Lazy-import OS clients
 * Support all Keystone auth methods
+* Add pruth to list of authors
 * Update LICENSE
 
 v0.3.0
 ------
 
-* Added first commits for modular structure
+* fixed reserve network descrption building
+* update
+* added separate config file
+* actually added the new files for autogen notebooks
+* added autogen notebooks
+* clean up
+* added some error handling to the some examples
+* added example functions for servers, networking, and reservations
+* Release 0.2.5
 
 v0.2.5
 ------
@@ -20,6 +58,7 @@ v0.2.5
 * Add support for username/password authentication
 * Update release notes
 * Add mailmap
+* Release 0.2.4
 
 v0.2.4
 ------
