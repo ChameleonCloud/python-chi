@@ -1,12 +1,23 @@
+import openstack
+
 from .context import reset, set, get, params, session
 
 
 __all__ = [
     'reset', 'set', 'get', 'params', 'session',
-    'blazar', 'glance', 'gnocchi', 'neutron', 'nova'
+    'connection', 'blazar', 'glance', 'gnocchi', 'neutron', 'nova'
 ]
 
 session_factory = session
+
+
+def connection(session=None):
+    """Get connection context for OpenStack SDK.
+
+    The returned :class:`openstack.connection.Connection` object has
+    several proxy modules attached for each service provided by the cloud.
+    """
+    return openstack.connect(session=(session or session_factory()))
 
 
 def blazar(session=None):
