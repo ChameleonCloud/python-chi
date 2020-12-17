@@ -210,14 +210,14 @@ class Server(object):
         created, self._fip = get_create_floatingip(self.neutron)
         self._fip_created = created
         self.ip = self._fip["floating_ip_address"]
-        self.conn.compute.add_floating_ip_to_server(self.server, self.ip)
+        self.conn.compute.add_floating_ip_to_server(self.server.id, self.ip)
         return self.ip
 
     def disassociate_floating_ip(self):
         if self.ip is None:
             return
 
-        self.conn.compute.remove_floating_ip_from_server(self.server, self.ip)
+        self.conn.compute.remove_floating_ip_from_server(self.server.id, self.ip)
         if self._fip_created:
             self.neutron.delete_floatingip(self._fip["id"])
 
