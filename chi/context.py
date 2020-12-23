@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 
 from keystoneauth1.identity.v3 import OidcAccessToken
@@ -6,6 +7,7 @@ from keystoneauth1 import loading
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
 from keystoneauth1 import session
 from oslo_config import cfg
+import requests
 
 from . import jupyterhub
 
@@ -14,6 +16,8 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_AUTH_TYPE = 'v3token'
 CONF_GROUP = 'chi'
+RESOURCE_API_URL = os.getenv('CHI_RESOURCE_API_URL',
+                             'https://api.chameleoncloud.org')
 
 session_opts = loading.get_session_conf_options()
 adapter_opts = loading.get_adapter_conf_options()
@@ -31,6 +35,11 @@ global_options = session_opts + adapter_opts + extra_opts
 
 _auth_plugin = None
 _session = None
+_sites = {}
+
+
+def printerr(msg):
+    return print(msg, file=sys.stderr)
 
 
 class SessionWithAccessTokenRefresh(session.Session):
@@ -186,6 +195,45 @@ def params():
     return keys
 
 
+def use_site(site_name):
+    global _sites
+    if not _sites:
+        res = requests.get(f'{RESOURCE_API_URL}/sites.json')
+        try:
+            res.raise_for_status()
+            items = res.json().get('items', [])
+            _sites = {s['name']: s for s in items}
+            if not _sites:
+                raise ValueError('No sites returned.')
+        except Exception:
+            printerr("""Failed to fetch list of available Chameleon sites.
+                You can still set the site information manually like this,
+                if you know the URL and name:
+
+                    chi.set('auth_url', 'https://chi.uc.chameleoncloud.org:5000/v3')
+                    chi.set('region_name', 'CHI@UC')
+                """)
+            return
+
+    site = _sites.get(site_name)
+    if not site:
+        raise ValueError((
+            f'No site named "{site_name}" exists! Possible values: '
+            ', '.join(_sites.keys())))
+
+    # Set important parameters
+    set('auth_url', f'{site["web"]}:5000/v3')
+    set('region_name', site['name'])
+
+    output = [
+        f'Now using {site_name}:',
+        f'URL: {site.get("web")}',
+        f'Location: {site.get("location")}',
+        f'Support contact: {site.get("user_support_contact")}',
+    ]
+    print('\n'.join(output))
+
+
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
 
@@ -210,7 +258,9 @@ def reset():
     environment variables.
     """
     global _session
+    global _sites
     _session = None
+    _sites = {}
     cfg.CONF.reset()
     _set_auth_plugin(
         os.getenv('OS_AUTH_TYPE',

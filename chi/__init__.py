@@ -1,10 +1,10 @@
 import openstack
 
-from .context import reset, set, get, params, session
+from .context import reset, set, get, params, session, use_site
 
 
 __all__ = [
-    'reset', 'set', 'get', 'params', 'session',
+     'get', 'params', 'reset', 'session', 'set', 'use_site',
     'connection', 'blazar', 'glance', 'gnocchi', 'neutron', 'nova'
 ]
 
