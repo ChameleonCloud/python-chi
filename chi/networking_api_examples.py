@@ -88,7 +88,7 @@ def get_port_id(name):
     return port['id']
 
 
-def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1"):
+def create_network(network_name, of_controller_ip=None, of_controller_port=None, vswitch_name=None, provider="physnet1",port_security_enabled='true'):
     ''' 
     Create a network. For an OpenFlow network include the IP and port of an OpenFlow controller on Chameleon or accessible through the public Internet. Include a virtual switch name if you plan to add additional private VLANs to this switch. Additional VLANs can be connected using a dedicated port corisponding the the VLAN tag and can be conrolled using a valid OpenFlow controller.  
     
@@ -119,6 +119,7 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
                                "provider:physical_network": provider,
                                "provider:network_type": "vlan",
                                "description": description,
+                               "port_security_enabled": port_security_enabled
                               }}
 
     network = chi.neutron().create_network(body=body_sample)
@@ -142,7 +143,7 @@ def show_network_by_name(network_name):
     return show_network(get_network_id(network_name=network_name)) 
 
 
-def create_port(port_name, network_id, subnet_id=None, ip_address=None):
+def create_port(port_name, network_id, subnet_id=None, ip_address=None, port_security_enabled='true'):
     ''' 
     TODO: Description needed
     
@@ -163,6 +164,7 @@ def create_port(port_name, network_id, subnet_id=None, ip_address=None):
     port={}
     port['name']=port_name
     port['network_id']=network_id
+    port['port_security_enabled']=port_security_enabled
     
     if subnet_id != None:
         fixed_ip={}
@@ -259,7 +261,7 @@ def show_port_by_name(port_name):
     
     
     
-def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24'):
+def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24', gateway_ip=None):
     ''' 
     TODO: Description needed
     
@@ -271,13 +273,16 @@ def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24'):
     #network=get_network_by_name(name=network_name)
     #network_id=network['id']
 
+    subnet={}
+    subnet['cidr']=cidr
+    subnet['ip_version']=4
+    subnet['network_id']=network_id
+    subnet['name']=subnet_name
+    if gateway_ip:
+        subnet['gateway_ip']=gateway_ip
+    
     #Add Subnet
-    body_create_subnet = {'subnets': [{'cidr': cidr,
-                                       'ip_version': 4, 
-                                       'network_id': network_id,
-                                       'name': subnet_name,
-                                      }]
-                          }
+    body_create_subnet = {'subnets': [ subnet ] }
     subnet = chi.neutron().create_subnet(body=body_create_subnet)
     return subnet
 
@@ -361,6 +366,8 @@ def add_route_to_router(router_id, cidr, nexthop):
     
     return chi.neutron().add_extra_routes_to_router(router_id, body)
 
+
+
 def remove_routes_from_router(router_id, routes):
     body = { "router" : {
                        "routes" : routes
@@ -368,6 +375,9 @@ def remove_routes_from_router(router_id, routes):
            }
     
     return chi.neutron().remove_extra_routes_from_router(router_id, body)
+
+def remove_all_routes_from_router(router_id):
+    return remove_routes_from_router(router_id, show_router(router_id)['routes'])
 
 def remove_route_from_router(router_id, cidr, nexthop):
     ''' 
@@ -467,6 +477,98 @@ def remove_port_from_router(router_id, port_id):
     return chi.neutron().remove_interface_router(router_id,body)
 
 
+#get from specifc reservation 
+#def get_floating_ip(reservation_id=None)
+
+def get_free_floating_ip():
+    ''' 
+    TODO: Description needed Gets or creates a free floating IP to use
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+   
+    ips = chi.neutron().list_floatingips()['floatingips']
+    #print (ips)
+    unbound = (ip for ip in ips if ip['port_id'] is None)
+    try:
+        fip = next(unbound)
+        return fip
+    except StopIteration:
+        print("No free floating IP found")
+
+
+def associate_floating_ip(server_name, floating_ip_str=None):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    server = get_server_by_name(server_name)
+    
+    if floating_ip_str == None:
+        fip = get_free_floating_ip()
+    else:
+        fip = get_specific_floating_ip(floating_ip_str)
+  
+    if fip == None:
+        return
+    ip = fip['floating_ip_address']
+    
+    # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
+    ports = chi.neutron().list_ports(**{'device_id': server.id}).get('ports')
+    fip_target = {
+        'port_id': ports[0]['id'],
+        'ip_addr': ports[0]['fixed_ips'][0]['ip_address']
+    }
+    # https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/dashboards/project/instances/tables.py#L671
+    target_id = fip_target['port_id']
+    chi.neutron().update_floatingip(fip['id'], body={
+             'floatingip': {
+                 'port_id': target_id,
+                 # 'fixed_ip_address': ip_address,
+              }
+          }
+    )
+    return ip
+
+def get_specific_floating_ip(ip_str):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    ips = chi.neutron().list_floatingips()['floatingips']
+    
+    for fip in ips:
+        if fip['floating_ip_address'] == ip_str:
+            return fip
+    print("Floating ip not found " + ip_str)
+    
+    return None
+
+def detach_floating_ip(server_name, floating_ip_str):
+    ''' 
+    TODO: Description needed
+    
+    Parameters
+    ----------
+    arg1 : str
+        Description of parameter `arg1`.
+    '''
+    server = get_server_by_name(server_name)
+    fip = get_specific_floating_ip(ip_str)
+    
+    chi.neutron().update_floatingip(floating_ip['id'],
+                {'floatingip': {'port_id': None}})
     
 def nuke_network(network_name):
     ''' 

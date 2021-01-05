@@ -10,6 +10,9 @@ from chi.networking_api_examples import *
 #neutron = chi.neutron()
 #glance = chi.glance()
 
+def list_images():
+    return chi.glance().images.list()
+
 def get_image_by_name(name):
     ''' 
     TODO: Description needed
@@ -20,7 +23,7 @@ def get_image_by_name(name):
         Description of parameter `arg1`.
     '''
     try:
-        return chi.glance().images.get(image_id=name)
+        return list(chi.glance().images.list(filters={'name': name}))[0]
     except:
         images = list(chi.glance().images.list(filters={'name': name}))
         if len(images) < 1:
@@ -30,6 +33,20 @@ def get_image_by_name(name):
         else:
             return images[0]
 
+def get_image_id(name):
+    image=get_image_by_name(name)
+    if image:
+        return image.id
+    else:
+        return None
+    
+def get_image(id):
+    return chi.glance().images.get(id)
+
+        
+def list_flavors():
+    return chi.nova().flavors.list()
+        
 def get_flavor_by_name(name):
     ''' 
     TODO: Description needed
@@ -46,7 +63,17 @@ def get_flavor_by_name(name):
     
     return flavor
     
+def get_flavor_id(name):
+    flavor=get_flavor_by_name(name)
+    if flavor:
+        return flavor.id
+    else:
+        return None
+    
+def get_flavor(id):
+    return chi.nova().flavors.get(id)
 
+    
 def get_server_by_name(name):
     ''' 
     TODO: Description needed
@@ -66,82 +93,59 @@ def get_server_by_name(name):
                 return None
     return server
 
-def get_free_floating_ip():
-    ''' 
-    TODO: Description needed Gets or creates a free floating IP to use
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-   
-    ips = chi.neutron().list_floatingips()['floatingips']
-    #print (ips)
-    unbound = (ip for ip in ips if ip['port_id'] is None)
-    try:
-        fip = next(unbound)
-        return fip
-    except StopIteration:
-        print("No free floating IP found")
-
-
-def associate_floating_ip(server_name, floating_ip_str=None):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    server = get_server_by_name(server_name)
-    
-    if floating_ip_str == None:
-        fip = get_free_floating_ip()
+def get_server_id(name):
+    server=get_server_by_name(name)
+    if server:
+        return server.id
     else:
-        fip = get_specific_floating_ip(floating_ip_str)
-  
-    if fip == None:
-        return
-    ip = fip['floating_ip_address']
+        return None
     
-    # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
-    ports = chi.neutron().list_ports(**{'device_id': server.id}).get('ports')
-    fip_target = {
-        'port_id': ports[0]['id'],
-        'ip_addr': ports[0]['fixed_ips'][0]['ip_address']
-    }
-    # https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/dashboards/project/instances/tables.py#L671
-    target_id = fip_target['port_id']
-    chi.neutron().update_floatingip(fip['id'], body={
-             'floatingip': {
-                 'port_id': target_id,
-                 # 'fixed_ip_address': ip_address,
-              }
-          }
-    )
-    return ip
+def get_server(id):
+    return chi.nova().servers.get(id)
 
-def get_specific_floating_ip(ip_str):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    ips = chi.neutron().list_floatingips()['floatingips']
-    
-    for fip in ips:
-        if fip['floating_ip_address'] == ip_str:
-            return fip
-    print("Floating ip not found " + ip_str)
-    
-    return None
 
-def create_server(server_name, reservation_id, key_name, network_name='sharednet1', count=1, image_name='CC-CentOS7', flavor_name='baremetal',fixed_ip=''):
+
+def list_servers():
+    return chi.nova().servers.list()
+
+
+def create_server_simple(server_name, 
+                  reservation_id, 
+                  key_name, 
+                  network_name='sharednet1', 
+                  fixed_ip='',
+                  count=1, 
+                  image_name='CC-CentOS7', 
+                  flavor_name='baremetal'):
+    
+    # Create network list
+    network_id = get_network_id(name=network_name)
+    nics=[{"net-id": network_id, "v4-fixed-ip": ''}]
+    
+    # Get flavor
+    flavor = get_flavor_by_name(name=flavor_name).id
+    if not flavor:
+        raise RuntimeError('no flavor found matching name "{}"'.format(flavor_name))
+    
+    #Get image
+    image_id = get_image_by_name(name=image_name)['id']
+        
+    return create_server(server_name, 
+                  reservation_id=reservation_id, 
+                  key_name=key_name, 
+                  count=count, 
+                  nics=nics,
+                  image_id=image_id, 
+                  flavor_id=get_flavor_id(flavor_name))
+    
+
+def create_server(server_name, 
+                  reservation_id, 
+                  key_name, 
+                  image_id, 
+                  nics=[{"net-id": 'sharednet1', 'v4-fixed-ip': ''}],
+                  count=1, 
+                  flavor_id=None):
     ''' 
     TODO: Description needed
     
@@ -151,27 +155,15 @@ def create_server(server_name, reservation_id, key_name, network_name='sharednet
         Description of parameter `arg1`.
     '''
     # Get flavor
-    flavor = get_flavor_by_name(name=flavor_name)
-    if not flavor:
-        raise RuntimeError('no flavor found matching name "{}"'.format(flavor_name))
-    
-    #Get image
-    image = get_image_by_name(name=image_name)
-    if not image:
-        raise RuntimeError('no flavor found matching name "{}"'.format(image_name))
-    
-    #Get network
-    network = get_network_by_name(name=network_name)
-    if not network:
-        raise RuntimeError('no flavor found matching name "{}"'.format(network_name))
-    network_id = network['id']
-   
+    if not flavor_id:
+        flavor_id=get_flavor_id('baremetal')
+        
     server = chi.nova().servers.create(name=server_name,
-                       image=image,
-                       flavor=flavor,
+                       image=image_id,
+                       flavor=flavor_id,
                        scheduler_hints={'reservation': reservation_id},
                        key_name=key_name,
-                       nics=[{"net-id": network_id, "v4-fixed-ip": fixed_ip}],
+                       nics=nics,
                        min_count=count,
                        max_count=count 
                        )
@@ -186,10 +178,9 @@ def delete_server_by_name(server_name):
     arg1 : str
         Description of parameter `arg1`.
     '''
-    server = get_server_by_name(server_name)
-    return server.delete()
+    return get_server_by_name(server_name).delete()
     
-def delete_server(server):
+def delete_server(server_id):
     ''' 
     TODO: Description needed
     
@@ -198,19 +189,5 @@ def delete_server(server):
     arg1 : str
         Description of parameter `arg1`.
     '''
-    return server.delete()
+    return get_server(id).delete()
 
-def detach_floating_ip(server_name, floating_ip_str):
-    ''' 
-    TODO: Description needed
-    
-    Parameters
-    ----------
-    arg1 : str
-        Description of parameter `arg1`.
-    '''
-    server = get_server_by_name(server_name)
-    fip = get_specific_floating_ip(ip_str)
-    
-    chi.neutron().update_floatingip(floating_ip['id'],
-                {'floatingip': {'port_id': None}})
