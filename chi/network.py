@@ -3,42 +3,39 @@ from .clients import neutron
 from neutronclient.common.exceptions import NotFound
 
 __all__ = [
+    'get_network',
     'get_network_id',
     'create_network',
     'delete_network',
     'update_network',
     'list_networks',
-    'show_network',
-    'show_network_by_name',
 
+    'get_subnet',
     'get_subnet_id',
     'create_subnet',
     'delete_subnet',
     'update_subnet',
     'list_subnets',
-    'show_subnet',
-    'show_subnet_by_name',
 
+    'get_port',
     'get_port_id',
     'create_port',
     'update_port',
     'delete_port',
     'list_ports',
-    'show_port',
-    'show_port_by_name',
 
+    'get_router',
     'get_router_id',
     'create_router',
     'delete_router',
     'update_router',
     'list_routers',
-    'show_router',
-    'show_router_by_name',
 
     'add_route_to_router',
+    'add_routes_to_router',
+    'remove_route_from_router',
     'remove_routes_from_router',
     'remove_all_routes_from_router',
-    'remove_route_from_router',
     'add_port_to_router',
     'add_port_to_router_by_name',
     'add_subnet_to_router',
@@ -48,8 +45,6 @@ __all__ = [
 
     'get_free_floating_ip',
     'get_floating_ip',
-    'associate_floating_ip',
-    'detach_floating_ip',
     'list_floating_ips',
 
     'nuke_network',
@@ -60,7 +55,7 @@ __all__ = [
 PUBLIC_NETWORK = 'public'
 
 
-def _resolve_id(resource, name):
+def _resolve_id(resource, name) -> str:
     list_fn = getattr(neutron(), f'list_{resource}', None)
     if not callable(list_fn):
         raise ValueError(f'Invalid resource type "{resource}"')
@@ -75,8 +70,8 @@ def _resolve_id(resource, name):
     return resources[0]['id']
 
 
-def _resolve_resource(resource, name_or_id):
-    get_fn = getattr(neutron(), f'get_{resource}', None)
+def _resolve_resource(resource, name_or_id) -> dict:
+    get_fn = getattr(neutron(), f'show_{resource}', None)
     if not callable(get_fn):
         raise ValueError(f'Invalid resource type "{resource}"')
     try:
@@ -90,16 +85,41 @@ def _resolve_resource(resource, name_or_id):
 # Networks
 ###########
 
-def get_network(ref):
+def get_network(ref) -> dict:
+    """Get a network by its name or ID.
+
+    Args:
+        ref (str): The name or ID of the network.
+
+    Returns:
+        The network representation.
+
+    Raises:
+        RuntimeError: If the network could not be found, or multiple networks
+            were returned for the search term.
+    """
     return _resolve_resource('network', ref)
 
 
-def get_network_id(name):
+def get_network_id(name) -> str:
+    """Look up a network's ID from its name.
+
+    Args:
+        name (str): The network name.
+
+    Returns:
+        The network's ID, if found.
+
+    Raises:
+        RuntimeError: If the network could not be found, or multiple networks
+            were returned for the search term.
+    """
     return _resolve_id('networks', name)
 
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None,
-                   vswitch_name=None, provider='physnet1', port_security_enabled=True):
+                   vswitch_name=None, provider='physnet1',
+                   port_security_enabled=True) -> dict:
     """Create a network.
 
     For an OpenFlow network include the IP and port of an OpenFlow controller
@@ -109,11 +129,11 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     the VLAN tag and can be conrolled using a valid OpenFlow controller.
 
     Args:
-        network_name (str): the name of the new network.
+        network_name (str): The new network name.
         of_controller_ip (str): the IP of the optional OpenFlow controller.
             The IP must be accessible on the public Internet.
         of_controller_port (str): the port of the optional OpenFlow controller.
-        vswitch_name (str): the name of the virtual switch to use.
+        vswitch_name (str): The virtual switch to use name.
         provider (str): the provider network to use when specifying stitchable
             VLANs (i.e. ExoGENI). Default: 'physnet1'
     """
@@ -137,6 +157,17 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
 
 
 def delete_network(network_id):
+    """Delete the network.
+
+    .. note::
+       This does not perform a full teardown of the network, including removing
+       subnets and ports. It will only succeed if the network does not have
+       any attached entities. See :func:`nuke_network` for a more complete
+       teardown function.
+
+    Args:
+        network_id (str): The network ID.
+    """
     return neutron().delete_network(network_id)
 
 
@@ -144,32 +175,66 @@ def update_network(network_id):
     raise NotImplementedError()
 
 
-def list_networks():
+def list_networks() -> 'list[dict]':
+    """List all networks associated with the current project.
+
+    Returns:
+        A list of all the found networks.
+    """
     return neutron().list_networks()
-
-
-def show_network(network_id):
-    return neutron().show_network(network_id)
-
-
-def show_network_by_name(network_name):
-    return show_network(get_network_id(network_name))
 
 
 ##########
 # Subnets
 ##########
 
-def get_subnet(ref):
+def get_subnet(ref) -> dict:
+    """Get a subnet by its name or ID.
+
+    Args:
+        ref (str): The name or ID of the subnet.
+
+    Returns:
+        The subnet representation.
+
+    Raises:
+        RuntimeError: If the subnet could not be found, or multiple subnets
+            were returned for the search term.
+    """
     return _resolve_resource('subnets', ref)
 
 
-def get_subnet_id(name):
+def get_subnet_id(name) -> str:
+    """Look up a subnet's ID from its name.
+
+    Args:
+        name (str): The subnet name.
+
+    Returns:
+        The subnet's ID, if found.
+
+    Raises:
+        RuntimeError: If the subnet could not be found, or multiple subnets
+            were returned for the search term.
+    """
     return _resolve_id('subnets', name)
 
 
 def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
-                  gateway_ip=None):
+                  gateway_ip=None) -> dict:
+    """Create a subnet on a network.
+
+    Args:
+        subnet_name (str): The name to give the new subnet.
+        network_id (str): The network to associate the subnet with ID.
+        cidr (str): The subnet's IPv4 CIDR range. (Default 192.168.1.0/24)
+        gateway_ip (str): The subnet's gateway address. If not defined,
+            the first address in the subnet will be automatically chosen as
+            the gateway.
+
+    Returns:
+        The new subnet representation.
+    """
     subnet = {
         'name': subnet_name,
         'cidr': cidr,
@@ -194,6 +259,11 @@ def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
 
 
 def delete_subnet(subnet_id):
+    """Delete the subnet.
+
+    Args:
+        subnet_id (str): The subnet ID.
+    """
     return neutron().delete_subnet(subnet_id)
 
 
@@ -201,32 +271,72 @@ def update_subnet(subnet_id):
     raise NotImplementedError()
 
 
-def list_subnets():
+def list_subnets() -> 'list[dict]':
+    """List all subnets associated with the current project.
+
+    Returns:
+        A list of all the found subnets.
+    """
     return neutron().list_subnets()
-
-
-def show_subnet(subnet_id):
-    return neutron().show_subnet(subnet_id)
-
-
-def show_subnet_by_name(name):
-    return show_subnet(get_subnet_id(name))
 
 
 ########
 # Ports
 ########
 
-def get_port(ref):
+def get_port(ref) -> dict:
+    """Get a port by its name or ID.
+
+    Args:
+        ref (str): The name or ID of the port.
+
+    Returns:
+        The port representation.
+
+    Raises:
+        RuntimeError: If the port could not be found, or multiple ports
+            were returned for the search term.
+    """
     return _resolve_resource('port', ref)
 
 
-def get_port_id(name):
+def get_port_id(name) -> str:
+    """Look up a port's ID from its name.
+
+    Args:
+        name (str): The port name.
+
+    Returns:
+        The port's ID, if found.
+
+    Raises:
+        RuntimeError: If the port could not be found, or multiple ports
+            were returned for the search term.
+    """
     return _resolve_id('ports', name)
 
 
 def create_port(port_name, network_id, subnet_id=None, ip_address=None,
-               port_security_enabled=True):
+               port_security_enabled=True) -> dict:
+    """Create a new port on a network.
+
+    Args:
+        port_name (str): The name to give the new port.
+        network_id (str): The ID of the network that the port will be
+            connected to.
+        subnet_id (str): The ID of the subnet that the port will be allocated
+            on. The port will be automatically assigned an IP address on this
+            subnet, unless the ``ip_address`` parameter is provided.
+        ip_address (str): The IP address to assign the port, if a specific
+            IP address is desired. By default an IP address is automatically
+            picked from the target subnet.
+        port_security_enabled (bool): Whether to enable `port security
+            <https://wiki.openstack.org/wiki/Neutron/ML2PortSecurityExtensionDriver>`_.
+            In general this should be kept on. (Default True).
+
+    Returns:
+        The created port representation.
+    """
     port = {
         'name': port_name,
         'network_id': network_id,
@@ -249,57 +359,89 @@ def update_port(port_id, subnet_id=None, ip_address=None):
 
 
 def delete_port(port_id):
+    """Delete the port.
+
+    Args:
+        port_id (str): The port ID.
+    """
     return neutron().delete_port(port_id)
 
 
-def list_ports():
+def list_ports() -> 'list[dict]':
+    """List all ports associated with the current project.
+
+    Returns:
+        A list of all the found ports.
+    """
     return neutron().list_ports()
-
-
-def show_port(port_id):
-    return neutron().show_port(port_id)
-
-
-def show_port_by_name(port_name):
-    return show_port(get_port_id(port_name))
 
 
 ##########
 # Routers
 ##########
 
-def get_router(ref):
+def get_router(ref) -> dict:
+    """Get a router by its name or ID.
+
+    Args:
+        ref (str): The name or ID of the router.
+
+    Returns:
+        The router representation.
+
+    Raises:
+        RuntimeError: If the router could not be found, or multiple routers
+            were returned for the search term.
+    """
     return _resolve_resource('router', ref)
 
 
-def get_router_id(name):
+def get_router_id(name) -> str:
+    """Look up a router's ID from its name.
+
+    Args:
+        name (str): The router name.
+
+    Returns:
+        The router's ID, if found.
+
+    Raises:
+        RuntimeError: If the router could not be found, or multiple routers
+            were returned for the search term.
+    """
     return _resolve_id('routers', name)
 
 
-def create_router(router_name, gw_network_name=None):
-    '''
-    Create a router with or without a public gateway.
+def create_router(router_name, gateway=False) -> dict:
+    """Create a router, with or without a public gateway.
 
     Args:
-        router_name (str): name of the new router.
-        gw_network_name (str): name of the external gateway network (i.e.,
-            the network that connects to the Internet). Chameleon's gateway
-            network is 'public'. Default: None
-    '''
+        router_name (str): The new router name.
+        gateway (bool): Whether to add a gateway to the public Internet on
+            the router. If no public gateway is requested, subnets connected
+            to this router will not have NAT to the Internet. (Default False).
+
+    Returns:
+        The created router representation.
+    """
     router = {
         'name': router_name,
         'admin_state_up': True,
     }
 
-    if gw_network_name:
-        public_net_id = get_network_id(gw_network_name)
+    if gateway:
+        public_net_id = get_network_id(PUBLIC_NETWORK)
         router['external_gateway_info'] = {'network_id': public_net_id}
 
-    router = neutron().create_router(body=router)
-    return router
+    return neutron().create_router(body=router)
 
 
 def delete_router(router_id):
+    """Delete the router.
+
+    Args:
+        router_id (str): The router ID.
+    """
     return neutron().delete_router(router_id)
 
 
@@ -307,16 +449,13 @@ def update_router(router_id):
     raise NotImplementedError()
 
 
-def list_routers():
+def list_routers() -> 'list[dict]':
+    """List all routers associated with the current project.
+
+    Returns:
+        A list of all the found routers.
+    """
     return neutron().list_routers()
-
-
-def show_router(router_id):
-    return neutron().show_router(router_id)
-
-
-def show_router_by_name(router_name):
-    return show_router(get_router_id(router_name))
 
 
 ####################
@@ -324,16 +463,66 @@ def show_router_by_name(router_name):
 ####################
 
 def add_route_to_router(router_id, cidr, nexthop):
+    """Add a new route to a router.
+
+    Args:
+        router_id (str): The router ID.
+        cidr (str): The destination subnet CIDR for the route.
+        nexthop (str): The nexthop address for the route.
+    """
+    return add_routes_to_router(router_id, [
+        {'destination': cidr, 'nexthop': nexthop}
+    ])
+
+
+def add_routes_to_router(router_id, routes):
+    """Add a set of routes to a router.
+
+    Args:
+        router_id (str): The router ID.
+        routes (list[dict]): A list of routes to add. The list is expected
+            to consist of items with a 'destination' and 'nexthop' key, e.g.:
+
+            .. code-block:: python
+                [
+                   {'destination': '10.0.0.0/24', 'nexthop': '10.0.0.1'},
+                   {'destination': '10.0.1.0/24', 'nexthop': '10.0.1.1'}
+                ]
+
+    """
     return neutron().add_extra_routes_to_router(router_id, {
-        'router': {
-            'routes' : [
-                {'destination': cidr, 'nexthop': nexthop}
-            ]
-        }
+        'router': {'routes': routes}
     })
 
 
+def remove_route_from_router(router_id, cidr, nexthop):
+    """Remove a single route from the router.
+
+    Args:
+        router_id (str): The router ID.
+        cidr (str): The destination subnet CIDR for the route.
+        nexthop (str): The nexthop address for the route.
+    """
+    return remove_routes_from_router(router_id, [
+        {'destination': cidr, 'nexthop': nexthop}
+    ])
+
+
 def remove_routes_from_router(router_id, routes):
+    """Remove a set of routes from a router.
+
+    Args:
+        router_id (str): The router ID.
+        routes (list[dict]): A list of routes to remove. The list is expected
+            to consist of items with a 'destination' and 'nexthop' key, e.g.:
+
+            .. code-block:: python
+                [
+                   {'destination': '10.0.0.0/24', 'nexthop': '10.0.0.1'},
+                   {'destination': '10.0.1.0/24', 'nexthop': '10.0.1.1'}
+                ]
+
+    """
     return neutron().remove_extra_routes_from_router(router_id, {
         'router': {
             'routes': routes
@@ -342,51 +531,80 @@ def remove_routes_from_router(router_id, routes):
 
 
 def remove_all_routes_from_router(router_id):
+    """Remove all routes from the router.
+
+    Args:
+        router_id (str): The router ID.
+    """
     return remove_routes_from_router(router_id,
-        show_router(router_id)['routes'])
-
-
-def remove_route_from_router(router_id, cidr, nexthop):
-    return neutron().remove_extra_routes_from_router(router_id, {
-        'router': {
-            'routes': [
-                {'destination': cidr, 'nexthop': nexthop}
-            ]
-        }
-    })
+        get_router(router_id)['routes'])
 
 
 def add_port_to_router(router_id, port_id):
+    """Add a port to a router.
+
+    Adding a port to a router does what??
+
+    Args:
+        router_id (str): The router ID.
+        port_id (str): The port ID.
+    """
     return neutron().add_interface_router(router_id, {'port_id': port_id})
 
 
 def add_port_to_router_by_name(router_name, port_name):
+    """Add a port to a router, referencing the router and port by name.
+
+    Args:
+        router_name (str): The router name.
+        port_name (str): The port name.
+    """
     router_id = get_router_id(router_name)
     port_id = get_port_id(port_name)
     return add_port_to_router(router_id, port_id)
 
 
+def remove_port_from_router(router_id, port_id):
+    """Remove a port from the router.
+
+    Args:
+        router_id (str): The router ID.
+        port_id (str): The port ID.
+    """
+    return neutron().remove_interface_router(router_id, {'port_id': port_id})
+
+
 def add_subnet_to_router(router_id, subnet_id):
-    return neutron().add_interface_router(router_id, {
-        'subnet_id': subnet_id
-    })
+    """Add a subnet to a router.
+
+    Args:
+        router_id (str): The router ID.
+        subnet_id (str): The subnet ID.
+    """
+    return neutron().add_interface_router(router_id, {'subnet_id': subnet_id})
 
 
 def add_subnet_to_router_by_name(router_name, subnet_name):
+    """Add a subnet to a router, referencing the router and subnet by name.
+
+    Args:
+        router_name (str): The router name.
+        subnet_name (str): The subnet name.
+    """
     router_id = get_router_id(router_name)
     subnet_id = get_subnet_id(subnet_name)
     return add_subnet_to_router(router_id, subnet_id)
 
 
 def remove_subnet_from_router(router_id, subnet_id):
+    """Remove a subnet from the router.
+
+    Args:
+        router_id (str): The router ID.
+        subnet_id (str): The subnet ID.
+    """
     return neutron().remove_interface_router(router_id, {
         'subnet_id': subnet_id
-    })
-
-
-def remove_port_from_router(router_id, port_id):
-    return neutron().remove_interface_router(router_id, {
-        'port_id': port_id
     })
 
 
@@ -394,15 +612,33 @@ def remove_port_from_router(router_id, port_id):
 # Floating IPs
 ###############
 
-def get_free_floating_ip():
-    ips = neutron().list_floatingips()['floatingips']
+def get_free_floating_ip() -> dict:
+    """Get the first unallocated floating IP available to your project.
+
+    Returns:
+        The free floating IP representation.
+
+    Raises:
+        ValueError: If your project has no free floating IPs.
+    """
+    ips = list_floating_ips()
     unbound_fip = next(iter([ip for ip in ips if ip['port_id'] is None]), None)
     if not unbound_fip:
         raise ValueError('No free floating IP found')
     return unbound_fip
 
 
-def get_or_create_floating_ip():
+def get_or_create_floating_ip() -> 'tuple[dict,bool]':
+    """Get the first unallocated floating IP or allocate one to the project.
+
+    Returns:
+        A tuple of the floating IP representation, and a boolean indicating
+            whether the IP was dynamically allocated to the project.
+
+    Raises:
+        Conflict: If there are no free floating IPs and there are no more
+            available to allocate.
+    """
     try:
         fip = get_free_floating_ip()
         created = False
@@ -418,25 +654,54 @@ def get_or_create_floating_ip():
     return fip, created
 
 
-def get_floating_ip(ip_address):
+def get_floating_ip(ip_address) -> dict:
+    """Get the floating IP representation for an IP address.
+
+    Args:
+        ip_address (str): The IP address of the floating IP.
+
+    Returns:
+        The floating IP representation.
+    """
     fip = next(iter([
         fip for fip in list_floating_ips()
-        if fip['floating_ip_address'] == ip_str
+        if fip['floating_ip_address'] == ip_address
     ]), None)
     if not fip:
         raise ValueError(f'No floating IP with address {ip_address} found')
     return fip
 
 
-def list_floating_ips():
-    return neutron().list_floatingips()['floatingips']
+def list_floating_ips() -> 'list[dict]':
+    """List all floating ips associated with the current project.
 
+    Returns:
+        A list of all the found floating ips.
+    """
+    return neutron().list_floatingips()
 
-###################
-# Wizard functions
-###################
 
 def nuke_network(network_name):
+    """Completely tear down the network.
+
+    Cleanly tearing down an OpenStack network representation involves a few
+    separate steps:
+
+    1. Detach the network's subnets from the router.
+    2. Delete the router.
+    3. Delete the subnet(s).
+    4. Delete the network.
+
+    This function performs all of those steps for you.
+
+    .. info::
+       This function will not work well for very advance networks, perhaps
+       those connected to multiple routers. You should perform your own cleanup
+       if your network's subnets are attached to multiple routers.
+
+    Args:
+        network_name (str): The network name.
+    """
     network_id = get_network_id(network_name)
 
     # Detach network's subnets from router
@@ -467,24 +732,53 @@ def nuke_network(network_name):
     print(f'Deleted network {network_id}')
 
 
-def chi_wizard_create_network(name, of_controller_ip=None,
-                              of_controller_port=None):
-    name_prefix = name
-    network_name = name_prefix + 'Net'
-    vswitch_name = name_prefix + 'VSwitch'
-    router_name = name_prefix + 'Router'
-    subnet_name = name_prefix + 'Subnet'
-    provider = 'physnet1'
+###################
+# Wizard functions
+###################
 
-    network = create_network(network_name, of_controller_ip=of_controller_ip,
-                             of_controller_port=of_controller_port,
-                             vswitch_name=vswitch_name, provider=provider)
-    subnet = create_subnet(subnet_name, network['id'])
-    router = create_router(router_name, network_name)
-    add_subnet_to_router(router['id'], subnet['id'])
+class wizard(object):
+    """A collection of "wizard" functions.
 
-    return network
+    These utility functions are very opinionated but can reduce boilerplate.
+    """
 
+    @staticmethod
+    def create_network(name_prefix, of_controller_ip=None,
+                       of_controller_port=None, gateway=False):
+        """Create a network and subnet, and connect the subnet to a new router.
 
-def chi_wizard_delete_network(name):
-    return nuke_network(name + 'Net')
+        Args:
+            name_prefix (str): The common name prefix for all created entities.
+            of_controller_ip (str): The OpenFlow controller IP, if using.
+            of_controller_port (int): The OpenFlow controller port, if using.
+            gateway (bool): Whether to add a WAN gateway to the router. Routers
+                with a WAN gateway are able to NAT to the Internet.
+
+        Returns:
+            The created network representation.
+        """
+        network_name = f'{name_prefix}Net'
+        vswitch_name = f'{name_prefix}VSwitch'
+        router_name = f'{name_prefix}Router'
+        subnet_name = f'{name_prefix}Subnet'
+        network = create_network(
+            network_name,
+            of_controller_ip=of_controller_ip,
+            of_controller_port=of_controller_port,
+            vswitch_name=vswitch_name,
+            provider='physnet1'
+        )
+        subnet = create_subnet(subnet_name, network['id'])
+        router = create_router(router_name, gateway=gateway)
+        add_subnet_to_router(router['id'], subnet['id'])
+
+        return network
+
+    @staticmethod
+    def delete_network(name_prefix):
+        """Delete a network created via :func:``wizard.create_network``.
+
+        Args:
+            name_prefix (str): The common name prefix for all created entities.
+        """
+        return nuke_network(f'{name_prefix}Net')

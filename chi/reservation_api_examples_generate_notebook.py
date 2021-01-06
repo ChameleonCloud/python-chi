@@ -3,7 +3,7 @@
 
 
 def create_network_notebook():
-    ''' 
+    '''
        This is the description of this example of  in the notebook from the docstring in reservation_notebook_examples.py.
     '''
     import json
@@ -14,20 +14,20 @@ def create_network_notebook():
     chi.set('project_name', 'CH-816532') # Replace with your project name
     chi.set('region_name', 'CHI@UC')     # Optional, defaults to 'CHI@UC'
 
-    network = create_network(network_name="pruthNet", 
-                             of_controller_ip=None, 
-                             of_controller_port=None, 
-                             vswitch_name="pruthVSwitch", 
+    network = create_network(network_name="pruthNet",
+                             of_controller_ip=None,
+                             of_controller_port=None,
+                             vswitch_name="pruthVSwitch",
                              provider="physnet1")
-    
-    
-        
+
+
+
 
     #Print the lease info
     print(json.dumps(network, indent=2))
 
 def create_router_notebook():
-    ''' 
+    '''
        This is the description of this example of  in the notebook from the docstring in reservation_notebook_examples.py.
     '''
     import json
@@ -44,10 +44,10 @@ def create_router_notebook():
     print(json.dumps(router, indent=2))
 
 def reserve_node_notebook():
-    ''' 
+    '''
        This is the description of this example of reserve_node_notebook in the notebook from the docstring in reservation_notebook_examples.py.
     '''
-    
+
     import json
     import os
     import chi
@@ -68,9 +68,9 @@ def reserve_node_notebook():
     #Print the lease info
     print(json.dumps(lease, indent=2))
 
-    
+
 def reserve_network_notebook():
-    ''' 
+    '''
        This is the description of this example of reserve_network_notebook in the notebook from the docstring in reservation_notebook_examples.py.
     '''
     import json
@@ -95,7 +95,7 @@ def reserve_network_notebook():
     print(json.dumps(lease, indent=2))
 
 def reserve_floating_ip_notebook():
-    ''' 
+    '''
        This is the description of this example of reserve_floating_ip_notebook in the notebook from the docstring in reservation_notebook_examples.py.
     '''
     import json
@@ -119,14 +119,14 @@ def reserve_floating_ip_notebook():
     print(json.dumps(lease, indent=2))
 
 def delete_lease_notebook():
-    ''' 
+    '''
        This is the description of this example of delete_lease_notebook in the notebook from the docstring in reservation_notebook_examples.py.
     '''
     import json
     import os
     import chi
 
-    from chi.reservation_api_examples import delete_lease_by_name
+    from chi.reservation_api_examples import delete_lease
 
     #Config with your project and site
     chi.set('project_name', 'CH-816532') # Replace with your project name
@@ -138,4 +138,4 @@ def delete_lease_notebook():
     lease_name = username+'Lease'
 
     #Delete the lease
-    lease = delete_lease_by_name(lease_name)
+    lease = delete_lease(lease_name)

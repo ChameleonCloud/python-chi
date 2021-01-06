@@ -465,24 +465,19 @@ def reserve_network(lease_name,
                     of_controller_port=None,
                     vswitch_name=None,
                     physical_network="physnet1"):
-    '''
-    This is the description of the library function for reserve_network from the api in reservation_api_examples.py.
+    """
+    This is the description of the library function for reserve_network from the
+    api in reservation_api_examples.py.
 
     Parameters
     ----------
-    lease_name : str
-        Description of parameter `lease_name`.
-    network_name : str
-        Description of parameter `network_name`
-    of_controller_ip : str
-        Description of parameter `of_controller_ip`
-    of_controller_port : str
-        Description of parameter `of_controller_port`
-    vswitch_name: str
-        Description of parameter `vswitch_name`
-    physical_network: str
+    lease_name : str Description of parameter `lease_name`. network_name : str
+        Description of parameter `network_name` of_controller_ip : str
+        Description of parameter `of_controller_ip` of_controller_port : str
+        Description of parameter `of_controller_port` vswitch_name: str
+        Description of parameter `vswitch_name` physical_network: str
         Description of parameter `physical_network`
-    '''
+    """
     start_date, end_date = lease_duration(days=1)
 
     # Build list of reservations (in this case there is only one reservation)
@@ -503,7 +498,7 @@ def reserve_network(lease_name,
 
 
 def reserve_floating_ip(lease_name, count=1):
-    '''
+    """
     This is the description of the library function for reserve_floating_ip from the api in reservation_api_examples.py.
 
     Parameters
@@ -512,7 +507,7 @@ def reserve_floating_ip(lease_name, count=1):
         Description of parameter `lease_name`.
     count : int
         Description of parameter `count`
-    '''
+    """
     start_date, end_date = lease_duration(days=1)
 
     # Build list of reservations (in this case there is only one reservation)
@@ -547,16 +542,15 @@ def reserve_multiple_resources(lease_name):
 # Leases
 #########
 
-def get_lease_id(lease_name):
-    matching = [l for l in blazar().lease.list() if l['name'] == lease_name]
-    if not matching:
-        raise ValueError(f'No leases found for name {lease_name}')
-    elif len(matching) > 1:
-        raise ValueError(f'Multiple leases found for name {lease_name}')
-    return matching[0]['id']
+def get_lease(ref) -> dict:
+    """Get a lease by its ID or name.
 
+    Args:
+        ref (str): The ID or name of the lease.
 
-def get_lease(ref):
+    Returns:
+        The lease matching the ID or name.
+    """
     try:
         return show_lease(ref)
     except BlazarClientException as err:
@@ -566,19 +560,46 @@ def get_lease(ref):
             raise
 
 
-def delete_lease(lease_id):
-    blazar().lease.delete(lease_id)
-    print(f'Deleted lease with id {lease_id}')
+def get_lease_id(lease_name) -> str:
+    """Look up a lease's ID from its name.
 
+    Args:
+        name (str): The name of the lease.
 
-def delete_lease_by_name(lease_name):
+    Returns:
+        The ID of the found lease.
+
+    Raises:
+        ValueError: If the lease could not be found, or if multiple leases were
+            found with the same name.
+    """
     matching = [l for l in blazar().lease.list() if l['name'] == lease_name]
     if not matching:
         raise ValueError(f'No leases found for name {lease_name}')
     elif len(matching) > 1:
         raise ValueError(f'Multiple leases found for name {lease_name}')
-    delete_lease(matching[0]['id'])
+    return matching[0]['id']
 
 
-def show_lease(lease_id):
+def delete_lease(ref):
+    """Delete the lease.
+
+    Args:
+        ref (str): The name or ID of the lease.
+    """
+    lease = get_lease(ref)
+    lease_id = lease['id']
+    blazar().lease.delete(lease_id)
+    print(f'Deleted lease with id {lease_id}')
+
+
+def show_lease(lease_id) -> dict:
+    """Get the details for a lease.
+
+    Args:
+        lease_id (str): The ID of the lease.
+
+    Returns:
+        The lease matching the ID.
+    """
     return blazar().lease.get(lease_id)
