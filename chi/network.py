@@ -543,8 +543,6 @@ def remove_all_routes_from_router(router_id):
 def add_port_to_router(router_id, port_id):
     """Add a port to a router.
 
-    Adding a port to a router does what??
-
     Args:
         router_id (str): The router ID.
         port_id (str): The port ID.
