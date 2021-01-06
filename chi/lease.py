@@ -17,7 +17,16 @@ from .util import random_base32
 __all__ = [
     'add_node_reservation',
     'add_network_reservation',
+    'add_fip_reservation',
+    'get_floating_ip_by_reservation_id',
     'lease_duration',
+    'reserve_node',
+    'reserve_network',
+    'reserve_floating_ip',
+    'reserve_multiple_resources',
+    'get_lease',
+    'get_lease_id',
+    'delete_lease',
 ]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
@@ -552,10 +561,10 @@ def get_lease(ref) -> dict:
         The lease matching the ID or name.
     """
     try:
-        return show_lease(ref)
+        return blazar().lease.get(ref)
     except BlazarClientException as err:
         if err.code == 404:
-            return show_lease(get_lease_id(ref))
+            return blazar().lease.get(get_lease_id(ref))
         else:
             raise
 
@@ -591,15 +600,3 @@ def delete_lease(ref):
     lease_id = lease['id']
     blazar().lease.delete(lease_id)
     print(f'Deleted lease with id {lease_id}')
-
-
-def show_lease(lease_id) -> dict:
-    """Get the details for a lease.
-
-    Args:
-        lease_id (str): The ID of the lease.
-
-    Returns:
-        The lease matching the ID.
-    """
-    return blazar().lease.get(lease_id)
