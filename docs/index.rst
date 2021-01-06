@@ -59,6 +59,7 @@ For more details about the modules available refer to their respective pages.
    modules/lease
    modules/server
    modules/network
+   modules/image
 
 
 Indices and tables
