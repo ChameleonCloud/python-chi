@@ -4,10 +4,12 @@ from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.servers import Server as NovaServer
 from novaclient.exceptions import NotFound
 
-from . import session, connection, glance, nova, neutron
+from .clients import connection, glance, nova, neutron
+from .context import session
 from .keypair import Keypair
 from .image import get_image, get_image_id
-from .network import get_network_id, get_or_create_floating_ip
+from .network import (get_network_id, get_or_create_floating_ip,
+                      get_floating_ip, get_free_floating_ip)
 from .util import random_base32
 
 __all__ = [
@@ -121,8 +123,8 @@ class Server(object):
                For bare metal instances, the number of network IDs cannot
                exceed the number of enabled NICs on the bare metal node.
 
-        **kwargs: Additional keyword arguments to pass to
-            :method:`novaclient.v2.servers.ServerManager:create`.
+        kwargs: Additional keyword arguments to pass to Nova's server
+            :meth:`~novaclient.v2.servers.ServerManager.create` function.
     """
     def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE,
                  **kwargs):
@@ -372,7 +374,7 @@ def get_server_id(name) -> str:
     return servers[0]['id']
 
 
-def list_servers() -> list(NovaServer):
+def list_servers() -> "list[NovaServer]":
     """List all servers under the current project.
 
     Returns:
@@ -416,6 +418,26 @@ def show_server_by_name(name) -> NovaServer:
     """
     server_id = get_server_id(name)
     return show_server(server_id)
+
+
+def associate_floating_ip(server_name, floating_ip_address=None):
+    server_id = get_server_id(server_name)
+
+    if floating_ip_address:
+        fip = get_floating_ip(floating_ip_address)
+    else:
+        fip = get_free_floating_ip()
+
+    ip = fip['floating_ip_address']
+    connection().compute.add_floating_ip_to_server(server_id, ip)
+
+    return ip
+
+
+def detach_floating_ip(server_name, floating_ip_address):
+    server_id = get_server_id(server_name)
+    connection().compute.remove_floating_ip_from_server(
+        server_id, floating_ip_address)
 
 
 ##########

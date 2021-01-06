@@ -1,25 +1,24 @@
-"""
-Lease management
-"""
-from __future__ import absolute_import, print_function, unicode_literals
-
-import datetime
+from datetime import datetime, timedelta
 import json
 import numbers
-import os
 import sys
 import time
 
+from blazarclient.exception import BlazarClientException
 from dateutil import tz
-
-from blazarclient.client import Client as BlazarClient
 from neutronclient.v2_0.client import Client as NeutronClient
 
-from . import context
+from .clients import blazar
+from .context import get as get_from_context, session
+from .network import get_network_id, PUBLIC_NETWORK
 from .server import Server, ServerError
-from .util import get_public_network, random_base32
+from .util import random_base32
 
-__all__ = ["lease_create_args", "lease_create_nodetype", "Lease"]
+__all__ = [
+    'add_node_reservation',
+    'add_network_reservation',
+    'lease_duration',
+]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 NODE_TYPES = {
@@ -38,7 +37,7 @@ NODE_TYPES = {
     "arm64",
 }
 DEFAULT_NODE_TYPE = "compute_haswell"
-DEFAULT_LEASE_LENGTH = datetime.timedelta(days=1)
+DEFAULT_LEASE_LENGTH = timedelta(days=1)
 DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
 
 
@@ -72,7 +71,7 @@ def lease_create_args(
         node types.
     """
     if start == "now":
-        start = datetime.datetime.now(tz=tz.tzutc()) + datetime.timedelta(seconds=70)
+        start = datetime.now(tz=tz.tzutc()) + timedelta(seconds=70)
 
     if length is None and end is None:
         length = DEFAULT_LEASE_LENGTH
@@ -81,7 +80,7 @@ def lease_create_args(
 
     if end is None:
         if isinstance(length, numbers.Number):
-            length = datetime.timedelta(seconds=length)
+            length = timedelta(seconds=length)
         end = start + length
 
     reservations = []
@@ -104,7 +103,7 @@ def lease_create_args(
         reservations += [
             {
                 "resource_type": "virtual:floatingip",
-                "network_id": get_public_network(neutronclient),
+                "network_id": get_network_id(PUBLIC_NETWORK),
                 "amount": fips,
             }
         ]
@@ -176,7 +175,7 @@ class Lease(object):
     """
 
     def __init__(self, **kwargs):
-        kwargs.setdefault("session", context.session())
+        kwargs.setdefault("session", session())
 
         self.session = kwargs.pop("session")
         self.blazar = BlazarClient(
@@ -306,7 +305,7 @@ class Lease(object):
                 "address": value.ip,
                 "auth": {
                     "user": "cc",
-                    "private_key": context.get("keypair_private_key"),
+                    "private_key": get_from_context("keypair_private_key"),
                 },
             }
             for key, value in self._servers.items()
@@ -337,3 +336,249 @@ class Lease(object):
         server = Server(*server_args, **server_kwargs)
         self._servers[server_name] = server
         return server
+
+
+def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE):
+    """Add a node reservation to a reservation list.
+
+    Args:
+        reservation_list (list[dict]): The list of reservations to add to.
+            The list will be extended in-place.
+        count (int): The number of nodes of the given type to request.
+            (Default 1).
+        node_type (str): The node type to request. (Default "compute_haswell").
+    """
+    reservation_list.append({
+        "resource_type": "physical:host",
+        "resource_properties": json.dumps(["==", "$node_type", node_type]),
+        "hypervisor_properties": "",
+        "min": count,
+        "max": count
+    })
+
+
+def add_network_reservation(reservation_list,
+                            network_name,
+                            of_controller_ip=None,
+                            of_controller_port=None,
+                            vswitch_name=None,
+                            physical_network="physnet1"):
+    """Add a network reservation to a reservation list.
+
+    Args:
+        reservation_list (list[dict]): The list of reservations to add to.
+            The list will be extended in-place.
+        network_name (str): The name of the network to create when the
+            reservation starts.
+        of_controller_ip (str): The OpenFlow controller IP, if the network
+            should be controlled by an external controller.
+        of_controller_port (int): The OpenFlow controller port.
+        vswitch_name (str): The name of the virtual switch associated with
+            this network. See `the virtual forwarding context documentation
+            <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_sdn.html#corsa-dp2000-virtual-forwarding-contexts-network-layout-and-advanced-features>`_
+            for more details.
+        physical_network (str): The physical provider network to reserve from.
+            This only needs to be changed if you are reserving a `stitchable
+            network <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_stitching.html>`_.
+            (Default "physnet1").
+    """
+    desc_parts = []
+    if of_controller_ip and of_controller_port:
+        desc_parts.append(
+            f'OFController={of_controller_ip}:{of_controller_port}')
+    if vswitch_name:
+        desc_parts.append(f'VSwitchName={vswitch_name}')
+
+    reservation_list.append({
+        'resource_type': 'network',
+        'network_name': network_name,
+        'network_description': ','.join(desc_parts),
+        'resource_properties': json.dumps(['==', '$physical_network', physical_network]),
+        'network_properties': '',
+    })
+
+
+def add_fip_reservation(reservation_list, count=1):
+    reservation_list.append({
+        'resource_type': 'virtual:floatingip',
+        'network_id': get_network_id(PUBLIC_NETWORK),
+        'amount': count
+    })
+
+
+def get_floating_ip_by_reservation_id(reservation_id):
+    # blazar().lease.list()
+    pass
+
+
+def lease_duration(days=1, hours=None):
+    """Compute the start and end dates for a lease given its desired duration.
+
+    When providing both ``days`` and ``hours``, the duration is summed. So,
+    the following would be a lease for one and a half days:
+
+    .. code-block:: python
+
+       start_date, end_date = lease_duration(days=1, hours=12)
+
+    Args:
+        days (int): The number of days the lease should be for.
+        hours (int): The number of hours the lease should be for.
+    """
+    now = datetime.now(tz=tz.tzutc())
+    # Start one minute into future to avoid Blazar thinking lease is in past
+    # due to rounding to closest minute.
+    start_date = (now + timedelta(minutes=1)).strftime(BLAZAR_TIME_FORMAT)
+    end_date = (now + timedelta(days=days, hours=hours)).strftime(BLAZAR_TIME_FORMAT)
+    return start_date, end_date
+
+
+def reserve_node(lease_name, node_type="compute_haswell", count=1):
+    '''
+    This is the description of the library function for reserve_node from the api in reservation_api_examples.py.
+
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    node_type : str
+        Description of parameter `node_type`
+    count : int
+        Description of parameter `count`
+    '''
+    start_date, end_date = lease_duration(days=1)
+
+    # Build list of reservations (in this case there is only one reservation)
+    reservation_list = []
+    add_node_reservation(reservation_list, count=count, node_type=node_type)
+
+    # Create the lease
+    return blazar().lease.create(name=lease_name,
+                                 start=start_date,
+                                 end=end_date,
+                                 reservations=reservation_list, events=[])
+
+
+def reserve_network(lease_name,
+                    network_name,
+                    of_controller_ip=None,
+                    of_controller_port=None,
+                    vswitch_name=None,
+                    physical_network="physnet1"):
+    '''
+    This is the description of the library function for reserve_network from the api in reservation_api_examples.py.
+
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    network_name : str
+        Description of parameter `network_name`
+    of_controller_ip : str
+        Description of parameter `of_controller_ip`
+    of_controller_port : str
+        Description of parameter `of_controller_port`
+    vswitch_name: str
+        Description of parameter `vswitch_name`
+    physical_network: str
+        Description of parameter `physical_network`
+    '''
+    start_date, end_date = lease_duration(days=1)
+
+    # Build list of reservations (in this case there is only one reservation)
+    reservation_list = []
+    add_network_reservation(reservation_list,
+                            network_name=network_name,
+                            of_controller_ip=of_controller_ip,
+                            of_controller_port=of_controller_port,
+                            vswitch_name=vswitch_name,
+                            physical_network=physical_network)
+
+    # Create the lease
+    return blazar().lease.create(name=lease_name,
+                                 start=start_date,
+                                 end=end_date,
+                                 reservations=reservation_list,
+                                 events=[])
+
+
+def reserve_floating_ip(lease_name, count=1):
+    '''
+    This is the description of the library function for reserve_floating_ip from the api in reservation_api_examples.py.
+
+    Parameters
+    ----------
+    lease_name : str
+        Description of parameter `lease_name`.
+    count : int
+        Description of parameter `count`
+    '''
+    start_date, end_date = lease_duration(days=1)
+
+    # Build list of reservations (in this case there is only one reservation)
+    reservation_list = []
+    add_fip_reservation(reservation_list, count=count)
+
+    # Create the lease
+    return blazar().lease.create(name=lease_name,
+                                 start=start_date,
+                                 end=end_date,
+                                 reservations=reservation_list, events=[])
+
+
+def reserve_multiple_resources(lease_name):
+    start_date, end_date = lease_duration(days=1)
+
+    # Build list of reservations (in this case there is only one reservation)
+    reservation_list = []
+    add_node_reservation(reservation_list, count=1, node_type="compute_haswell")
+    add_network_reservation(reservation_list, network_name=lease_name+"Network")
+    add_fip_reservation(reservation_list, count=1)
+
+    # Create the lease
+    return blazar().lease.create(name=lease_name,
+                                 start=start_date,
+                                 end=end_date,
+                                 reservations=reservation_list,
+                                 events=[])
+
+
+#########
+# Leases
+#########
+
+def get_lease_id(lease_name):
+    matching = [l for l in blazar().lease.list() if l['name'] == lease_name]
+    if not matching:
+        raise ValueError(f'No leases found for name {lease_name}')
+    elif len(matching) > 1:
+        raise ValueError(f'Multiple leases found for name {lease_name}')
+    return matching[0]['id']
+
+
+def get_lease(ref):
+    try:
+        return show_lease(ref)
+    except BlazarClientException as err:
+        if err.code == 404:
+            return show_lease(get_lease_id(ref))
+        else:
+            raise
+
+
+def delete_lease(lease_id):
+    blazar().lease.delete(lease_id)
+    print(f'Deleted lease with id {lease_id}')
+
+
+def delete_lease_by_name(lease_name):
+    matching = [l for l in blazar().lease.list() if l['name'] == lease_name]
+    if not matching:
+        raise ValueError(f'No leases found for name {lease_name}')
+    elif len(matching) > 1:
+        raise ValueError(f'Multiple leases found for name {lease_name}')
+    delete_lease(matching[0]['id'])
+
+
+def show_lease(lease_id):
+    return blazar().lease.get(lease_id)

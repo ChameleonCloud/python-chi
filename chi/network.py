@@ -1,5 +1,4 @@
-from . import connection, neutron
-from .server import get_server_id
+from .clients import neutron
 
 from neutronclient.common.exceptions import NotFound
 
@@ -427,26 +426,6 @@ def get_floating_ip(ip_address):
     if not fip:
         raise ValueError(f'No floating IP with address {ip_address} found')
     return fip
-
-
-def associate_floating_ip(server_name, floating_ip_address=None):
-    server_id = get_server_id(server_name)
-
-    if floating_ip_address:
-        fip = get_floating_ip(floating_ip_address)
-    else:
-        fip = get_free_floating_ip()
-
-    ip = fip['floating_ip_address']
-    connection().compute.add_floating_ip_to_server(server_id, ip)
-
-    return ip
-
-
-def detach_floating_ip(server_name, floating_ip_address):
-    server_id = get_server_id(server_name)
-    connection().compute.remove_floating_ip_from_server(
-        server_id, floating_ip_address)
 
 
 def list_floating_ips():
