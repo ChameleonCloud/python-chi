@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(".."))
+
 project = "python-chi"
 copyright = "2021, University of Chicago"
 author = "Jason Anderson"
