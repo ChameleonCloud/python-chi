@@ -15,5 +15,5 @@ Wizards
 
 There are additionally some functions that tie together several common tasks.
 
-.. automodule:: chi.network.wizard
+.. autoclass:: chi.network.wizard
    :members:
