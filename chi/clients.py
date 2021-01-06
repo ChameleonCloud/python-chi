@@ -1,5 +1,3 @@
-import openstack
-
 from .context import session
 
 session_factory = session
@@ -11,6 +9,7 @@ def connection(session=None):
     The returned :class:`openstack.connection.Connection` object has
     several proxy modules attached for each service provided by the cloud.
     """
+    import openstack
     return openstack.connect(session=(session or session_factory()))
 
 
