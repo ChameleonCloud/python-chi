@@ -1,6 +1,7 @@
 fabric
 gnocchiclient
 keystoneauth1
+openstacksdk
 paramiko
 python-blazarclient
 python-glanceclient
