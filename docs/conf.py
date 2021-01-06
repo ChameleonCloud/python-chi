@@ -32,10 +32,6 @@ pygments_style = "sphinx"
 # -- Options for HTML output -------------------------------------------------
 
 html_theme = "sphinx_rtd_theme"
-html_theme_options = {
-    "github_user": "ChameleonCloud",
-    "github_repo": "python-chi",
-}
 html_static_path = ["_static"]
 
 # Custom sidebar templates, must be a dictionary that maps document names
