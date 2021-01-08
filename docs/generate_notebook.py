@@ -2,13 +2,25 @@
 import inspect
 import json
 import os
-import re
 from textwrap import dedent
 
 import click
 import nbformat.v4 as nbf
 
-USES_REGEX = re.compile(r'uses:.*\n(?:\s*([a-z_\-\.]+\n))', flags=re.IGNORECASE|re.MULTILINE)
+
+INTRO_CELLS = [
+    nbf.new_markdown_cell(dedent("""
+    First, select which project and site you wish to authenticate against.
+    """)),
+    nbf.new_code_cell(dedent("""
+    import chi
+
+    chi.use_site('CHI@UC')
+    # Set to your project's charge code
+    chi.set('project_name', 'CH-XXXXXX')
+    """))
+]
+
 
 def generate_notebook(*example_fns, title=None):
     nb = nbf.new_notebook()
@@ -21,6 +33,9 @@ def generate_notebook(*example_fns, title=None):
 
     if title:
         nb.cells.append(nbf.new_markdown_cell(f'# {title}'))
+
+    # Put in the generic intro cells
+    nb.cells.extend(INTRO_CELLS)
 
     for fn in example_fns:
         docs = get_docs(fn)
