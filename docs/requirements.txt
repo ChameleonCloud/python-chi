@@ -1,4 +1,6 @@
+click
 nbformat
+nbsphinx
 rstcheck
 sphinx
 sphinx-autobuild

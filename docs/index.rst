@@ -61,6 +61,12 @@ For more details about the modules available refer to their respective pages.
    modules/network
    modules/image
 
+.. toctree::
+   :caption: Examples
+   :glob:
+
+   notebooks/*
+
 
 Indices and tables
 ==================

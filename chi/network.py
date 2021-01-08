@@ -484,6 +484,7 @@ def add_routes_to_router(router_id, routes):
             to consist of items with a 'destination' and 'nexthop' key, e.g.:
 
             .. code-block:: python
+
                 [
                    {'destination': '10.0.0.0/24', 'nexthop': '10.0.0.1'},
                    {'destination': '10.0.1.0/24', 'nexthop': '10.0.1.1'}
@@ -517,6 +518,7 @@ def remove_routes_from_router(router_id, routes):
             to consist of items with a 'destination' and 'nexthop' key, e.g.:
 
             .. code-block:: python
+
                 [
                    {'destination': '10.0.0.0/24', 'nexthop': '10.0.0.1'},
                    {'destination': '10.0.1.0/24', 'nexthop': '10.0.1.1'}
@@ -692,7 +694,8 @@ def nuke_network(network_name):
 
     This function performs all of those steps for you.
 
-    .. info::
+    .. note::
+
        This function will not work well for very advance networks, perhaps
        those connected to multiple routers. You should perform your own cleanup
        if your network's subnets are attached to multiple routers.

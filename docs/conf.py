@@ -11,6 +11,7 @@ version = "0.1"
 release = "0.1"
 
 extensions = [
+    "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
@@ -23,7 +24,7 @@ source_suffix = [".rst"]
 
 master_doc = "index"
 
-exclude_patterns = []
+exclude_patterns = ["build"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -33,6 +34,7 @@ pygments_style = "sphinx"
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_extra_path = ["_extra"]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -85,3 +87,20 @@ intersphinx_mapping = {
     "MySQLdb": ("https://mysqlclient.readthedocs.io/", None),
     "novaclient": ("https://docs.openstack.org/python-novaclient/latest/", None),
 }
+
+notebook_examples = [
+    ('Making a reservation', 'notebooks/reservations.ipynb', [
+        'tests/test_lease.py:example_reserve_node',
+        'tests/test_lease.py:example_reserve_floating_ip',
+        'tests/test_lease.py:example_reserve_network',
+        'tests/test_lease.py:example_reserve_multiple_resources',
+    ])
+]
+
+nbsphinx_execute = 'never'
+
+import generate_notebook
+for title, file, examples in notebook_examples:
+    generate_notebook.generate(examples, output_file=file, title=title)
+    # Also copy to the extras folder
+    generate_notebook.generate(examples, output_file=f'_extras/{file}', title=title)

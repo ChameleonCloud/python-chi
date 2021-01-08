@@ -2,18 +2,30 @@
 import inspect
 import json
 import os
-import sys
+import re
+from textwrap import dedent
 
+import click
 import nbformat.v4 as nbf
 
+USES_REGEX = re.compile(r'uses:.*\n(?:\s*([a-z_\-\.]+\n))', flags=re.IGNORECASE|re.MULTILINE)
 
-def generate_notebook(*example_fns):
+def generate_notebook(*example_fns, title=None):
     nb = nbf.new_notebook()
+    nb.cells = []
+    nb.metadata.language_info = {
+        'name': 'Python',
+        'version': 3,
+    }
+    nb.metadata['nbsphinx'] = {'execute': 'never'}
+
+    if title:
+        nb.cells.append(nbf.new_markdown_cell(f'# {title}'))
 
     for fn in example_fns:
         docs = get_docs(fn)
         source = get_source(fn).replace(docs, '')
-        nb['cells'].extend([
+        nb.cells.extend([
             nbf.new_markdown_cell(f'## {docs}'),
             nbf.new_code_cell(source),
         ])
@@ -43,22 +55,64 @@ def get_source(fn):
         source = (source.replace(fn.__doc__, '')
             .replace('"""', '')
             .replace(':\n    \n', ':\n'))
-    return source
+    lines = [l for l in source.split('\n') if (not l or l.startswith(' '))]
+    return dedent('\n'.join(lines))
 
 
 def get_docs(fn):
-    return inspect.getdoc(fn)
+    docstring = inspect.getdoc(fn)
+    # Parse "Uses" section
+    # print(docstring)
+    # print(USES_REGEX.match(docstring))
+    return docstring
 
 
-# TODO: use an actual CLI arg parser.
-if __name__ == '__main__':
-    argv = sys.argv[1:]
+def generate(examples, output_file=None, title=None):
     fns = []
-    for filearg in argv:
-        file_name, example_name = filearg.split(':')
-        fn = load_function(file_name, example_name)
+    for example_ref in examples:
+        file_name, fn_name = example_ref.split(':')
+        fn = load_function(file_name, fn_name)
         if not fn:
-            raise RuntimeError(f'Unable to load {example_name} from {file_name}')
+            raise RuntimeError(f'Unable to load {fn_name} from {file_name}')
         fns.append(fn)
-    with open('notebook.ipynb', 'w') as f:
-        f.write(json.dumps(generate_notebook(*fns), indent=2) + '\n')
+    with open(output_file, 'w') as f:
+        contents = json.dumps(generate_notebook(*fns, title=title), indent=2)
+        f.write(contents + '\n')
+
+
+@click.command()
+@click.option('--output-file', default='notebook.ipynb',
+              help='The output notebook file')
+@click.option('--title', help='A title to give the Notebook')
+@click.argument('examples', nargs=-1)
+def cli(examples, output_file=None, title=None):
+    """Generate a notebook from a list of example functions.
+
+    EXAMPLES are expected to be a list of files and the functions located
+    within those files, for example, to inline the 'reserve_node' function
+    located in 'tests/test_lease.py':
+
+      generate_notebook.py tests/test_lease.py:reserve_node
+
+    The outputted notebook will have a Markdown cell with the function's
+    docstring, while the source of the function will be included in to a
+    following code cell.
+
+    Multiple examples can be provided, in which case the outputted Notebook
+    file will have multiple code and markdown cells.
+    """
+    fns = []
+    for example_ref in examples:
+        file_name, fn_name = example_ref.split(':')
+        fn = load_function(file_name, fn_name)
+        if not fn:
+            raise RuntimeError(f'Unable to load {fn_name} from {file_name}')
+        fns.append(fn)
+    with open(output_file, 'w') as f:
+        contents = json.dumps(generate_notebook(*fns, title=title), indent=2)
+        f.write(contents + '\n')
+    generate(examples, output_file=output_file, title=title)
+
+
+if __name__ == '__main__':
+    cli()

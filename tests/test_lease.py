@@ -10,10 +10,21 @@ def now():
 def example_reserve_node():
     """Reserve a bare metal node.
 
-    Uses:
-        :func:`~chi.lease.lease_duration`
-        :func:`~chi.lease.add_node_reservation`
-        :func:`~chi.lease.create_lease`
+    Multiple nodes can be reserved at once by changing the `count` variable.
+    This example makes a reservation for the "compute_haswell" node type.
+    [See here](https://chameleoncloud.readthedocs.io/en/latest/technical/reservations.html#chameleon-node-types)
+    for a complete list of node types available currently.
+
+    <div class="alert alert-info">
+
+    **Functions used in this example:**
+
+    * [add_node_reservation](../modules/lease.html#chi.lease.add_node_reservation)
+    * [lease_duration](../modules/lease.html#chi.lease.lease_duration)
+    * [create_lease](../modules/lease.html#chi.lease.create_lease)
+
+    </div>
+
     """
     from chi.lease import lease_duration, add_node_reservation, create_lease
 
@@ -51,10 +62,25 @@ def test_example_reserve_node(mocker, now):
 def example_reserve_network():
     """Reserve a VLAN segment.
 
-    Uses:
-        :func:`~chi.lease.lease_duration`
-        :func:`~chi.lease.add_network_reservation`
-        :func:`~chi.lease.create_lease`
+    This example illustrates how to reserve an isolated VLAN in order to
+    ensure your network experiment is not subject to cross-traffic from other
+    experimenters.
+
+    This is also how you reserve
+    [stitchable VLANs](https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_stitching.html)
+    provided through ExoGENI. For these VLANs, you must set `physical_network`
+    to "exogeni".
+
+    <div class="alert alert-info">
+
+    **Functions used in this example:**
+
+    * [add_network_reservation](../modules/lease.html#chi.lease.add_network_reservation)
+    * [lease_duration](../modules/lease.html#chi.lease.lease_duration)
+    * [create_lease](../modules/lease.html#chi.lease.create_lease)
+
+    </div>
+
     """
     from chi.lease import lease_duration, add_network_reservation, create_lease
 
@@ -104,10 +130,26 @@ def test_example_reserve_network(mocker, now):
 def example_reserve_floating_ip():
     """Reserve a floating IP.
 
-    Uses:
-        :func:`~chi.lease.lease_duration`
-        :func:`~chi.lease.add_fip_reservation`
-        :func:`~chi.lease.create_lease`
+    While it's possible to allocate a floating IP ad hoc from Chameleon most
+    of the time, there are a limited amount of IPs and they are sometimes
+    exhausted. You can reserve a floating IP to ensure you have access to one
+    to attach to your experimental nodes to allow, e.g., external SSH
+    connectivity.
+
+    [See here](https://www.chameleoncloud.org/blog/2019/02/27/save-planet-use-fewer-ips/)
+    for some tips on how to make the most out of a single floating IP, which
+    can help you avoid excessive charges.
+
+    <div class="alert alert-info">
+
+    **Functions used in this example:**
+
+    * [add_fip_reservation](../modules/lease.html#chi.lease.add_fip_reservation)
+    * [lease_duration](../modules/lease.html#chi.lease.lease_duration)
+    * [create_lease](../modules/lease.html#chi.lease.create_lease)
+
+    </div>
+
     """
     from chi.lease import lease_duration, add_fip_reservation, create_lease
 
@@ -146,12 +188,18 @@ def test_example_reserve_floating_ip(mocker, now):
 def example_reserve_multiple_resources():
     """Reserve multiple types of resources in a single lease.
 
-    Uses:
-        :func:`~chi.lease.lease_duration`
-        :func:`~chi.lease.add_node_reservation`
-        :func:`~chi.lease.add_fip_reservation`
-        :func:`~chi.lease.add_network_reservation`
-        :func:`~chi.lease.create_lease`
+    <div class="alert alert-info">
+
+    **Functions used in this example:**
+
+    * [add_node_reservation](../modules/lease.html#chi.lease.add_node_reservation)
+    * [add_network_reservation](../modules/lease.html#chi.lease.add_network_reservation)
+    * [add_fip_reservation](../modules/lease.html#chi.lease.add_fip_reservation)
+    * [lease_duration](../modules/lease.html#chi.lease.lease_duration)
+    * [create_lease](../modules/lease.html#chi.lease.create_lease)
+
+    </div>
+
     """
     from chi.lease import (
         lease_duration, add_node_reservation, add_network_reservation,
