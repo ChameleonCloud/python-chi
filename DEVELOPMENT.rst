@@ -25,8 +25,8 @@ All examples must follow a few rules:
 
       </div>
 
-    The ``function_module`` refers to the name of the *documentation page* that
-    contains the API documentation for that module.
+   The ``function_module`` refers to the name of the *documentation page* that
+   contains the API documentation for that module.
 4. Any new examples should be either added to an existing Notebook output
    configuration or have a new output config. These are declared in
    ``docs/conf.py``.
