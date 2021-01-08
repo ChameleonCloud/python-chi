@@ -11,14 +11,14 @@ import nbformat.v4 as nbf
 INTRO_CELLS = [
     nbf.new_markdown_cell(dedent("""
     First, select which project and site you wish to authenticate against.
-    """)),
+    """).strip()),
     nbf.new_code_cell(dedent("""
     import chi
 
     chi.use_site('CHI@UC')
     # Set to your project's charge code
     chi.set('project_name', 'CH-XXXXXX')
-    """))
+    """).strip())
 ]
 
 
