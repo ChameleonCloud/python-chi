@@ -404,6 +404,13 @@ def add_network_reservation(reservation_list,
 
 
 def add_fip_reservation(reservation_list, count=1):
+    """Add a floating IP reservation to a reservation list.
+
+    Args:
+        reservation_list (list[dict]): The list of reservations to add to.
+            The list will be extended in-place.
+        count (int): The number of floating IPs to reserve.
+    """
     reservation_list.append({
         'resource_type': 'virtual:floatingip',
         'network_id': get_network_id(PUBLIC_NETWORK),
