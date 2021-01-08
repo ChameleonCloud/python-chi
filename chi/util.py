@@ -1,4 +1,6 @@
 import base64
+from datetime import datetime
+from dateutil import tz
 import os
 
 
@@ -17,3 +19,7 @@ def get_public_network(neutronclient):
     else:
         raise RuntimeError("couldn't find public net")
     return pubnet_id
+
+
+def utcnow():
+    return datetime.now(tz=tz.tzutc())
