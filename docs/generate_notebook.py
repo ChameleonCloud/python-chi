@@ -101,16 +101,6 @@ def cli(examples, output_file=None, title=None):
     Multiple examples can be provided, in which case the outputted Notebook
     file will have multiple code and markdown cells.
     """
-    fns = []
-    for example_ref in examples:
-        file_name, fn_name = example_ref.split(':')
-        fn = load_function(file_name, fn_name)
-        if not fn:
-            raise RuntimeError(f'Unable to load {fn_name} from {file_name}')
-        fns.append(fn)
-    with open(output_file, 'w') as f:
-        contents = json.dumps(generate_notebook(*fns, title=title), indent=2)
-        f.write(contents + '\n')
     generate(examples, output_file=output_file, title=title)
 
 
