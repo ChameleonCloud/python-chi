@@ -11,4 +11,5 @@ python:
   version: 3.8
   install:
     - requirements: requirements.txt
+    - requirements: test-requirements.txt
     - requirements: docs/requirements.txt
