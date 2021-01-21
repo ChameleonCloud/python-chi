@@ -54,4 +54,4 @@ def list_images():
     Returns:
         All images associated with the current project.
     """
-    return glance().images.list()
+    return list(glance().images.list())
