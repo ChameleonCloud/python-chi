@@ -48,8 +48,6 @@ __all__ = [
     'list_floating_ips',
 
     'nuke_network',
-    'chi_wizard_create_network',
-    'chi_wizard_delete_network',
 ]
 
 PUBLIC_NETWORK = 'public'
