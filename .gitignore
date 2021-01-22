@@ -20,4 +20,5 @@ dist/
 # Documentation
 docs/build/
 
-chi/.ipynb_checkpointsdf
+# Jupyter
+.ipynb_checkpoints/
