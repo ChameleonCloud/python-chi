@@ -40,7 +40,7 @@ def get_image_id(name):
         ValueError: If the image could not be found, or if multiple images
             matched the name.
     """
-    images = glance().images.list(filters={'name': name})
+    images = list(glance().images.list(filters={'name': name}))
     if not images:
         raise ValueError(f'No images found matching name "{name}"')
     elif len(images) > 1:
