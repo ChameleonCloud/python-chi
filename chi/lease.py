@@ -352,10 +352,14 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
         count (int): The number of nodes of the given type to request.
             (Default 1).
         node_type (str): The node type to request. (Default "compute_haswell").
+            If None, the reservation will not target any particular node type.
     """
+    resource_properties = []
+    if node_type:
+        resource_properties.extend(["==", "$node_type", node_type])
     reservation_list.append({
         "resource_type": "physical:host",
-        "resource_properties": json.dumps(["==", "$node_type", node_type]),
+        "resource_properties": json.dumps(resource_properties),
         "hypervisor_properties": "",
         "min": count,
         "max": count
