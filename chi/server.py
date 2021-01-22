@@ -448,7 +448,7 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
                   network_name='sharednet1', nics=[], image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
                   flavor_name=BAREMETAL_FLAVOR, count=1) -> NovaServer:
-    f"""Launch a new server instance.
+    """Launch a new server instance.
 
     Args:
         server_name (str): A name to give the server.
@@ -466,9 +466,9 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
         image_id (str): The image ID to use for the server's disk image.
         image_name (str): The name of the image to user for the server's disk
             image. If ``image_id`` is also set, that takes priority.
-            (Default {DEFAULT_IMAGE}.)
+            (Default ``DEFAULT_IMAGE``.)
         flavor_id (str): The flavor ID to use when launching the server.
-            (Default {BAREMETAL_FLAVOR}).
+            (Default ``BAREMETAL_FLAVOR``).
         flavor_name (str): The name of the flavor to use when launching the
             server. If ``flavor_id`` is also set, that takes priority.
         count (int): The number of instances to launch. When launching bare
