@@ -98,6 +98,14 @@ notebook_examples = [
 ]
 
 nbsphinx_execute = 'never'
+# This is processed by Jinja2 and inserted before each notebook
+nbsphinx_prolog = r"""
+{% set docname = env.doc2path(env.docname, base=None) %}
+
+.. figure:: https://img.shields.io/badge/Chameleon-Open%20Notebook-brightgreen
+   :target: https://jupyter.chameleoncloud.org/hub/import?deposition_repo=http&deposition_id=https://python-chi.readthedocs.io/en/latest/{{ docname|e }}&ephemeral=true
+
+"""
 
 import generate_notebook
 for title, file, examples in notebook_examples:
