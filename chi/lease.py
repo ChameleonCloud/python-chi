@@ -366,6 +366,52 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
     })
 
 
+def get_node_reservation(lease_ref, count=None, node_type=None):
+    """Retrieve a reservation ID for a node reservation.
+
+    The reservation ID is useful to have when launching bare metal instances.
+
+    Args:
+        lease_ref (str): The ID or name of the lease.
+        count (int): An optional count of nodes the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+        node_type (str): An optional node type the desired reservation was
+            made for. Use this if you have multiple reservations undera  lease.
+
+    Returns:
+        The ID of the reservation, if found.
+
+    Raises:
+        ValueError: If no reservation was found, or multiple were found.
+    """
+    lease = get_lease(lease_ref)
+    try:
+        reservations = json.loads(lease.get("reservations"))
+    except Exception:
+        reservations = []
+
+    def _passes(res):
+        if res.get("resource_type") != "physical:host":
+            return False
+        if (count is not None
+            and not all(int(res.get(key)) == count
+                        for key in ["min_count", "max_count"])):
+            return False
+        if (node_type is not None
+            and node_type not in res.get("resource_properties")):
+            return False
+        return True
+
+    node_reservations = [r for r in reservations if _passes(r)]
+    if not node_reservations:
+        raise ValueError("No node reservation found")
+    elif len(node_reservations) > 1:
+        raise ValueError("Multiple node reservations found")
+    else:
+        return node_reservations[0]
+
+
+
 def add_network_reservation(reservation_list,
                             network_name,
                             of_controller_ip=None,

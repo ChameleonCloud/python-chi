@@ -19,12 +19,18 @@ CONF_GROUP = 'chi'
 RESOURCE_API_URL = os.getenv('CHI_RESOURCE_API_URL',
                              'https://api.chameleoncloud.org')
 
+
+def default_key_name():
+    username = os.getenv('USER')
+    return f'{username}-jupyter' if username else None
+
+
 session_opts = loading.get_session_conf_options()
 adapter_opts = loading.get_adapter_conf_options()
 # Settings that do not affect authentication, but are used  to define defaults
 # for other operations.
 extra_opts = [
-    cfg.StrOpt('key-name', help=(
+    cfg.StrOpt('key-name', default=default_key_name(), help=(
         'Name of the SSH keypair to allow access to launched instances')),
     cfg.StrOpt('image', help=(
         'Name of disk image to use when launching instances')),

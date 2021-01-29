@@ -1,11 +1,12 @@
 from datetime import datetime
+from operator import attrgetter
 
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.servers import Server as NovaServer
 from novaclient.exceptions import NotFound
 
 from .clients import connection, glance, nova, neutron
-from .context import session
+from .context import get as get_from_context, session
 from .keypair import Keypair
 from .image import get_image, get_image_id
 from .network import (get_network_id, get_or_create_floating_ip,
@@ -29,6 +30,7 @@ __all__ = [
 ]
 
 DEFAULT_IMAGE = 'CC-CentOS7'
+DEFAULT_NETWORK = 'sharednet1'
 BAREMETAL_FLAVOR = 'baremetal'
 
 class ServerError(RuntimeError):
@@ -146,7 +148,7 @@ class Server(object):
         self._noclean = kwargs.pop("_no_clean")
 
         net_ids = kwargs.pop("net_ids", None)
-        net_name = kwargs.pop("net_name", "sharednet1")
+        net_name = kwargs.pop("net_name", DEFAULT_NETWORK)
         if net_ids is None and net_name is not None:
             net_ids = [get_network_id(net_name)]
 
@@ -374,13 +376,18 @@ def get_server_id(name) -> str:
     return servers[0].id
 
 
-def list_servers() -> "list[NovaServer]":
+def list_servers(**kwargs) -> "list[NovaServer]":
     """List all servers under the current project.
+
+    Args:
+        kwargs: Keyword arguments, which will be passed to
+            :func:`novaclient.v2.servers.list`. For example, to filter by
+            instance name, provide ``search_opts={'name': 'my-instance'}``
 
     Returns:
         All servers associated with the current project.
     """
-    return nova().servers.list()
+    return nova().servers.list(**kwargs)
 
 
 def delete_server(server_id):
@@ -445,9 +452,9 @@ def detach_floating_ip(server_name, floating_ip_address):
 ##########
 
 def create_server(server_name, reservation_id, key_name=None, network_id=None,
-                  network_name='sharednet1', nics=[], image_id=None,
+                  network_name=DEFAULT_NETWORK, nics=[], image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=BAREMETAL_FLAVOR, count=1) -> NovaServer:
+                  flavor_name=BAREMETAL_FLAVOR, count=1) -> 'Union[NovaServer,list[NovaServer]]':
     """Launch a new server instance.
 
     Args:
@@ -474,7 +481,18 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
         count (int): The number of instances to launch. When launching bare
             metal server instances, this number must be less than or equal to
             the total number of hosts reserved. (Default 1).
+
+    Returns:
+        The created server instance. If ``count`` was larger than 1, then a
+            list of all created instances will be returned instead.
+
+    Raises:
+        ValueError: if an invalid count is provided.
     """
+    if count < 1:
+        raise ValueError('Must launch at least one server.')
+    if not key_name:
+        key_name = get_from_context('key_name')
     if not network_id:
         network_id = get_network_id(network_name)
     if not nics:
@@ -483,7 +501,7 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
         image_id = get_image_id(image_name)
     if not flavor_id:
         flavor_id = get_flavor_id(flavor_name)
-    return nova().servers.create(
+    server = nova().servers.create(
         name=server_name,
         image=image_id,
         flavor=flavor_id,
@@ -493,3 +511,10 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
         min_count=count,
         max_count=count
     )
+    if count > 1:
+        matching = list_servers(search_opts={'name': f'{server_name}-'})
+        # In case there are others matching the name, just get the latest
+        # batch of instances.
+        return sorted(matching, key=attrgetter('created'), reverse=True)[:count]
+    else:
+        return server

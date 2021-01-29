@@ -94,7 +94,10 @@ notebook_examples = [
         'tests/test_lease.py:example_reserve_floating_ip',
         'tests/test_lease.py:example_reserve_network',
         'tests/test_lease.py:example_reserve_multiple_resources',
-    ])
+    ]),
+    ('Launching a bare metal instance', 'notebooks/baremetal.ipynb', [
+        'tests/test_server.py:example_create_server',
+    ]),
 ]
 
 nbsphinx_execute = 'never'
