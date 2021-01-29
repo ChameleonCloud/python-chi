@@ -17,6 +17,7 @@ def example_create_server():
     **Functions used in this example:**
 
     * [create_server](../modules/server.html#chi.server.create_server)
+    * [get_node_reservation](../modules/lease.html#chi.lease.get_node_reservation)
 
     </div>
 
