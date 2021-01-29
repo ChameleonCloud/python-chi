@@ -371,7 +371,7 @@ def get_server_id(name) -> str:
         raise ValueError(f'No matching servers found for name "{name}"')
     elif len(servers) > 1:
         raise ValueError(f'Multiple matching servers found for name "{name}"')
-    return servers[0]['id']
+    return servers[0].id
 
 
 def list_servers() -> "list[NovaServer]":
