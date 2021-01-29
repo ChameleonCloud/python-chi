@@ -45,7 +45,7 @@ def get_image_id(name):
         raise ValueError(f'No images found matching name "{name}"')
     elif len(images) > 1:
         raise ValueError(f'Multiple images found matching name "{name}"')
-    return images[0]['id']
+    return images[0].id
 
 
 def list_images():
@@ -54,4 +54,4 @@ def list_images():
     Returns:
         All images associated with the current project.
     """
-    return glance().images.list()
+    return list(glance().images.list())
