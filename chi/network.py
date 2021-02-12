@@ -179,7 +179,7 @@ def list_networks() -> 'list[dict]':
     Returns:
         A list of all the found networks.
     """
-    return neutron().list_networks()
+    return neutron().list_networks()["networks"]
 
 
 ##########
@@ -275,7 +275,7 @@ def list_subnets() -> 'list[dict]':
     Returns:
         A list of all the found subnets.
     """
-    return neutron().list_subnets()
+    return neutron().list_subnets()["subnets"]
 
 
 ########
@@ -371,7 +371,7 @@ def list_ports() -> 'list[dict]':
     Returns:
         A list of all the found ports.
     """
-    return neutron().list_ports()
+    return neutron().list_ports()["ports"]
 
 
 ##########
@@ -453,7 +453,7 @@ def list_routers() -> 'list[dict]':
     Returns:
         A list of all the found routers.
     """
-    return neutron().list_routers()
+    return neutron().list_routers()["routers"]
 
 
 ####################
@@ -676,7 +676,7 @@ def list_floating_ips() -> 'list[dict]':
     Returns:
         A list of all the found floating ips.
     """
-    return neutron().list_floatingips()
+    return neutron().list_floatingips()["floatingips"]
 
 
 def nuke_network(network_name):
