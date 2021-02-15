@@ -73,10 +73,12 @@ def _resolve_resource(resource, name_or_id) -> dict:
     if not callable(get_fn):
         raise ValueError(f'Invalid resource type "{resource}"')
     try:
-        return get_fn(name_or_id)
+        res = get_fn(name_or_id)
     except NotFound:
         resource_id = _resolve_id(f'{resource}s', name_or_id)
-        return get_fn(resource_id)
+        res = get_fn(resource_id)
+    # Unwrap nested structure
+    return res.get(resource)
 
 
 ###########
@@ -199,7 +201,7 @@ def get_subnet(ref) -> dict:
         RuntimeError: If the subnet could not be found, or multiple subnets
             were returned for the search term.
     """
-    return _resolve_resource('subnets', ref)
+    return _resolve_resource('subnet', ref)
 
 
 def get_subnet_id(name) -> str:
