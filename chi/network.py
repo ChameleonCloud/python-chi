@@ -2,6 +2,8 @@ from .clients import neutron
 
 from neutronclient.common.exceptions import NotFound
 
+import json
+
 __all__ = [
     'get_network',
     'get_network_id',
@@ -440,7 +442,7 @@ def create_router(router_name, gw_network_name=None) -> dict:
                              }}
         
     router = neutron().create_router(request)
-    return router['router']
+    return router
 
 
 def delete_router(router_id):
