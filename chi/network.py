@@ -255,7 +255,7 @@ def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
         ]
     })
 
-    return subnet
+    return subnet['subnets'][0]
 
 
 def delete_subnet(subnet_id):
@@ -412,7 +412,7 @@ def get_router_id(name) -> str:
     return _resolve_id('routers', name)
 
 
-def create_router(router_name, gateway=False) -> dict:
+def create_router(router_name, gw_network_name=None) -> dict:
     ''' 
     Create a router with or without a public gateway. 
     
@@ -425,8 +425,8 @@ def create_router(router_name, gateway=False) -> dict:
         Chameleon gateway network is 'public'. Default: None
     '''
     request = {}
-    if gateway:
-        public_net_id= get_network_id(PUBLIC_NETWORK)
+    if gw_network_name:
+        public_net_id= get_network_id(gw_network_name)
         
         #Create Router
         request = {'router': {'name': router_name,
@@ -440,7 +440,7 @@ def create_router(router_name, gateway=False) -> dict:
                              }}
         
     router = neutron().create_router(request)
-    return router
+    return router['router']
 
 
 def delete_router(router_id):
