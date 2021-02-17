@@ -624,15 +624,14 @@ def get_free_floating_ip() -> dict:
 
     Returns:
         The free floating IP representation.
-
-    Raises:
-        ValueError: If your project has no free floating IPs.
     """
-    ips = list_floating_ips()
-    unbound_fip = next(iter([ip for ip in ips if ip['port_id'] is None]), None)
-    if not unbound_fip:
-        raise ValueError('No free floating IP found')
-    return unbound_fip
+    ips = neutron().list_floatingips()['floatingips']
+    unbound = (ip for ip in ips if ip['port_id'] is None)
+    try:
+        fip = next(unbound)
+        return fip
+    except StopIteration:
+        print("No free floating IP found")
 
 
 def get_or_create_floating_ip() -> 'tuple[dict,bool]':
