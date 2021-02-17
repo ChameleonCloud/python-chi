@@ -339,13 +339,13 @@ def show_flavor_by_name(name) -> NovaFlavor:
 ##########
 
 def get_server(ref) -> NovaServer:
-    """Get a server by its ID or name.
+    """Get a server by its ID.
 
     Args:
         ref (str): The ID or name of the server.
 
     Returns:
-        The server matching the ID or name.
+        The server matching the ID.
 
     Raises:
         NotFound: If the server could not be found.
