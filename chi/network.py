@@ -413,27 +413,34 @@ def get_router_id(name) -> str:
 
 
 def create_router(router_name, gateway=False) -> dict:
-    """Create a router, with or without a public gateway.
-
-    Args:
-        router_name (str): The new router name.
-        gateway (bool): Whether to add a gateway to the public Internet on
-            the router. If no public gateway is requested, subnets connected
-            to this router will not have NAT to the Internet. (Default False).
-
-    Returns:
-        The created router representation.
-    """
-    router = {
-        'name': router_name,
-        'admin_state_up': True,
-    }
-
+    ''' 
+    Create a router with or without a public gateway. 
+    
+    Parameters
+    ----------
+    router_name : str
+        Name of the new router.
+    gw_network_name: str
+        Name of the external gateway network (i.e. the network that connects to the Internet). 
+        Chameleon gateway network is 'public'. Default: None
+    '''
+    request = {}
     if gateway:
-        public_net_id = get_network_id(PUBLIC_NETWORK)
-        router['external_gateway_info'] = {'network_id': public_net_id}
-
-    return neutron().create_router(body=router)
+        public_net_id= get_network_id(PUBLIC_NETWORK)
+        
+        #Create Router
+        request = {'router': {'name': router_name,
+                              'admin_state_up': True,
+                              'external_gateway_info': {"network_id": public_net_id},
+                             }}
+    else:
+        #Create Router without gateway
+        request = {'router': {'name': router_name,
+                              'admin_state_up': True,
+                             }}
+        
+    router = neutron().create_router(request)
+    return router
 
 
 def delete_router(router_id):
