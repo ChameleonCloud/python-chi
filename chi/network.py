@@ -710,34 +710,47 @@ def nuke_network(network_name):
     Args:
         network_name (str): The network name.
     """
+    network = get_network(network_name)
     network_id = get_network_id(network_name)
+    print('next network')
+    print(json.dumps(network, indent=2))
+    
+    #Detach the router from all of its networks
+    router_device_id=None
+    for port in neutron().list_ports()['ports']:
+        if port['device_owner'] == "network:router_interface" and port['network_id'] == network_id:
+            router_device_id = port['device_id']
+            print('next port: router_device_id' + router_device_id)
+            print(json.dumps(port, indent=2))
+            break
+        port=None
+    if port != None:
+        for router in neutron().list_routers()['routers']:
+            if router['id'] == router_device_id:
+                print('next router')
+                print(json.dumps(router, indent=2))
+                for fixed_ip in port['fixed_ips']:
+                    print('Detaching router ' + router_device_id + ' from subnet ' + fixed_ip['subnet_id'])
+                    remove_subnet_from_router(router_device_id, fixed_ip['subnet_id'])
 
-    # Detach network's subnets from router
-    port = next(iter([
-        p for p in list_ports()
-        if (p['device_owner'] == 'network:router_interface' and
-            p['network_id'] == network_id)
-    ]), None)
-    router_id = port['device_id'] if port else None
-    if router_id:
-        for fixed_ip in port['fixed_ips']:
-            subnet_id = fixed_ip['subnet_id']
-            remove_subnet_from_router(router_id, fixed_ip['subnet_id'])
-            print(f'Detached subnet {subnet_id}')
-        delete_router(router_id)
-        print(f'Deleted router {router_id}')
+    #Delete the router
+    if router_device_id:
+        print('Deleting router ' + router_device_id)
+        delete_router(router_device_id)
 
-    # TODO: also detach any running instances (?)
-
-    # Delete all subnets
-    for subnet in list_subnets():
+    
+    #Delete the subnet
+    for subnet in neutron().list_subnets()['subnets']:
         if subnet['network_id'] == network_id:
-            subnet_id = subnet['id']
+            print('next subnet')
+            print(json.dumps(subnet, indent=2))
+            subnet_id=subnet['id']
+            print('Deleting subnet ' + subnet_id)
             delete_subnet(subnet_id)
-            print(f'Deleted subnet {subnet_id}')
 
+    #Delete the network
+    print('Deleting network ' + network_name)
     delete_network(network_id)
-    print(f'Deleted network {network_id}')
 
 
 ###################
