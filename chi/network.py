@@ -669,13 +669,14 @@ def get_floating_ip(ip_address) -> dict:
     Returns:
         The floating IP representation.
     """
-    fip = next(iter([
-        fip for fip in list_floating_ips()
-        if fip['floating_ip_address'] == ip_address
-    ]), None)
-    if not fip:
-        raise ValueError(f'No floating IP with address {ip_address} found')
-    return fip
+    ips = neutron().list_floatingips()['floatingips']
+    
+    for fip in ips:
+        if fip['floating_ip_address'] == ip_address:
+            return fip
+    print("Floating ip not found " + ip_address)
+    
+    return None
 
 
 def list_floating_ips() -> 'list[dict]':
