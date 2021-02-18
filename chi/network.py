@@ -415,17 +415,15 @@ def get_router_id(name) -> str:
 
 
 def create_router(router_name, gw_network_name=None) -> dict:
-    ''' 
-    Create a router with or without a public gateway. 
+    """Create a router, with or without a public gateway.
     
-    Parameters
-    ----------
-    router_name : str
-        Name of the new router.
-    gw_network_name: str
-        Name of the external gateway network (i.e. the network that connects to the Internet). 
-        Chameleon gateway network is 'public'. Default: None
-    '''
+    Args:
+        router_name (str): The new router name.
+        gw_network_name (str): The name of the public gateway requested to
+            provide subnets connected this router NAT to the Internet.
+    Returns:
+        The created router representation.
+    """
     request = {}
     if gw_network_name:
         public_net_id= get_network_id(gw_network_name)
