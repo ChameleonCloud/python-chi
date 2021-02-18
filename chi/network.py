@@ -2,6 +2,8 @@ from .clients import neutron
 
 from neutronclient.common.exceptions import NotFound
 
+import json
+
 __all__ = [
     'get_network',
     'get_network_id',
@@ -255,7 +257,7 @@ def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
         ]
     })
 
-    return subnet
+    return subnet['subnets'][0]
 
 
 def delete_subnet(subnet_id):
@@ -412,28 +414,23 @@ def get_router_id(name) -> str:
     return _resolve_id('routers', name)
 
 
-def create_router(router_name, gateway=False) -> dict:
+def create_router(router_name, gw_network_name=None) -> dict:
     """Create a router, with or without a public gateway.
-
+    
     Args:
         router_name (str): The new router name.
-        gateway (bool): Whether to add a gateway to the public Internet on
-            the router. If no public gateway is requested, subnets connected
-            to this router will not have NAT to the Internet. (Default False).
-
+        gw_network_name (str): The name of the public gateway requested to
+            provide subnets connected this router NAT to the Internet.
     Returns:
         The created router representation.
     """
-    router = {
-        'name': router_name,
-        'admin_state_up': True,
-    }
-
-    if gateway:
-        public_net_id = get_network_id(PUBLIC_NETWORK)
-        router['external_gateway_info'] = {'network_id': public_net_id}
-
-    return neutron().create_router(body=router)
+    router = {"name": router_name, "admin_state_up": True}
+    
+    if gw_network_name:
+        router["external_gateway_info"] = {"network_id": get_network_id(gw_network_name)}
+        
+    response = neutron().create_router(body={"router": router})
+    return response["router"]
 
 
 def delete_router(router_id):
@@ -617,15 +614,14 @@ def get_free_floating_ip() -> dict:
 
     Returns:
         The free floating IP representation.
-
-    Raises:
-        ValueError: If your project has no free floating IPs.
     """
-    ips = list_floating_ips()
-    unbound_fip = next(iter([ip for ip in ips if ip['port_id'] is None]), None)
-    if not unbound_fip:
-        raise ValueError('No free floating IP found')
-    return unbound_fip
+    ips = neutron().list_floatingips()['floatingips']
+    unbound = (ip for ip in ips if ip['port_id'] is None)
+    try:
+        fip = next(unbound)
+        return fip
+    except StopIteration:
+        raise Exception("No free floating IP found")
 
 
 def get_or_create_floating_ip() -> 'tuple[dict,bool]':
@@ -663,13 +659,12 @@ def get_floating_ip(ip_address) -> dict:
     Returns:
         The floating IP representation.
     """
-    fip = next(iter([
-        fip for fip in list_floating_ips()
-        if fip['floating_ip_address'] == ip_address
-    ]), None)
-    if not fip:
-        raise ValueError(f'No floating IP with address {ip_address} found')
-    return fip
+    ips = neutron().list_floatingips()['floatingips']
+    
+    for fip in ips:
+        if fip['floating_ip_address'] == ip_address:
+            return fip
+    raise Exception("Floating ip not found " + ip_address
 
 
 def list_floating_ips() -> 'list[dict]':
@@ -703,34 +698,32 @@ def nuke_network(network_name):
     Args:
         network_name (str): The network name.
     """
-    network_id = get_network_id(network_name)
-
-    # Detach network's subnets from router
-    port = next(iter([
-        p for p in list_ports()
-        if (p['device_owner'] == 'network:router_interface' and
-            p['network_id'] == network_id)
-    ]), None)
-    router_id = port['device_id'] if port else None
-    if router_id:
-        for fixed_ip in port['fixed_ips']:
-            subnet_id = fixed_ip['subnet_id']
-            remove_subnet_from_router(router_id, fixed_ip['subnet_id'])
-            print(f'Detached subnet {subnet_id}')
-        delete_router(router_id)
-        print(f'Deleted router {router_id}')
-
-    # TODO: also detach any running instances (?)
-
-    # Delete all subnets
-    for subnet in list_subnets():
+    network = get_network(network_name)
+    network_id = network["id"]
+    
+    #Detach the router from all of its networks
+    router_ports = [
+        port for port in neutron().list_ports()["ports"]
+        if port["device_owner"] == "network:router_interface" and port["network_id"] == network_id
+    ]
+    
+    for port in router_ports:
+        for fixed_ip in port["fixed_ips"]:
+            router_id = port["device_id"]
+            remove_subnet_from_router(router_id, fixed_ip["subnet_id"])
+    
+    #Delete the router
+    for port in router_ports:
+        delete_router(port["device_id"])
+    
+    #Delete the subnet
+    for subnet in neutron().list_subnets()['subnets']:
         if subnet['network_id'] == network_id:
-            subnet_id = subnet['id']
+            subnet_id=subnet['id']
             delete_subnet(subnet_id)
-            print(f'Deleted subnet {subnet_id}')
 
+    #Delete the network
     delete_network(network_id)
-    print(f'Deleted network {network_id}')
 
 
 ###################
