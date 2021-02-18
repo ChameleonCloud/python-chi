@@ -714,22 +714,19 @@ def nuke_network(network_name):
     network_id = network["id"]
     
     #Detach the router from all of its networks
-    router_device_id=None
-    for port in neutron().list_ports()['ports']:
-        if port['device_owner'] == "network:router_interface" and port['network_id'] == network_id:
-            router_device_id = port['device_id']
-            break
-        port=None
-    if port != None:
-        for router in neutron().list_routers()['routers']:
-            if router['id'] == router_device_id:
-                for fixed_ip in port['fixed_ips']:
-                    remove_subnet_from_router(router_device_id, fixed_ip['subnet_id'])
-
+    router_ports = [
+        port for port in neutron().list_ports()["ports"]
+        if port["device_owner"] == "network:router_interface" and port["network_id"] == network_id
+    ]
+    
+    for port in router_ports:
+        for fixed_ip in port["fixed_ips"]:
+            router_id = port["device_id"]
+            remove_subnet_from_router(router_id, fixed_ip["subnet_id"])
+    
     #Delete the router
-    if router_device_id:
-        delete_router(router_device_id)
-
+    for port in router_ports:
+        delete_router(port["device_id"])
     
     #Delete the subnet
     for subnet in neutron().list_subnets()['subnets']:
