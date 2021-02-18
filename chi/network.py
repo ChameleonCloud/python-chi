@@ -424,23 +424,13 @@ def create_router(router_name, gw_network_name=None) -> dict:
     Returns:
         The created router representation.
     """
-    request = {}
+    router = {"name": router_name, "admin_state_up": True}
+    
     if gw_network_name:
-        public_net_id= get_network_id(gw_network_name)
+        router["external_gateway_info"] = {"network_id": get_network_id(gw_network_name)}
         
-        #Create Router
-        request = {'router': {'name': router_name,
-                              'admin_state_up': True,
-                              'external_gateway_info': {"network_id": public_net_id},
-                             }}
-    else:
-        #Create Router without gateway
-        request = {'router': {'name': router_name,
-                              'admin_state_up': True,
-                             }}
-        
-    router = neutron().create_router(request)
-    return router
+    response = neutron().create_router(body={"router": router})
+    return response["router"]
 
 
 def delete_router(router_id):
