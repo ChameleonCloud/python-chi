@@ -711,7 +711,7 @@ def nuke_network(network_name):
         network_name (str): The network name.
     """
     network = get_network(network_name)
-    network_id = get_network_id(network_name)
+    network_id = network["id"]
     
     #Detach the router from all of its networks
     router_device_id=None
