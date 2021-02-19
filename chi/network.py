@@ -416,7 +416,7 @@ def get_router_id(name) -> str:
 
 def create_router(router_name, gw_network_name=None) -> dict:
     """Create a router, with or without a public gateway.
-    
+
     Args:
         router_name (str): The new router name.
         gw_network_name (str): The name of the public gateway requested to
@@ -425,10 +425,10 @@ def create_router(router_name, gw_network_name=None) -> dict:
         The created router representation.
     """
     router = {"name": router_name, "admin_state_up": True}
-    
+
     if gw_network_name:
         router["external_gateway_info"] = {"network_id": get_network_id(gw_network_name)}
-        
+
     response = neutron().create_router(body={"router": router})
     return response["router"]
 
@@ -660,11 +660,11 @@ def get_floating_ip(ip_address) -> dict:
         The floating IP representation.
     """
     ips = neutron().list_floatingips()['floatingips']
-    
+
     for fip in ips:
         if fip['floating_ip_address'] == ip_address:
             return fip
-    raise Exception("Floating ip not found " + ip_address
+    raise Exception(f"Floating IP {ip_address} not found")
 
 
 def list_floating_ips() -> 'list[dict]':
@@ -700,22 +700,22 @@ def nuke_network(network_name):
     """
     network = get_network(network_name)
     network_id = network["id"]
-    
+
     #Detach the router from all of its networks
     router_ports = [
         port for port in neutron().list_ports()["ports"]
         if port["device_owner"] == "network:router_interface" and port["network_id"] == network_id
     ]
-    
+
     for port in router_ports:
         for fixed_ip in port["fixed_ips"]:
             router_id = port["device_id"]
             remove_subnet_from_router(router_id, fixed_ip["subnet_id"])
-    
+
     #Delete the router
     for port in router_ports:
         delete_router(port["device_id"])
-    
+
     #Delete the subnet
     for subnet in neutron().list_subnets()['subnets']:
         if subnet['network_id'] == network_id:
