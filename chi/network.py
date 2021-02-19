@@ -664,7 +664,7 @@ def get_floating_ip(ip_address) -> dict:
     for fip in ips:
         if fip['floating_ip_address'] == ip_address:
             return fip
-    raise Exception("Floating ip not found " + ip_address
+    raise Exception("Floating ip not found " + ip_address)
 
 
 def list_floating_ips() -> 'list[dict]':
