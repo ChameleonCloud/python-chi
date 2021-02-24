@@ -445,9 +445,6 @@ def associate_floating_ip(server_name, floating_ip_address=None):
     
     # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
     ports = neutron().list_ports(**{'device_id': server.id}).get('ports')
-    print(server.id)
-    print(ports)
-    
     
     fip_target = {
         'port_id': ports[0]['id'],
