@@ -97,6 +97,7 @@ notebook_examples = [
     ]),
     ('Launching a bare metal instance', 'notebooks/baremetal.ipynb', [
         'tests/test_server.py:example_create_server',
+        'tests/test_server.py:example_wait_for_connectivity',
     ]),
 ]
 
