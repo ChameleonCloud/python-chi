@@ -460,15 +460,12 @@ def associate_floating_ip(server_id, floating_ip_address=None):
             to the project.
 
     """
-    if floating_ip_address:
-        fip = get_floating_ip(floating_ip_address)
-    else:
-        fip = get_free_floating_ip()
+    if not floating_ip_address:
+        floating_ip_address = get_free_floating_ip()["floating_ip_address"]
 
-    ip = fip['floating_ip_address']
-    connection().compute.add_floating_ip_to_server(server_id, ip)
+    connection().compute.add_floating_ip_to_server(server_id, floating_ip_address)
 
-    return ip
+    return floating_ip_address
 
 
 def detach_floating_ip(server_id, floating_ip_address):

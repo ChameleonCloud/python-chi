@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 session_factory = session
 
+NOVA_API_VERSION = "2.10"
+
 
 def connection(session=None) -> "Connection":
     """Get connection context for OpenStack SDK.
@@ -24,8 +26,14 @@ def connection(session=None) -> "Connection":
     The returned :class:`openstack.connection.Connection` object has
     several proxy modules attached for each service provided by the cloud.
     """
-    import openstack
-    return openstack.connect(session=(session or session_factory()))
+    from openstack.config import cloud_region
+    from openstack.connection import Connection
+    sess = session or session_factory()
+    cloud_config = cloud_region.from_session(sess)
+    return Connection(
+        config=cloud_config,
+        compute_api_version=NOVA_API_VERSION,
+    )
 
 
 def blazar(session=None) -> "BlazarClient":
@@ -56,7 +64,7 @@ def neutron(session=None) -> "NeutronClient":
 
 def nova(session=None) -> "NovaClient":
     from novaclient.client import Client as NovaClient
-    return NovaClient('2.10', session=(session or session_factory()))
+    return NovaClient(NOVA_API_VERSION, session=(session or session_factory()))
 
 
 def ironic(session=None) -> "IronicClient":
