@@ -256,7 +256,7 @@ def create_subnet(subnet_name, network_id,
             }
         ]
 
-     
+
     subnet_rtn = neutron().create_subnet(body={
         'subnets': [ subnet ]
     })
@@ -613,19 +613,31 @@ def remove_subnet_from_router(router_id, subnet_id):
 # Floating IPs
 ###############
 
-def get_free_floating_ip() -> dict:
+def get_free_floating_ip(allocate=True) -> dict:
     """Get the first unallocated floating IP available to your project.
+
+    Args:
+        allocate (bool): Whether to allocate a new floating IP if there are no
+            Floating IPs currently free in your project. Defaults to True.
 
     Returns:
         The free floating IP representation.
     """
-    ips = neutron().list_floatingips()['floatingips']
+    _neutron = neutron()
+    ips = _neutron.list_floatingips()['floatingips']
     unbound = (ip for ip in ips if ip['port_id'] is None)
     try:
         fip = next(unbound)
         return fip
     except StopIteration:
-        raise Exception("No free floating IP found")
+        if not allocate:
+            raise RuntimeError(
+                "No free floating IPs in project and not allocating a new one")
+        return _neutron.create_floatingip({
+            "floatingip": {
+                "floating_network_id": get_network_id(PUBLIC_NETWORK),
+            }
+        })["floatingip"]
 
 
 def get_or_create_floating_ip() -> 'tuple[dict,bool]':
@@ -640,7 +652,8 @@ def get_or_create_floating_ip() -> 'tuple[dict,bool]':
             available to allocate.
     """
     try:
-        fip = get_free_floating_ip()
+        # Set allocate=False so we explicitly know if we created one.
+        fip = get_free_floating_ip(allocate=False)
         created = False
     except Exception:
         network_id = get_network_id(PUBLIC_NETWORK)
