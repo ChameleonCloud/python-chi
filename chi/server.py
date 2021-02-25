@@ -27,6 +27,8 @@ __all__ = [
     'show_server_by_name',
 
     'create_server',
+    'associate_floating_ip',
+    'detach_floating_ip',
 ]
 
 DEFAULT_IMAGE = 'CC-CentOS7'
@@ -427,18 +429,41 @@ def show_server_by_name(name) -> NovaServer:
     return show_server(server_id)
 
 
+
 def associate_floating_ip(server_name, floating_ip_address=None):
-    server_id = get_server_id(server_name)
-
-    if floating_ip_address:
-        fip = get_floating_ip(floating_ip_address)
-    else:
+    #TODO: This function should add fip to a port, not a server
+    server = get_server(server_name)
+    
+    if floating_ip_address == None:
         fip = get_free_floating_ip()
-
+    else:
+        fip = get_floating_ip(floating_ip_address)
+  
+    if fip == None:
+        return
     ip = fip['floating_ip_address']
-    connection().compute.add_floating_ip_to_server(server_id, ip)
-
+    
+    # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
+    ports = neutron().list_ports(**{'device_id': server.id}).get('ports')
+    
+    fip_target = {
+        'port_id': ports[0]['id'],
+        'ip_addr': ports[0]['fixed_ips'][0]['ip_address']
+    }
+    # https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/dashboards/project/instances/tables.py#L671
+    target_id = fip_target['port_id']
+    neutron().update_floatingip(fip['id'], body={
+             'floatingip': {
+                 'port_id': target_id,
+                 # 'fixed_ip_address': ip_address,
+              }
+          }
+    )
     return ip
+
+
+
+
 
 
 def detach_floating_ip(server_name, floating_ip_address):

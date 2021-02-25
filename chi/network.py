@@ -222,7 +222,10 @@ def get_subnet_id(name) -> str:
     return _resolve_id('subnets', name)
 
 
-def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
+def create_subnet(subnet_name, network_id,
+                  cidr='192.168.1.0/24',
+                  allocation_pool_start=None,
+                  allocation_pool_end=None,
                   gateway_ip=None) -> dict:
     """Create a subnet on a network.
 
@@ -245,19 +248,20 @@ def create_subnet(subnet_name, network_id, cidr='192.168.1.0/24',
     }
     if gateway_ip:
         subnet['gateway_ip'] = gateway_ip
-
-    subnet = neutron().create_subnet(body={
-        'subnets': [
+    if allocation_pool_start and allocation_pool_end:
+        subnet['allocation_pools']= [
             {
-                'name': subnet_name,
-                'cidr': cidr,
-                'ip_version': 4,
-                'network_id': network_id,
+            "start": allocation_pool_start,
+            "end": allocation_pool_end,
             }
         ]
+
+     
+    subnet_rtn = neutron().create_subnet(body={
+        'subnets': [ subnet ]
     })
 
-    return subnet['subnets'][0]
+    return subnet_rtn['subnets'][0]
 
 
 def delete_subnet(subnet_id):
