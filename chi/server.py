@@ -2,6 +2,7 @@ from datetime import datetime
 from operator import attrgetter
 
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
+from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
 from novaclient.exceptions import NotFound
 
@@ -11,7 +12,7 @@ from .keypair import Keypair
 from .image import get_image, get_image_id
 from .network import (get_network_id, get_or_create_floating_ip,
                       get_floating_ip, get_free_floating_ip)
-from .util import random_base32
+from .util import random_base32, sshkey_fingerprint
 
 __all__ = [
     'get_flavor',
@@ -31,6 +32,8 @@ __all__ = [
 
     'associate_floating_ip',
     'detach_floating_ip',
+
+    'update_keypair',
 ]
 
 DEFAULT_IMAGE = 'CC-CentOS7'
@@ -441,6 +444,17 @@ def show_server_by_name(name) -> NovaServer:
 
 
 def associate_floating_ip(server_name, floating_ip_address=None):
+    """Associate an allocated Floating IP with a server by name.
+
+    If no Floating IP is specified, one will be allocated dynamically.
+
+    Args:
+        server_name (str): The name of the server.
+        floating_ip_address (str): The IPv4 address of the Floating IP to
+            assign. If specified, this Floating IP must already be allocated
+            to the project.
+
+    """
     server_id = get_server_id(server_name)
 
     if floating_ip_address:
@@ -455,9 +469,62 @@ def associate_floating_ip(server_name, floating_ip_address=None):
 
 
 def detach_floating_ip(server_name, floating_ip_address):
+    """Remove an allocated Floating IP from a server by name.
+
+    Args:
+        server_name (str): The name of the server.
+        floating_ip_address (str): The IPv4 address of the Floating IP to
+            remove from the server.
+
+    """
     server_id = get_server_id(server_name)
     connection().compute.remove_floating_ip_from_server(
         server_id, floating_ip_address)
+
+
+############
+# Key pairs
+############
+
+def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
+    """Update a key pair's public key.
+
+    Due to how OpenStack Nova works, this requires deleting and re-creating the
+    key even for public key updates. The key will not be re-created if it
+    already exists and the fingerprints match.
+
+    Args:
+        key_name (str): The name of the key pair to update. Defaults to value
+            of the "key_name" context variable.
+        public_key (str): The public key to update the key pair to reference.
+            Defaults to the contents of the file specified by the
+            "keypair_public_key" context variable.
+
+    Returns:
+        The updated (or created) key pair.
+    """
+    if not key_name:
+        key_name = get_from_context("key_name")
+    if not public_key:
+        public_key_path = get_from_context("keypair_public_key")
+        if public_key_path:
+            with open(public_key_path, "r") as pubkey:
+                public_key = pubkey.read().strip()
+
+    assert key_name is not None
+    assert public_key is not None
+
+    _nova = nova()
+    try:
+        existing = _nova.keypairs.get(key_name)
+        if existing.fingerprint == sshkey_fingerprint(public_key):
+            return existing
+        _nova.keypairs.delete(key_name)
+        return _nova.keypairs.create(
+            key_name, public_key=public_key, key_type="ssh")
+    except NotFound:
+        return _nova.keypairs.create(
+            key_name, public_key=public_key, key_type="ssh")
 
 
 ##########
@@ -477,7 +544,8 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
             reservation for bare metal server instances.
         key_name (str): A key pair name to associate with the server. Any user
             holding the private key for the key pair will be able to SSH to
-            the instance as the ``cc`` user.
+            the instance as the ``cc`` user. Defaults to the key specified
+            by the "key_name" context variable.
         network_id (str): The network ID to connect the server to. The server
             will obtain an IP address on this network when it boots.
         network_name (str): The name of the network to connect the server to.
@@ -506,7 +574,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
     if count < 1:
         raise ValueError('Must launch at least one server.')
     if not key_name:
-        key_name = get_from_context('key_name')
+        key_name = update_keypair().id
     if not network_id:
         network_id = get_network_id(network_name)
     if not nics:

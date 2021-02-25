@@ -5,5 +5,6 @@ openstacksdk
 paramiko
 python-blazarclient
 python-glanceclient
+python-ironicclient
 python-neutronclient
 python-novaclient
