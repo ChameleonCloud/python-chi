@@ -585,7 +585,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         if flavor_name:
             flavor_id = get_flavor_id(flavor_name)
         else:
-            flavor_id = next(f.id for f in list_flavors(), None)
+            flavor_id = next((f.id for f in list_flavors()), None)
             if not flavor_id:
                 raise NotFound('Could not auto-select flavor to use')
 
