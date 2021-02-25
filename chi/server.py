@@ -448,20 +448,18 @@ def show_server_by_name(name) -> NovaServer:
     return show_server(server_id)
 
 
-def associate_floating_ip(server_name, floating_ip_address=None):
-    """Associate an allocated Floating IP with a server by name.
+def associate_floating_ip(server_id, floating_ip_address=None):
+    """Associate an allocated Floating IP with a server.
 
     If no Floating IP is specified, one will be allocated dynamically.
 
     Args:
-        server_name (str): The name of the server.
+        server_id (str): The ID of the server.
         floating_ip_address (str): The IPv4 address of the Floating IP to
             assign. If specified, this Floating IP must already be allocated
             to the project.
 
     """
-    server_id = get_server_id(server_name)
-
     if floating_ip_address:
         fip = get_floating_ip(floating_ip_address)
     else:
@@ -473,16 +471,15 @@ def associate_floating_ip(server_name, floating_ip_address=None):
     return ip
 
 
-def detach_floating_ip(server_name, floating_ip_address):
+def detach_floating_ip(server_id, floating_ip_address):
     """Remove an allocated Floating IP from a server by name.
 
     Args:
-        server_name (str): The name of the server.
+        server_id (str): The name of the server.
         floating_ip_address (str): The IPv4 address of the Floating IP to
             remove from the server.
 
     """
-    server_id = get_server_id(server_name)
     connection().compute.remove_floating_ip_from_server(
         server_id, floating_ip_address)
 
