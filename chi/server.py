@@ -502,7 +502,10 @@ def wait_for_active(server_id, timeout=(60 * 20)):
             Defaults to 20 minutes.
 
     """
-    return connection().compute.wait_for_server(server_id, wait=timeout)
+    from openstack.compute.v2.server import Server
+    compute = connection().compute
+    server = compute._get_resource(Server, server_id)
+    return compute.wait_for_server(server, wait=timeout)
 
 
 def wait_for_tcp(host, port, timeout=(60 * 20)):

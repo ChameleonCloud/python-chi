@@ -29,6 +29,9 @@ def connection(session=None) -> "Connection":
     from openstack.config import cloud_region
     from openstack.connection import Connection
     sess = session or session_factory()
+    if hasattr(sess, 'session'):
+        # Handle Adapters, which have a nested Session
+        sess = sess.session
     cloud_config = cloud_region.from_session(sess)
     return Connection(
         config=cloud_config,
