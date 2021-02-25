@@ -18,6 +18,7 @@ __all__ = [
     'get_flavor_id',
     'show_flavor',
     'show_flavor_by_name',
+    'list_flavors',
 
     'get_server',
     'get_server_id',
@@ -27,6 +28,7 @@ __all__ = [
     'show_server_by_name',
 
     'create_server',
+
     'associate_floating_ip',
     'detach_floating_ip',
 ]
@@ -336,6 +338,15 @@ def show_flavor_by_name(name) -> NovaFlavor:
     return show_flavor(flavor_id)
 
 
+def list_flavors() -> 'list[NovaFlavor]':
+    """Get a list of all available flavors.
+
+    Returns:
+        A list of all flavors.
+    """
+    return nova().flavors.list()
+
+
 ##########
 # Servers
 ##########
@@ -429,41 +440,18 @@ def show_server_by_name(name) -> NovaServer:
     return show_server(server_id)
 
 
-
 def associate_floating_ip(server_name, floating_ip_address=None):
-    #TODO: This function should add fip to a port, not a server
-    server = get_server(server_name)
-    
-    if floating_ip_address == None:
-        fip = get_free_floating_ip()
-    else:
+    server_id = get_server_id(server_name)
+
+    if floating_ip_address:
         fip = get_floating_ip(floating_ip_address)
-  
-    if fip == None:
-        return
+    else:
+        fip = get_free_floating_ip()
+
     ip = fip['floating_ip_address']
-    
-    # using method from https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/api/neutron.py#L518
-    ports = neutron().list_ports(**{'device_id': server.id}).get('ports')
-    
-    fip_target = {
-        'port_id': ports[0]['id'],
-        'ip_addr': ports[0]['fixed_ips'][0]['ip_address']
-    }
-    # https://github.com/ChameleonCloud/horizon/blob/f5cf987633271518970b24de4439e8c1f343cad9/openstack_dashboard/dashboards/project/instances/tables.py#L671
-    target_id = fip_target['port_id']
-    neutron().update_floatingip(fip['id'], body={
-             'floatingip': {
-                 'port_id': target_id,
-                 # 'fixed_ip_address': ip_address,
-              }
-          }
-    )
+    connection().compute.add_floating_ip_to_server(server_id, ip)
+
     return ip
-
-
-
-
 
 
 def detach_floating_ip(server_name, floating_ip_address):
@@ -476,10 +464,10 @@ def detach_floating_ip(server_name, floating_ip_address):
 # Wizards
 ##########
 
-def create_server(server_name, reservation_id, key_name=None, network_id=None,
+def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
                   network_name=DEFAULT_NETWORK, nics=[], image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=BAREMETAL_FLAVOR, count=1) -> 'Union[NovaServer,list[NovaServer]]':
+                  flavor_name=None, count=1) -> 'Union[NovaServer,list[NovaServer]]':
     """Launch a new server instance.
 
     Args:
@@ -499,10 +487,11 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
         image_name (str): The name of the image to user for the server's disk
             image. If ``image_id`` is also set, that takes priority.
             (Default ``DEFAULT_IMAGE``.)
-        flavor_id (str): The flavor ID to use when launching the server.
-            (Default ``BAREMETAL_FLAVOR``).
+        flavor_id (str): The flavor ID to use when launching the server. If not
+            set, and no ``flavor_name`` is set, the first flavor found is used.
         flavor_name (str): The name of the flavor to use when launching the
-            server. If ``flavor_id`` is also set, that takes priority.
+            server. If ``flavor_id`` is also set, that takes priority. If not
+            set, and no ``flavor_id`` is set, the first flavor found is used.
         count (int): The number of instances to launch. When launching bare
             metal server instances, this number must be less than or equal to
             the total number of hosts reserved. (Default 1).
@@ -525,12 +514,22 @@ def create_server(server_name, reservation_id, key_name=None, network_id=None,
     if not image_id:
         image_id = get_image_id(image_name)
     if not flavor_id:
-        flavor_id = get_flavor_id(flavor_name)
+        if flavor_name:
+            flavor_id = get_flavor_id(flavor_name)
+        else:
+            flavor_id = next(f.id for f in list_flavors(), None)
+            if not flavor_id:
+                raise NotFound('Could not auto-select flavor to use')
+
+    scheduler_hints = {}
+    if reservation_id:
+        scheduler_hints['reservation'] = reservation_id
+
     server = nova().servers.create(
         name=server_name,
         image=image_id,
         flavor=flavor_id,
-        scheduler_hints={'reservation': reservation_id},
+        scheduler_hints=scheduler_hints,
         key_name=key_name,
         nics=nics,
         min_count=count,
