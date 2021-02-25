@@ -1,5 +1,7 @@
 from datetime import datetime
 from operator import attrgetter
+import socket
+import time
 
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
@@ -32,6 +34,9 @@ __all__ = [
 
     'associate_floating_ip',
     'detach_floating_ip',
+
+    'wait_for_active',
+    'wait_for_tcp',
 
     'update_keypair',
 ]
@@ -481,6 +486,60 @@ def detach_floating_ip(server_name, floating_ip_address):
     connection().compute.remove_floating_ip_from_server(
         server_id, floating_ip_address)
 
+
+def wait_for_active(server_id, timeout=(60 * 20)):
+    """Wait for the server to go in to the ACTIVE state.
+
+    If the server goes in to an ERROR state, this function will terminate. This
+    is a blocking function.
+
+    .. note::
+
+       For bare metal servers, when the server transitions to ACTIVE state, this
+       actually indicates it has started its final boot. It may still take some
+       time for the boot to complete and interfaces e.g., SSH to come up.
+
+       If you want to wait for a TCP service like SSH, refer to
+       :func:`wait_for_port`.
+
+    Args:
+        server_id (str): The ID of the server.
+        timeout (int): The number of seconds to wait for before giving up.
+            Defaults to 20 minutes.
+
+    """
+    return connection().compute.wait_for_server(server_id, wait=timeout)
+
+
+def wait_for_tcp(host, port, timeout=(60 * 20)):
+    """Wait until a port on a server starts accepting TCP connections.
+
+    The implementation is taken from `wait_for_tcp_port.py
+    <https://gist.github.com/butla/2d9a4c0f35ea47b7452156c96a4e7b12>`_.
+
+    Args:
+        host (str): The host that should be accepting connections. This can
+            be either a Floating IP or a hostname.
+        port (int): Port number.
+        timeout (int): How long to wait before raising errors, in seconds.
+            Defaults to 20 minutes.
+
+    Raises:
+        TimeoutError: If the port isn't accepting connection after time
+            specified in `timeout`.
+    """
+    start_time = time.perf_counter()
+
+    while True:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                break
+        except OSError as ex:
+            time.sleep(0.01)
+            if time.perf_counter() - start_time >= timeout:
+                raise TimeoutError((
+                    f'Waited too long for the port {port} on host {host} to '
+                    'start accepting connections.')) from ex
 
 ############
 # Key pairs
