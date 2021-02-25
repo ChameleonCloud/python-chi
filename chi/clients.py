@@ -56,7 +56,7 @@ def neutron(session=None) -> "NeutronClient":
 
 def nova(session=None) -> "NovaClient":
     from novaclient.client import Client as NovaClient
-    return NovaClient('2', session=(session or session_factory()))
+    return NovaClient('2.10', session=(session or session_factory()))
 
 
 def ironic(session=None) -> "IronicClient":
