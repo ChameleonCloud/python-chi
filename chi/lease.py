@@ -23,6 +23,7 @@ __all__ = [
     'get_lease_id',
     'create_lease',
     'delete_lease',
+    'wait_for_active',
 ]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
@@ -578,3 +579,26 @@ def delete_lease(ref):
     lease_id = lease['id']
     blazar().lease.delete(lease_id)
     print(f'Deleted lease with id {lease_id}')
+
+
+def wait_for_active(ref):
+    """Wait for the lease to become active.
+
+    This function will wait for 2.5 minutes, which is a somewhat arbitrary
+    amount of time.
+
+    Args:
+        ref (str): The name or ID of the lease.
+
+    Raises:
+        TimeoutError: If the lease fails to become active within the timeout.
+    """
+    for _ in range(15):
+        time.sleep(10)
+        status = get_lease(ref)['status']
+        if status == 'ACTIVE':
+            break
+        elif status == 'ERROR':
+            raise RuntimeError("Lease went into ERROR state")
+    else:
+        raise TimeoutError("Lease failed to start")
