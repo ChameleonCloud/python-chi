@@ -54,9 +54,10 @@ class SessionWithAccessTokenRefresh(session.Session):
 
     def __init__(self, auth=None, **kwargs):
         def get_access_token(_auth):
+            expires_at = getattr(_auth, '_expires_at', time.time())
             should_refresh = (
-                _auth._expires_at - time.time() < self.REFRESH_THRESHOLD)
-            if not _auth._access_token or should_refresh:
+                expires_at - time.time() < self.REFRESH_THRESHOLD)
+            if not getattr(_auth, '_access_token', None) or should_refresh:
                 try:
                     access_token, expires_at = jupyterhub.refresh_access_token()
                     _auth._access_token = access_token
