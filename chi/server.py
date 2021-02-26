@@ -494,7 +494,7 @@ def wait_for_active(server_id, timeout=(60 * 20)):
        time for the boot to complete and interfaces e.g., SSH to come up.
 
        If you want to wait for a TCP service like SSH, refer to
-       :func:`wait_for_port`.
+       :func:`wait_for_tcp`.
 
     Args:
         server_id (str): The ID of the server.
