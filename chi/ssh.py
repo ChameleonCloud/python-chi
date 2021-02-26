@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from fabric import Connection
 from paramiko.client import WarningPolicy
 
