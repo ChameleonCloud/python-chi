@@ -56,6 +56,7 @@ For more details about the modules available refer to their respective pages.
    :caption: Modules
    :maxdepth: 1
 
+   modules/context
    modules/lease
    modules/server
    modules/network
