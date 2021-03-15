@@ -203,6 +203,29 @@ def params():
 
 
 def use_site(site_name):
+    """Configure the global request context to target a particular CHI site.
+
+    Targeting a site will mean that leases, instance launch requests, and any
+    other API calls will be sent to that site. By default, no site is selected,
+    and one must be explicitly chosen.
+
+    .. code-block:: python
+
+       chi.use_site("CHI@UC")
+
+    Changing the site will affect future calls the client makes, implicitly.
+    Therefore something like this is possible:
+
+    .. code-block:: python
+
+       chi.use_site("CHI@UC")
+       chi.lease.create_lease("my-uc-lease", reservations)
+       chi.use_site("CHI@TACC")
+       chi.lease.create_lease("my-tacc-lease", reservations)
+
+    Args:
+        site_name (str): The name of the site, e.g., "CHI@UC".
+    """
     global _sites
     if not _sites:
         res = requests.get(f'{RESOURCE_API_URL}/sites.json')
