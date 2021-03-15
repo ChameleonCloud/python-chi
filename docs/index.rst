@@ -41,16 +41,17 @@ For more details about the modules available refer to their respective pages.
   # Select your site
   chi.use_site('CHI@UC')
 
-  # Make a reservation
+  # Make a reservation ...
   reservations = []
+  # ... for one node of type "compute_skylake"
   chi.lease.add_node_reservation(
-    reservations, node_type='compute_skylake', count=1)
+      reservations, node_type='compute_skylake', count=1)
+  # ... and one Floating IP
+  chi.lease.add_fip_reservation(count=1)
+  # ... for one day.
   start_date, end_date = chi.lease.lease_duration(days=1)
-  blazar().lease.create(name=lease_name,
-                        start=start_date,
-                        end=end_date,
-                        reservations=reservation_list,
-                        events=[])
+  chi.lease.create_lease(
+      lease_name, reservations, start_date=start_date, end_date=end_date)
 
 .. toctree::
    :caption: Modules
