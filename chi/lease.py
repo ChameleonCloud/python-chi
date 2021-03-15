@@ -596,15 +596,18 @@ def wait_for_active(ref):
     Args:
         ref (str): The name or ID of the lease.
 
+    Returns:
+        The lease in ACTIVE state.
+
     Raises:
         TimeoutError: If the lease fails to become active within the timeout.
     """
     for _ in range(15):
-        time.sleep(10)
-        status = get_lease(ref)['status']
+        lease = get_lease(ref)
+        status = lease['status']
         if status == 'ACTIVE':
-            break
+            return lease
         elif status == 'ERROR':
             raise RuntimeError("Lease went into ERROR state")
-    else:
-        raise TimeoutError("Lease failed to start")
+        time.sleep(10)
+    raise TimeoutError("Lease failed to start")
