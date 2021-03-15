@@ -13,6 +13,9 @@ from .network import get_network_id, PUBLIC_NETWORK
 from .server import Server, ServerError
 from .util import random_base32, utcnow
 
+import logging
+LOG = logging.getLogger(__name__)
+
 __all__ = [
     'add_node_reservation',
     'add_network_reservation',
@@ -386,10 +389,13 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
         ValueError: If no reservation was found, or multiple were found.
     """
     lease = get_lease(lease_ref)
-    try:
-        reservations = json.loads(lease.get("reservations"))
-    except Exception:
-        reservations = []
+    reservations = lease.get("reservations", [])
+    if isinstance(reservations, str):
+        LOG.info("Blazar returned nested JSON structure, unpacking.")
+        try:
+            reservations = json.loads(reservations)
+        except Exception:
+            pass
 
     def _passes(res):
         if res.get("resource_type") != "physical:host":
