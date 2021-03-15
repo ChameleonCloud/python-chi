@@ -48,6 +48,7 @@ __all__ = [
     'get_free_floating_ip',
     'get_floating_ip',
     'list_floating_ips',
+    'bind_floating_ip',
 
     'nuke_network',
 ]
@@ -322,20 +323,39 @@ def get_port_id(name) -> str:
     return _resolve_id('ports', name)
 
 
-def create_port(port_name, network_id, subnet_id=None, ip_address=None,
+def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_address=None,
                port_security_enabled=True) -> dict:
     """Create a new port on a network.
+
+    This function has a short-form and a long-form invocation. In the short form,
+    you can specify ``subnet_id`` and ``ip_address`` to give the port a single
+    assignment on a subnet. In the long form you can specify ``fixed_ips`` to
+    define multiple assignments.
 
     Args:
         port_name (str): The name to give the new port.
         network_id (str): The ID of the network that the port will be
             connected to.
+        fixed_ips (list[dict]): A list of IP assignments to give to the port
+            on various subnets. Each assignment must at minimum have a ``subnet_id``
+            defined. An optional ``ip_address`` can be included on an assignment
+            to specify the exact IP address to assign. Otherwise, one is chosen
+            automatically from the available IPs on the subnet. There can be
+            multiple assignments (i.e., IPs) on a single subnet.
         subnet_id (str): The ID of the subnet that the port will be allocated
             on. The port will be automatically assigned an IP address on this
             subnet, unless the ``ip_address`` parameter is provided.
+
+            .. note::
+               This parameter is ignored if ``fixed_ips`` is set.
+
         ip_address (str): The IP address to assign the port, if a specific
             IP address is desired. By default an IP address is automatically
             picked from the target subnet.
+
+            .. note::
+               This parameter is ignored if ``fixed_ips`` is set.
+
         port_security_enabled (bool): Whether to enable `port security
             <https://wiki.openstack.org/wiki/Neutron/ML2PortSecurityExtensionDriver>`_.
             In general this should be kept on. (Default True).
@@ -349,13 +369,13 @@ def create_port(port_name, network_id, subnet_id=None, ip_address=None,
         'port_security_enabled': port_security_enabled,
     }
 
-    if subnet_id != None:
-        fixed_ip = {
-            'subnet_id': subnet_id,
-        }
-        if ip_address != None:
+    if fixed_ips is None and subnet_id is not None:
+        fixed_ip = {'subnet_id': subnet_id}
+        if ip_address is not None:
             fixed_ip['ip_address'] = ip_address
-        port['fixed_ips'] = [fixed_ip]
+        fixed_ips = [fixed_ip]
+
+    port['fixed_ips'] = fixed_ips
 
     return neutron().create_port(body={'port': port})
 
@@ -691,6 +711,29 @@ def list_floating_ips() -> 'list[dict]':
         A list of all the found floating ips.
     """
     return neutron().list_floatingips()["floatingips"]
+
+
+def bind_floating_ip(ip_address, port_id=None, fixed_ip_address=None):
+    """Directly assign a Floating IP to an existing port/address.
+
+    .. note::
+       If you just want to attach a Floating IP to a server instance, the
+       :func:`chi.server.associate_floating_ip` function is simpler.
+
+    Args:
+        ip_address (str): The Floating IP address.
+        port_id (str): The ID of the port to bind to.
+        fixed_ip_address (str): The address in the port to bind to. This is
+            only required if the port has multiple IP addresses assigned; by
+            default the first IP in a port is bound.
+    """
+    fip = get_floating_ip(ip_address)
+    neutron().update_floatingip(fip["id"], body={
+        "floatingip": {
+            "port_id": port_id,
+            "fixed_ip_address": fixed_ip_address,
+        }
+    })
 
 
 def nuke_network(network_name):
