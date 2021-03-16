@@ -9,7 +9,7 @@ from neutronclient.v2_0.client import Client as NeutronClient
 
 from .clients import blazar
 from .context import get as get_from_context, session
-from .network import get_network_id, PUBLIC_NETWORK
+from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
 from .server import Server, ServerError
 from .util import random_base32, utcnow
 
@@ -20,7 +20,8 @@ __all__ = [
     'add_node_reservation',
     'add_network_reservation',
     'add_fip_reservation',
-    'get_floating_ip_by_reservation_id',
+    'get_node_reservation',
+    'get_reserved_floating_ips',
     'lease_duration',
     'get_lease',
     'get_lease_id',
@@ -388,16 +389,7 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
     Raises:
         ValueError: If no reservation was found, or multiple were found.
     """
-    lease = get_lease(lease_ref)
-    reservations = lease.get("reservations", [])
-    if isinstance(reservations, str):
-        LOG.info("Blazar returned nested JSON structure, unpacking.")
-        try:
-            reservations = json.loads(reservations)
-        except Exception:
-            pass
-
-    def _passes(res):
+    def _find_node_reservation(res):
         if res.get("resource_type") != "physical:host":
             return False
         if (count is not None
@@ -409,14 +401,51 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
             return False
         return True
 
-    node_reservations = [r for r in reservations if _passes(r)]
-    if not node_reservations:
-        raise ValueError("No node reservation found")
-    elif len(node_reservations) > 1:
-        raise ValueError("Multiple node reservations found")
-    else:
-        return node_reservations[0]
+    res = _reservation_matching(lease_ref, _find_node_reservation)
+    return res["id"]
 
+
+def get_reserved_floating_ips(lease_ref) -> "list[str]":
+    """Get a list of Floating IP addresses reserved in a lease.
+
+    Args:
+        lease_ref (str): The ID or name of the lease.
+
+    Returns:
+        A list of all reserved Floating IP addresses, if any were reserved.
+    """
+    def _find_fip_reservation(res):
+        return res.get("resource_type") == "virtual:floatingip"
+
+    res = _reservation_matching(lease_ref, _find_fip_reservation, multiple=True)
+    fips = list_floating_ips()
+    return [
+        fip["floating_ip_address"] for fip in fips
+        if any(f"reservation:{r['id']}" in fip["tags"] for r in res)
+    ]
+
+
+def _reservation_matching(lease_ref, match_fn, multiple=False):
+    lease = get_lease(lease_ref)
+    reservations = lease.get("reservations", [])
+    if isinstance(reservations, str):
+        LOG.info("Blazar returned nested JSON structure, unpacking.")
+        try:
+            reservations = json.loads(reservations)
+        except Exception:
+            pass
+
+    matches = [r for r in reservations if match_fn(r)]
+
+    if not matches:
+        raise ValueError("No matching reservation found")
+
+    if multiple:
+        return matches
+    else:
+        if len(matches) > 1:
+            raise ValueError("Multiple matching reservations found")
+        return matches[0]
 
 
 def add_network_reservation(reservation_list,
@@ -473,11 +502,6 @@ def add_fip_reservation(reservation_list, count=1):
         'network_id': get_network_id(PUBLIC_NETWORK),
         'amount': count
     })
-
-
-def get_floating_ip_by_reservation_id(reservation_id):
-    # blazar().lease.list()
-    pass
 
 
 def lease_duration(days=1, hours=0):
