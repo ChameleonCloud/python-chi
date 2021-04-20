@@ -736,7 +736,7 @@ def bind_floating_ip(ip_address, port_id=None, fixed_ip_address=None):
     })
 
 
-def nuke_network(network_name):
+def nuke_network(network_ref: str):
     """Completely tear down the network.
 
     Cleanly tearing down an OpenStack network representation involves a few
@@ -756,9 +756,9 @@ def nuke_network(network_name):
        if your network's subnets are attached to multiple routers.
 
     Args:
-        network_name (str): The network name.
+        network_ref (str): The network name or ID.
     """
-    network = get_network(network_name)
+    network = get_network(network_ref)
     network_id = network["id"]
 
     #Detach the router from all of its networks
