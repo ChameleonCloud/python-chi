@@ -141,7 +141,7 @@ def ironic(session=None) -> "IronicClient":
     from ironicclient import client as IronicClient
     return IronicClient.get_client(
         '1',
-        session=session,
+        session=(session or session_factory()),
         region_name=getattr(session, 'region_name', None),
         # Ironic client defaults to 1.9 currently,
         # "latest" will be latest the API supports
