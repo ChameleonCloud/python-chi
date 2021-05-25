@@ -5,9 +5,8 @@ import sys
 import time
 
 from blazarclient.exception import BlazarClientException
-from neutronclient.v2_0.client import Client as NeutronClient
 
-from .clients import blazar
+from .clients import blazar, neutron
 from .context import get as get_from_context, session
 from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
 from .server import Server, ServerError
@@ -188,10 +187,8 @@ class Lease(object):
         kwargs.setdefault("session", session())
 
         self.session = kwargs.pop("session")
-        self.blazar = BlazarClient(
-            "1", service_type="reservation", session=self.session
-        )
-        self.neutron = NeutronClient(session=self.session)
+        self.blazar = blazar(session=self.session)
+        self.neutron = neutron(session=self.session)
 
         self.lease = None
 
