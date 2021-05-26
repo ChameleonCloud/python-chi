@@ -539,7 +539,12 @@ def get_lease(ref) -> dict:
     try:
         return blazar().lease.get(ref)
     except BlazarClientException as err:
-        if err.code == 404:
+        # Blazar's exception class is a bit odd and stores the actual code
+        # in 'kwargs'. The 'code' attribute on the exception is just the default
+        # code. Prefer to use .kwargs['code'] if present, fall back to .code
+        code = (
+            getattr(err, "kwargs", {}).get("code", getattr(err, "code", None)))
+        if code == 404:
             return blazar().lease.get(get_lease_id(ref))
         else:
             raise
