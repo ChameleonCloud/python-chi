@@ -11,7 +11,7 @@ def example_reserve_node():
     """Reserve a bare metal node.
 
     Multiple nodes can be reserved at once by changing the `count` variable.
-    This example makes a reservation for the "compute_haswell" node type.
+    This example makes a reservation for the "compute_skylake" node type.
     [See here](https://chameleoncloud.readthedocs.io/en/latest/technical/reservations.html#chameleon-node-types)
     for a complete list of node types available currently.
 
@@ -29,7 +29,7 @@ def example_reserve_node():
     from chi.lease import lease_duration, add_node_reservation, create_lease
 
     lease_name = "myLease"
-    node_type = "compute_haswell"
+    node_type = "compute_skylake"
     start_date, end_date = lease_duration(days=1)
 
     # Build list of reservations (in this case there is only one reservation)
@@ -54,7 +54,7 @@ def test_example_reserve_node(mocker, now):
         reservations=[{
             'resource_type': 'physical:host',
             'hypervisor_properties': '', 'max': 1, 'min': 1,
-            'resource_properties': '["==", "$node_type", "compute_haswell"]',
+            'resource_properties': '["==", "$node_type", "compute_skylake"]',
         }]
     )
 
@@ -210,7 +210,7 @@ def example_reserve_multiple_resources():
 
     # Build list of reservations
     reservations = []
-    add_node_reservation(reservations, count=1, node_type="compute_haswell")
+    add_node_reservation(reservations, count=1, node_type="compute_skylake")
     add_network_reservation(reservations, network_name=f"{lease_name}Network")
     add_fip_reservation(reservations, count=1)
 
@@ -234,7 +234,7 @@ def test_example_reserve_multiple_resources(mocker, now):
         reservations=[{
             'resource_type': 'physical:host',
             'hypervisor_properties': '', 'max': 1, 'min': 1,
-            'resource_properties': '["==", "$node_type", "compute_haswell"]',
+            'resource_properties': '["==", "$node_type", "compute_skylake"]',
         }, {
             'resource_type': 'network',
             'network_name': 'myLeaseNetwork',
