@@ -32,7 +32,6 @@ __all__ = [
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 NODE_TYPES = {
     "compute_skylake",
-    "compute_skylake",
     "compute_haswell_ib",
     "storage",
     "storage_hierarchy",
