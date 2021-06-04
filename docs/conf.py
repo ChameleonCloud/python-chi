@@ -125,7 +125,7 @@ nbsphinx_prolog = r"""
 
 """
 
-from . import generate_notebook
+import generate_notebook
 
 for title, file, examples in notebook_examples:
     generate_notebook.generate(examples, output_file=file, title=title)
