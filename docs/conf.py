@@ -61,7 +61,13 @@ description = "Chameleon Cloud Python API"
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "ChameleonCloudPythonAPI.tex", description, "Nick Timkovich", "manual"),
+    (
+        master_doc,
+        "ChameleonCloudPythonAPI.tex",
+        description,
+        "Nick Timkovich",
+        "manual",
+    ),
 ]
 
 # (source start file, name, description, authors, manual section).
@@ -89,19 +95,27 @@ intersphinx_mapping = {
 }
 
 notebook_examples = [
-    ('Making a reservation', 'notebooks/reservations.ipynb', [
-        'tests/test_lease.py:example_reserve_node',
-        'tests/test_lease.py:example_reserve_floating_ip',
-        'tests/test_lease.py:example_reserve_network',
-        'tests/test_lease.py:example_reserve_multiple_resources',
-    ]),
-    ('Launching a bare metal instance', 'notebooks/baremetal.ipynb', [
-        'tests/test_server.py:example_create_server',
-        'tests/test_server.py:example_wait_for_connectivity',
-    ]),
+    (
+        "Making a reservation",
+        "notebooks/reservations.ipynb",
+        [
+            "tests/test_lease.py:example_reserve_node",
+            "tests/test_lease.py:example_reserve_floating_ip",
+            "tests/test_lease.py:example_reserve_network",
+            "tests/test_lease.py:example_reserve_multiple_resources",
+        ],
+    ),
+    (
+        "Launching a bare metal instance",
+        "notebooks/baremetal.ipynb",
+        [
+            "tests/test_server.py:example_create_server",
+            "tests/test_server.py:example_wait_for_connectivity",
+        ],
+    ),
 ]
 
-nbsphinx_execute = 'never'
+nbsphinx_execute = "never"
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_prolog = r"""
 {% set docname = env.doc2path(env.docname, base=None) %}
@@ -111,8 +125,9 @@ nbsphinx_prolog = r"""
 
 """
 
-import generate_notebook
+from . import generate_notebook
+
 for title, file, examples in notebook_examples:
     generate_notebook.generate(examples, output_file=file, title=title)
     # Also copy to the extras folder
-    generate_notebook.generate(examples, output_file=f'_extras/{file}', title=title)
+    generate_notebook.generate(examples, output_file=f"_extras/{file}", title=title)
