@@ -62,6 +62,7 @@ For more details about the modules available refer to their respective pages.
    modules/server
    modules/network
    modules/image
+   modules/container
 
 .. toctree::
    :caption: Examples

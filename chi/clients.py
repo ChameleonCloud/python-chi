@@ -4,6 +4,7 @@ from .context import session
 # We have to do this because we lazy-import the client definitions
 # inside each function to reduce runtime dependencies.
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from openstack.connection import Connection
     from blazarclient.client import Client as BlazarClient
@@ -13,11 +14,13 @@ if TYPE_CHECKING:
     from novaclient.client import Client as NovaClient
     from ironicclient import client as IronicClient
     from keystoneclient.v3.client import Client as KeystoneClient
+    from zunclient.client import Client as ZunClient
 
 
 session_factory = session
 
 NOVA_API_VERSION = "2.10"
+ZUN_API_VERSION = "1"
 
 
 def connection(session=None) -> "Connection":
@@ -41,8 +44,9 @@ def connection(session=None) -> "Connection":
     """
     from openstack.config import cloud_region
     from openstack.connection import Connection
+
     sess = session or session_factory()
-    if hasattr(sess, 'session'):
+    if hasattr(sess, "session"):
         # Handle Adapters, which have a nested Session
         sess = sess.session
     cloud_config = cloud_region.from_session(sess)
@@ -63,8 +67,10 @@ def blazar(session=None) -> "BlazarClient":
         A new Blazar client.
     """
     from blazarclient.client import Client as BlazarClient
-    return BlazarClient('1', service_type='reservation',
-        session=(session or session_factory()))
+
+    return BlazarClient(
+        "1", service_type="reservation", session=(session or session_factory())
+    )
 
 
 def glance(session=None) -> "GlanceClient":
@@ -78,7 +84,8 @@ def glance(session=None) -> "GlanceClient":
         A new Glance client.
     """
     from glanceclient.client import Client as GlanceClient
-    return GlanceClient('2', session=(session or session_factory()))
+
+    return GlanceClient("2", session=(session or session_factory()))
 
 
 def gnocchi(session=None) -> "GnocchiClient":
@@ -92,6 +99,7 @@ def gnocchi(session=None) -> "GnocchiClient":
         A new Gnocchi client.
     """
     from gnocchiclient.v1.client import Client as GnocchiClient
+
     sess = session or session_factory()
     session_options = dict(auth=sess.session.auth)
     adapter_options = dict(interface=sess.interface, region_name=sess.region_name)
@@ -111,6 +119,7 @@ def neutron(session=None) -> "NeutronClient":
         A new Neutron client.
     """
     from neutronclient.v2_0.client import Client as NeutronClient
+
     return NeutronClient(session=(session or session_factory()))
 
 
@@ -125,6 +134,7 @@ def nova(session=None) -> "NovaClient":
         A new Nova client.
     """
     from novaclient.client import Client as NovaClient
+
     return NovaClient(NOVA_API_VERSION, session=(session or session_factory()))
 
 
@@ -139,13 +149,14 @@ def ironic(session=None) -> "IronicClient":
         A new Ironic client.
     """
     from ironicclient import client as IronicClient
+
     return IronicClient.get_client(
-        '1',
+        "1",
         session=(session or session_factory()),
-        region_name=getattr(session, 'region_name', None),
+        region_name=getattr(session, "region_name", None),
         # Ironic client defaults to 1.9 currently,
         # "latest" will be latest the API supports
-        os_ironic_api_version='latest'
+        os_ironic_api_version="latest",
     )
 
 
@@ -160,9 +171,18 @@ def keystone(session=None) -> "KeystoneClient":
         A new Keystone client.
     """
     from keystoneclient.v3.client import Client as KeystoneClient
+
     sess = session or session_factory()
     # We have to set interface/region_name also on the Keystone client, as it
     # does not smartly inherit the value sent in on a KSA Adapter instance.
-    return KeystoneClient(session=sess,
-        interface=getattr(sess, 'interface', None),
-        region_name=getattr(sess, 'region_name', None))
+    return KeystoneClient(
+        session=sess,
+        interface=getattr(sess, "interface", None),
+        region_name=getattr(sess, "region_name", None),
+    )
+
+
+def zun(session=None) -> "ZunClient":
+    from zunclient.client import Client as ZunClient
+
+    return ZunClient(ZUN_API_VERSION, session=(session or session_factory()))
