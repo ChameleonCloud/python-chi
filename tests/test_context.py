@@ -6,14 +6,15 @@ import requests_mock
 
 import chi
 
+
 def setup_function():
     chi.reset()
 
 
 def test_get():
     value = "KEYNAME"
-    chi.set("key_name", value)
-    assert chi.get("key_name") == value
+    chi.set("keypair_name", value)
+    assert chi.get("keypair_name") == value
 
 
 def test_get_invalid_key():
@@ -23,8 +24,8 @@ def test_get_invalid_key():
 
 def test_set():
     values = ["KEYNAME", "KEYNAME2"]
-    [chi.set("key_name", k) for k in values]
-    assert chi.get("key_name") == values[-1]
+    [chi.set("keypair_name", k) for k in values]
+    assert chi.get("keypair_name") == values[-1]
 
 
 def test_set_invalid_key():
@@ -34,9 +35,9 @@ def test_set_invalid_key():
 
 def test_reset():
     value = "KEYNAME"
-    chi.set("key_name", value)
+    chi.set("keypair_name", value)
     chi.reset()
-    assert chi.get("key_name") == None
+    assert chi.get("keypair_name") == None
 
 
 def test_session():
@@ -89,45 +90,55 @@ def test_set_auth_params_in_any_order():
 
 
 def test_default_from_env():
-    os.environ['OS_AUTH_TYPE'] = 'v3password'
-    os.environ['OS_USERNAME'] = 'USERNAME'
-    os.environ['OS_PASSWORD'] = 'PASSWORD'
-    os.environ['OS_PROJECT_ID'] = 'PROJECT_ID'
+    os.environ["OS_AUTH_TYPE"] = "v3password"
+    os.environ["OS_USERNAME"] = "USERNAME"
+    os.environ["OS_PASSWORD"] = "PASSWORD"
+    os.environ["OS_PROJECT_ID"] = "PROJECT_ID"
     chi.reset()
-    assert chi.get('auth_type') == 'v3password'
-    assert chi.get('username') == 'USERNAME'
-    assert chi.get('password') == 'PASSWORD'
-    assert chi.get('project_id') == 'PROJECT_ID'
+    assert chi.get("auth_type") == "v3password"
+    assert chi.get("username") == "USERNAME"
+    assert chi.get("password") == "PASSWORD"
+    assert chi.get("project_id") == "PROJECT_ID"
 
 
 def test_use_site():
     with requests_mock.Mocker() as m:
-        m.get('https://api.chameleoncloud.org/sites.json', json={'items': [
-            {'name': 'foo', 'web': 'http://web', 'user_support_contact': 'help'}
-        ]})
-        chi.use_site('foo')
-        assert chi.get('auth_url') == 'http://web:5000/v3'
-        assert chi.get('region_name') == 'foo'
+        m.get(
+            "https://api.chameleoncloud.org/sites.json",
+            json={
+                "items": [
+                    {"name": "foo", "web": "http://web", "user_support_contact": "help"}
+                ]
+            },
+        )
+        chi.use_site("foo")
+        assert chi.get("auth_url") == "http://web:5000/v3"
+        assert chi.get("region_name") == "foo"
 
 
 def test_use_site_missing_site():
     with requests_mock.Mocker() as m:
-        m.get('https://api.chameleoncloud.org/sites.json', json={'items': [
-            {'name': 'foo', 'web': 'http://web', 'user_support_contact': 'help'}
-        ]})
+        m.get(
+            "https://api.chameleoncloud.org/sites.json",
+            json={
+                "items": [
+                    {"name": "foo", "web": "http://web", "user_support_contact": "help"}
+                ]
+            },
+        )
         with pytest.raises(ValueError):
-            chi.use_site('bar')
+            chi.use_site("bar")
 
 
 def _test_use_site_error_case(**mock_kwargs):
     """Helper function for default error behavior with .use_site"""
     with requests_mock.Mocker() as m:
-        chi.set('auth_url', 'before_update')
-        chi.set('region_name', 'before_update')
-        m.get('https://api.chameleoncloud.org/sites.json', **mock_kwargs)
-        chi.use_site('foo')
-        assert chi.get('auth_url') == 'before_update'
-        assert chi.get('region_name') == 'before_update'
+        chi.set("auth_url", "before_update")
+        chi.set("region_name", "before_update")
+        m.get("https://api.chameleoncloud.org/sites.json", **mock_kwargs)
+        chi.use_site("foo")
+        assert chi.get("auth_url") == "before_update"
+        assert chi.get("region_name") == "before_update"
 
 
 def test_use_site_http_error():
@@ -135,7 +146,7 @@ def test_use_site_http_error():
 
 
 def test_use_site_empty_list():
-    _test_use_site_error_case(json={'items': []})
+    _test_use_site_error_case(json={"items": []})
 
 
 def test_use_site_malformed():

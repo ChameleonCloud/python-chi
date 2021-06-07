@@ -560,7 +560,7 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
         The updated (or created) key pair.
     """
     if not key_name:
-        key_name = get_from_context("key_name")
+        key_name = get_from_context("keypair_name")
     if not public_key:
         public_key_path = get_from_context("keypair_public_key")
         if public_key_path:
