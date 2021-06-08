@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
+import tarfile
 import time
 import typing
 
@@ -156,6 +158,15 @@ def execute(container_ref: "str", command: "str") -> "dict":
         A summary of the output of the command, with "output" and "exit_code".
     """
     return zun().containers.execute(container_ref, command=command, run=True)
+
+
+def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
+    fd = io.BytesIO()
+    with tarfile.TarFile(fileobj=fd) as tar:
+        tar.add(source, arcname=".")
+    data = fd.read()
+    fd.close()
+    return zun().containers.put_archive(container_ref, dest, data)
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
