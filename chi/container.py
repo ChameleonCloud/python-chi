@@ -212,7 +212,7 @@ def associate_floating_ip(container_ref: "str", floating_ip_address=None) -> "st
 
     container = zun().containers.get(container_ref)
     for net_id, addrs in container.addresses.items():
-        port = next([a["port"] for a in addrs if a["port"]], None)
+        port = next(iter([a["port"] for a in addrs if a["port"]]), None)
         if port:
             bind_floating_ip(floating_ip_address, port_id=port)
             return floating_ip_address
