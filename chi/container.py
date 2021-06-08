@@ -16,7 +16,7 @@ import time
 import typing
 
 from .clients import zun
-from .network import get_network_id
+from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 
 if typing.TYPE_CHECKING:
     from zunclient.v1.containers import Container
@@ -191,3 +191,30 @@ def _wait_for_status(
                     f"{status.lower()}."
                 )
             )
+
+
+def associate_floating_ip(container_ref: "str", floating_ip_address=None) -> "str":
+    """Assign a Floating IP address to a container.
+
+    The container's first address will be used for the assignment.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        floating_ip_address (str): The Floating IP address, which must already
+            be owned by the requesting project. If not defined, a Floating IP
+            will be allocated, if there are any available.
+
+    Returns:
+        The Floating IP address, if it was bound successfully, else None.
+    """
+    if not floating_ip_address:
+        floating_ip_address = get_free_floating_ip()["floating_ip_address"]
+
+    container = zun().containers.get(container_ref)
+    for net_id, addrs in container.addresses.items():
+        port = next([a["port"] for a in addrs if a["port"]], None)
+        if port:
+            bind_floating_ip(floating_ip_address, port_id=port)
+            return floating_ip_address
+
+    return None
