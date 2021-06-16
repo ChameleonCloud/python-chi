@@ -162,8 +162,9 @@ def execute(container_ref: "str", command: "str") -> "dict":
 
 def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
     fd = io.BytesIO()
-    with tarfile.TarFile(fileobj=fd) as tar:
+    with tarfile.open(fileobj=fd, mode="w") as tar:
         tar.add(source, arcname=".")
+    fd.seek(0)
     data = fd.read()
     fd.close()
     return zun().containers.put_archive(container_ref, dest, data)
