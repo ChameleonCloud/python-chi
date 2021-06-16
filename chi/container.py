@@ -42,6 +42,8 @@ def create_container(
     image: "str" = None,
     environment: "dict" = None,
     exposed_ports: "list[str]" = [],
+    runtime: "str" = None,
+    host: "str" = None,
     nets: "list[dict]" = None,
     network_id: "str" = None,
     network_name: "str" = DEFAULT_NETWORK,
@@ -68,8 +70,16 @@ def create_container(
         network_name (str): The name of a network to launch the container on.
             This has no effect if ``network_id`` is already provided. Default
             "containernet1".
+        host (str): The Zun host to launch a container on. If not specified,
+            the host is chosen by Zun.
+        runtime (str): The container runtime to use. This should only be
+            overridden when explicitly launching containers onto a host/platform
+            requiring a separate runtime to, e.g., pass-through GPU devices,
+            such as the "nvidia" runtime provided by NVIDIA Jetson Nano/TX2.
         start (bool): Whether to automatically start the container after it
             is created. Default True.
+        **kwargs: Additional keyword arguments to send to the Zun client's
+            container create call.
     """
 
     if not nets:
@@ -84,6 +94,8 @@ def create_container(
         nets=nets,
         exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
         environment=environment,
+        runtime=runtime,
+        host=host,
         **kwargs,
     )
 
