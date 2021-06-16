@@ -285,12 +285,22 @@ def use_site(site_name):
 
     site = _sites.get(site_name)
     if not site:
-        raise ValueError(
-            (
-                f'No site named "{site_name}" exists! Possible values: '
-                ", ".join(_sites.keys())
+        # TODO(jason): Remove this fallback when CHI@Edge is enrolled into
+        # the resource discovery API and the resource catalogue has support for it.
+        if site_name == "CHI@Edge":
+            site = {
+                "name": "CHI@Edge",
+                "web": "https://chi.edge.chameleoncloud.org",
+                "location": "Distributed",
+                "user_support_contact": "https://groups.google.com/g/chameleon-edge-users",
+            }
+        else:
+            raise ValueError(
+                (
+                    f'No site named "{site_name}" exists! Possible values: '
+                    ", ".join(_sites.keys())
+                )
             )
-        )
 
     # Set important parameters
     set("auth_url", f'{site["web"]}:5000/v3')
