@@ -43,7 +43,6 @@ def create_container(
     environment: "dict" = None,
     exposed_ports: "list[str]" = [],
     runtime: "str" = None,
-    host: "str" = None,
     nets: "list[dict]" = None,
     network_id: "str" = None,
     network_name: "str" = DEFAULT_NETWORK,
@@ -92,6 +91,9 @@ def create_container(
     if reservation_id:
         hints["reservation"] = reservation_id
 
+    # Note: ``host`` is not defined as an arg because there is some special
+    # handling of it in the Zun client; it is not sent if it is not on kwargs.
+    # If it is on kwargs it is expected to be non-None.
     container = zun().containers.create(
         name=name,
         image=image,
@@ -100,7 +102,6 @@ def create_container(
         exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
         environment=environment,
         runtime=runtime,
-        host=host,
         hints=hints,
         **kwargs,
     )
