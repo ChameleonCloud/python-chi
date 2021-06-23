@@ -47,6 +47,7 @@ def create_container(
     nets: "list[dict]" = None,
     network_id: "str" = None,
     network_name: "str" = DEFAULT_NETWORK,
+    reservation_id: "str" = None,
     start: "bool" = True,
     **kwargs,
 ) -> "Container":
@@ -87,6 +88,10 @@ def create_container(
             network_id = get_network_id(network_name)
         nets = [{"network": network_id}]
 
+    hints = {}
+    if reservation_id:
+        hints["reservation"] = reservation_id
+
     container = zun().containers.create(
         name=name,
         image=image,
@@ -96,6 +101,7 @@ def create_container(
         environment=environment,
         runtime=runtime,
         host=host,
+        hints=hints,
         **kwargs,
     )
 

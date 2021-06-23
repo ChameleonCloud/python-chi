@@ -13,20 +13,23 @@ from .server import Server, ServerError
 from .util import random_base32, utcnow
 
 import logging
+
 LOG = logging.getLogger(__name__)
 
 __all__ = [
-    'add_node_reservation',
-    'add_network_reservation',
-    'add_fip_reservation',
-    'get_node_reservation',
-    'get_reserved_floating_ips',
-    'lease_duration',
-    'get_lease',
-    'get_lease_id',
-    'create_lease',
-    'delete_lease',
-    'wait_for_active',
+    "add_node_reservation",
+    "add_network_reservation",
+    "add_fip_reservation",
+    "add_device_reservation",
+    "get_node_reservation",
+    "get_device_reservation",
+    "get_reserved_floating_ips",
+    "lease_duration",
+    "get_lease",
+    "get_lease_id",
+    "create_lease",
+    "delete_lease",
+    "wait_for_active",
 ]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
@@ -359,13 +362,15 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
     resource_properties = []
     if node_type:
         resource_properties.extend(["==", "$node_type", node_type])
-    reservation_list.append({
-        "resource_type": "physical:host",
-        "resource_properties": json.dumps(resource_properties),
-        "hypervisor_properties": "",
-        "min": count,
-        "max": count
-    })
+    reservation_list.append(
+        {
+            "resource_type": "physical:host",
+            "resource_properties": json.dumps(resource_properties),
+            "hypervisor_properties": "",
+            "min": count,
+            "max": count,
+        }
+    )
 
 
 def get_node_reservation(lease_ref, count=None, node_type=None):
@@ -378,7 +383,7 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
         count (int): An optional count of nodes the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
         node_type (str): An optional node type the desired reservation was
-            made for. Use this if you have multiple reservations undera  lease.
+            made for. Use this if you have multiple reservations under a lease.
 
     Returns:
         The ID of the reservation, if found.
@@ -386,19 +391,58 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
     Raises:
         ValueError: If no reservation was found, or multiple were found.
     """
+
     def _find_node_reservation(res):
         if res.get("resource_type") != "physical:host":
             return False
-        if (count is not None
-            and not all(int(res.get(key)) == count
-                        for key in ["min_count", "max_count"])):
+        if count is not None and not all(
+            int(res.get(key)) == count for key in ["min_count", "max_count"]
+        ):
             return False
-        if (node_type is not None
-            and node_type not in res.get("resource_properties")):
+        if node_type is not None and node_type not in res.get("resource_properties"):
             return False
         return True
 
     res = _reservation_matching(lease_ref, _find_node_reservation)
+    return res["id"]
+
+
+def get_device_reservation(lease_ref, count=None, device_model=None, device_name=None):
+    """Retrieve a reservation ID for a device reservation.
+
+    The reservation ID is useful to have when requesting containers.
+
+    Args:
+        lease_ref (str): The ID or name of the lease.
+        count (int): An optional count of devices the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+        device_model (str): An optional device model the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+        device_name (str): An optional device name the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+
+    Returns:
+        The ID of the reservation, if found.
+
+    Raises:
+        ValueError: If no reservation was found, or multiple were found.
+    """
+
+    def _find_device_reservation(res):
+        if res.get("resource_type") != "device":
+            return False
+        if count is not None and not all(
+            int(res.get(key)) == count for key in ["min_count", "max_count"]
+        ):
+            return False
+        resource_properties = res.get("resource_properties")
+        if device_model is not None and device_model not in resource_properties:
+            return False
+        if device_name is not None and device_name not in resource_properties:
+            return False
+        return True
+
+    res = _reservation_matching(lease_ref, _find_device_reservation)
     return res["id"]
 
 
@@ -411,13 +455,15 @@ def get_reserved_floating_ips(lease_ref) -> "list[str]":
     Returns:
         A list of all reserved Floating IP addresses, if any were reserved.
     """
+
     def _find_fip_reservation(res):
         return res.get("resource_type") == "virtual:floatingip"
 
     res = _reservation_matching(lease_ref, _find_fip_reservation, multiple=True)
     fips = list_floating_ips()
     return [
-        fip["floating_ip_address"] for fip in fips
+        fip["floating_ip_address"]
+        for fip in fips
         if any(f"reservation:{r['id']}" in fip["tags"] for r in res)
     ]
 
@@ -445,12 +491,14 @@ def _reservation_matching(lease_ref, match_fn, multiple=False):
         return matches[0]
 
 
-def add_network_reservation(reservation_list,
-                            network_name,
-                            of_controller_ip=None,
-                            of_controller_port=None,
-                            vswitch_name=None,
-                            physical_network="physnet1"):
+def add_network_reservation(
+    reservation_list,
+    network_name,
+    of_controller_ip=None,
+    of_controller_port=None,
+    vswitch_name=None,
+    physical_network="physnet1",
+):
     """Add a network reservation to a reservation list.
 
     Args:
@@ -472,18 +520,21 @@ def add_network_reservation(reservation_list,
     """
     desc_parts = []
     if of_controller_ip and of_controller_port:
-        desc_parts.append(
-            f'OFController={of_controller_ip}:{of_controller_port}')
+        desc_parts.append(f"OFController={of_controller_ip}:{of_controller_port}")
     if vswitch_name:
-        desc_parts.append(f'VSwitchName={vswitch_name}')
+        desc_parts.append(f"VSwitchName={vswitch_name}")
 
-    reservation_list.append({
-        'resource_type': 'network',
-        'network_name': network_name,
-        'network_description': ','.join(desc_parts),
-        'resource_properties': json.dumps(['==', '$physical_network', physical_network]),
-        'network_properties': '',
-    })
+    reservation_list.append(
+        {
+            "resource_type": "network",
+            "network_name": network_name,
+            "network_description": ",".join(desc_parts),
+            "resource_properties": json.dumps(
+                ["==", "$physical_network", physical_network]
+            ),
+            "network_properties": "",
+        }
+    )
 
 
 def add_fip_reservation(reservation_list, count=1):
@@ -494,11 +545,51 @@ def add_fip_reservation(reservation_list, count=1):
             The list will be extended in-place.
         count (int): The number of floating IPs to reserve.
     """
-    reservation_list.append({
-        'resource_type': 'virtual:floatingip',
-        'network_id': get_network_id(PUBLIC_NETWORK),
-        'amount': count
-    })
+    reservation_list.append(
+        {
+            "resource_type": "virtual:floatingip",
+            "network_id": get_network_id(PUBLIC_NETWORK),
+            "amount": count,
+        }
+    )
+
+
+def add_device_reservation(
+    reservation_list, count=1, device_model=None, device_name=None
+):
+    """Add an IoT/edge device reservation to a reservation list.
+
+    Args:
+        reservation_list (list[dict]): The list of reservations to add to.
+        count (int): The number of devices to request.
+        device_model (str): The model of device to reserve. This should match
+            a "model" property of the devices registered in Blazar.
+        device_name (str): The name of a specific device to reserve. If this
+            is provided in conjunction with ``count`` or other constraints,
+            an error will be raised, as there is only 1 possible device that
+            can match this criteria, because devices have unique names.
+
+    Raises:
+        ValueError: If ``device_name`` is provided, but ``count`` is greater
+            than 1, or some other constraint is present.
+    """
+    reservation = {
+        "resource_type": "device",
+        "min": count,
+        "max": count,
+    }
+    resource_properties = []
+    if device_name:
+        if count > 1:
+            raise ValueError(
+                "Cannot reserve multiple devices if device_name is a constraint."
+            )
+        resource_properties.append(["==", "$name", json.dumps(device_name)])
+    elif device_model:
+        resource_properties.append(["==", "$model", json.dumps(device_model)])
+
+    reservation["resource_properties"] = json.dumps(resource_properties)
+    reservation_list.append(reservation)
 
 
 def lease_duration(days=1, hours=0):
@@ -527,6 +618,7 @@ def lease_duration(days=1, hours=0):
 # Leases
 #########
 
+
 def get_lease(ref) -> dict:
     """Get a lease by its ID or name.
 
@@ -542,8 +634,7 @@ def get_lease(ref) -> dict:
         # Blazar's exception class is a bit odd and stores the actual code
         # in 'kwargs'. The 'code' attribute on the exception is just the default
         # code. Prefer to use .kwargs['code'] if present, fall back to .code
-        code = (
-            getattr(err, "kwargs", {}).get("code", getattr(err, "code", None)))
+        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
         if code == 404:
             return blazar().lease.get(get_lease_id(ref))
         else:
@@ -563,12 +654,12 @@ def get_lease_id(lease_name) -> str:
         ValueError: If the lease could not be found, or if multiple leases were
             found with the same name.
     """
-    matching = [l for l in blazar().lease.list() if l['name'] == lease_name]
+    matching = [l for l in blazar().lease.list() if l["name"] == lease_name]
     if not matching:
-        raise ValueError(f'No leases found for name {lease_name}')
+        raise ValueError(f"No leases found for name {lease_name}")
     elif len(matching) > 1:
-        raise ValueError(f'Multiple leases found for name {lease_name}')
-    return matching[0]['id']
+        raise ValueError(f"Multiple leases found for name {lease_name}")
+    return matching[0]["id"]
 
 
 def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
@@ -592,13 +683,15 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
         start_date = utcnow()
 
     if not reservations:
-        raise ValueError('No reservations provided.')
+        raise ValueError("No reservations provided.")
 
-    return blazar().lease.create(name=lease_name,
-                                 start=start_date,
-                                 end=end_date,
-                                 reservations=reservations,
-                                 events=[])
+    return blazar().lease.create(
+        name=lease_name,
+        start=start_date,
+        end=end_date,
+        reservations=reservations,
+        events=[],
+    )
 
 
 def delete_lease(ref):
@@ -608,9 +701,9 @@ def delete_lease(ref):
         ref (str): The name or ID of the lease.
     """
     lease = get_lease(ref)
-    lease_id = lease['id']
+    lease_id = lease["id"]
     blazar().lease.delete(lease_id)
-    print(f'Deleted lease with id {lease_id}')
+    print(f"Deleted lease with id {lease_id}")
 
 
 def wait_for_active(ref):
@@ -630,10 +723,10 @@ def wait_for_active(ref):
     """
     for _ in range(15):
         lease = get_lease(ref)
-        status = lease['status']
-        if status == 'ACTIVE':
+        status = lease["status"]
+        if status == "ACTIVE":
             return lease
-        elif status == 'ERROR':
+        elif status == "ERROR":
             raise RuntimeError("Lease went into ERROR state")
         time.sleep(10)
     raise TimeoutError("Lease failed to start")
