@@ -584,9 +584,14 @@ def add_device_reservation(
             raise ValueError(
                 "Cannot reserve multiple devices if device_name is a constraint."
             )
-        resource_properties.append(["==", "$name", json.dumps(device_name)])
+        resource_properties.append(["==", "$name", device_name])
     elif device_model:
-        resource_properties.append(["==", "$model", json.dumps(device_model)])
+        resource_properties.append(["==", "$model", device_model])
+
+    if len(resource_properties) == 1:
+        resource_properties = resource_properties[0]
+    elif resource_properties:
+        resource_properties.insert(0, "and")
 
     reservation["resource_properties"] = json.dumps(resource_properties)
     reservation_list.append(reservation)
