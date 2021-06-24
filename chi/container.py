@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+import logging
 import tarfile
 import time
 import typing
@@ -24,6 +25,7 @@ if typing.TYPE_CHECKING:
     from zunclient.v1.containers import Container
 
 DEFAULT_NETWORK = "containernet1"
+LOG = logging.getLogger(__name__)
 
 __all__ = [
     "list_containers",
@@ -48,6 +50,7 @@ def create_container(
     network_name: "str" = DEFAULT_NETWORK,
     reservation_id: "str" = None,
     start: "bool" = True,
+    start_timeout: "int" = None,
     **kwargs,
 ) -> "Container":
     """Create a container instance.
@@ -107,7 +110,13 @@ def create_container(
     )
 
     if start:
-        container = _wait_for_status(container.uuid, "Created")
+        timeout = start_timeout or (60 * 30)
+        LOG.info(f"Waiting up to {timeout}s for container creation ...")
+        # Wait for a while, the image may need to download. 30 minutes is
+        # _quite_ a long time, but the user can interrupt or choose a smaller
+        # timeout.
+        container = _wait_for_status(container.uuid, "Created", timeout=timeout)
+        LOG.info("Starting container ...")
         zun().containers.start(container.uuid)
 
     return container
