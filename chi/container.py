@@ -136,6 +136,8 @@ def get_container(container_ref: "str") -> "Container":
 
     Args:
         container_ref (str): The name or ID of the container.
+        tag (str): An optional version to tag the container image with. If not
+            defined, defaults to "latest".
 
     Returns:
         The container, if found.
@@ -144,7 +146,7 @@ def get_container(container_ref: "str") -> "Container":
 
 
 def snapshot_container(
-    container_ref: "str", repository: "str", tag: "str" = None
+    container_ref: "str", repository: "str", tag: "str" = "latest"
 ) -> "str":
     return zun().containers.commit(container_ref, repository, tag=tag)["uuid"]
 
