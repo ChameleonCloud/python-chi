@@ -14,6 +14,7 @@
 
 import io
 import logging
+from re import I
 import tarfile
 import time
 import typing
@@ -24,6 +25,7 @@ from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 if typing.TYPE_CHECKING:
     from zunclient.v1.containers import Container
 
+DEFAULT_IMAGE_DRIVER = "docker"
 DEFAULT_NETWORK = "containernet1"
 LOG = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ __all__ = [
 def create_container(
     name: "str",
     image: "str" = None,
+    image_driver: "str" = DEFAULT_IMAGE_DRIVER,
     environment: "dict" = None,
     exposed_ports: "list[str]" = [],
     runtime: "str" = None,
@@ -59,6 +62,10 @@ def create_container(
         name (str): The name to give the container.
         image (str): The Docker image, with or without tag information. If no
             tag is provided, "latest" is assumed.
+        image_driver (str): The image storage driver to use to retrieve the
+            image. Defaults to "docker", meaning the image is assumed to be a
+            Docker registry repository. Specify "glance" to launch a snapshot
+            image by passing the Glance Image ID in the ``image`` argument.
         environment (dict): A set of environment variables to pass to the
             container.
         exposed_ports (list[str]): A list of ports to expose on the container.
@@ -100,7 +107,7 @@ def create_container(
     container = zun().containers.create(
         name=name,
         image=image,
-        image_driver="docker",
+        image_driver=image_driver,
         nets=nets,
         exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
         environment=environment,
