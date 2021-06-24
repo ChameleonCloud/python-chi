@@ -37,6 +37,7 @@ __all__ = [
     "destroy_container",
     "get_logs",
     "execute",
+    "upload",
     "wait_for_active",
 ]
 
@@ -155,6 +156,17 @@ def get_container(container_ref: "str") -> "Container":
 def snapshot_container(
     container_ref: "str", repository: "str", tag: "str" = "latest"
 ) -> "str":
+    """Create a snapshot of a running container.
+
+    This will store the container's file system in Glance as a new Image.
+    You can then specify the Image ID in container create requests.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        repository (str): The name to give the snapshot.
+        tag (str): An optional version tag to give the snapshot. Defaults to
+            "latest".
+    """
     return zun().containers.commit(container_ref, repository, tag=tag)["uuid"]
 
 
@@ -198,6 +210,13 @@ def execute(container_ref: "str", command: "str") -> "dict":
 
 
 def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
+    """Upload a file or directory to a running container.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        source (str): The (local) path to the file or directory to upload.
+        dest (str): The (container) path to upload the file or directory to.
+    """
     fd = io.BytesIO()
     with tarfile.open(fileobj=fd, mode="w") as tar:
         tar.add(source, arcname=".")
