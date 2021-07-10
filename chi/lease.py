@@ -37,6 +37,8 @@ NODE_TYPES = {
     "compute_haswell",
     "compute_skylake",
     "compute_haswell_ib",
+    "compute_cascadelake",
+    "compute_cascadelake_r",
     "storage",
     "storage_hierarchy",
     "gpu_p100",
