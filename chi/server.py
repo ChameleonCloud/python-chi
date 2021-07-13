@@ -3,18 +3,19 @@ from operator import attrgetter
 import socket
 import time
 
+from novaclient.exceptions import NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
-from novaclient.exceptions import NotFound
 
 from .clients import connection, glance, nova, neutron
 from .context import get as get_from_context, session
-from .keypair import Keypair
 from .image import get_image, get_image_id
+from .keypair import Keypair
 from .network import (get_network_id, get_or_create_floating_ip,
                       get_floating_ip, get_free_floating_ip)
 from .util import random_base32, sshkey_fingerprint
+
 
 __all__ = [
     'get_flavor',
@@ -45,6 +46,7 @@ DEFAULT_IMAGE = 'CC-CentOS7'
 DEFAULT_NETWORK = 'sharednet1'
 BAREMETAL_FLAVOR = 'baremetal'
 
+
 class ServerError(RuntimeError):
     def __init__(self, msg, server):
         super().__init__(msg)
@@ -67,7 +69,7 @@ def instance_create_args(
         "name": name,
         "flavor": flavor,
         "image": image,
-        "scheduler_hints": {"reservation": reservation,},
+        "scheduler_hints": {"reservation": reservation, },
         "key_name": key,
     }
 
@@ -140,6 +142,7 @@ class Server(object):
         kwargs: Additional keyword arguments to pass to Nova's server
             :meth:`~novaclient.v2.servers.ServerManager.create` function.
     """
+
     def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE,
                  **kwargs):
         kwargs.setdefault("session", session())
@@ -180,7 +183,8 @@ class Server(object):
             )
             self.server = self.nova.servers.create(**server_kwargs)
         else:
-            raise ValueError("Missing required argument: 'id' or 'lease' required.")
+            raise ValueError(
+                "Missing required argument: 'id' or 'lease' required.")
 
         self.id = self.server.id
         self.name = self.server.name
@@ -254,7 +258,8 @@ class Server(object):
         if self.ip is None:
             return
 
-        self.conn.compute.remove_floating_ip_from_server(self.server.id, self.ip)
+        self.conn.compute.remove_floating_ip_from_server(
+            self.server.id, self.ip)
         if self._fip_created:
             self.neutron.delete_floatingip(self._fip["id"])
 
@@ -542,6 +547,7 @@ def wait_for_tcp(host, port, timeout=(60 * 20)):
 # Key pairs
 ############
 
+
 def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
     """Update a key pair's public key.
 
@@ -590,7 +596,7 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
 def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
                   network_name=DEFAULT_NETWORK, nics=[], image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=None, count=1) -> 'Union[NovaServer,list[NovaServer]]':
+                  flavor_name=None, count=1, hypervisor_hostname=None) -> 'Union[NovaServer,list[NovaServer]]':
     """Launch a new server instance.
 
     Args:
@@ -657,7 +663,8 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         key_name=key_name,
         nics=nics,
         min_count=count,
-        max_count=count
+        max_count=count,
+        hypervisor_hostname=hypervisor_hostname
     )
     if count > 1:
         matching = list_servers(search_opts={'name': f'{server_name}-'})
