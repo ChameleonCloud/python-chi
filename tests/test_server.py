@@ -1,10 +1,10 @@
-from contextlib import nullcontext
-from collections import namedtuple
 from datetime import datetime
-
 import pytest
 
 from chi.server import BAREMETAL_FLAVOR, DEFAULT_IMAGE, DEFAULT_NETWORK
+from collections import namedtuple
+from contextlib import nullcontext
+
 
 @pytest.fixture()
 def now():
@@ -55,7 +55,8 @@ def test_example_create_server(mocker):
     mocker.patch("chi.server.get_network_id", side_effect=get_network_id)
     mocker.patch("chi.server.get_image_id", side_effect=get_image_id)
     mocker.patch("chi.server.list_flavors", side_effect=list_flavors)
-    mocker.patch("chi.lease.get_node_reservation", return_value="reservation-id")
+    mocker.patch("chi.lease.get_node_reservation",
+                 return_value="reservation-id")
     mocker.patch("chi.server.update_keypair", side_effect=update_keypair)
 
     example_create_server()
@@ -68,7 +69,8 @@ def test_example_create_server(mocker):
         nics=[{"net-id": "network-id", "v4-fixed-ip": ""}],
         scheduler_hints={"reservation": "reservation-id"},
         max_count=1,
-        min_count=1
+        min_count=1,
+        hypervisor_hostname=None
     )
 
 
@@ -108,7 +110,8 @@ def test_example_wait_for_connectivity(mocker):
     def get_free_floating_ip():
         return {"floating_ip_address": "fake-floating-ip"}
 
-    mocker.patch("chi.server.get_free_floating_ip", side_effect=get_free_floating_ip)
+    mocker.patch("chi.server.get_free_floating_ip",
+                 side_effect=get_free_floating_ip)
     socket_create = mocker.patch("chi.server.socket.create_connection")
     socket_create.return_value = nullcontext()
 
@@ -117,4 +120,4 @@ def test_example_wait_for_connectivity(mocker):
     connection.compute.add_floating_ip_to_server.assert_called_once_with(
         "6b2bae1e-0311-493f-836c-a9da0cb9e0c0", "fake-floating-ip")
     socket_create.assert_called_once_with(
-        ("fake-floating-ip", 22), timeout=(60*20))
+        ("fake-floating-ip", 22), timeout=(60 * 20))
