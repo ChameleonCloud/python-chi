@@ -8,6 +8,8 @@ from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
 from novaclient.exceptions import NotFound
 
+from openstack.compute.v2.server import Server as OpenStackServer
+
 from .clients import connection, glance, nova, neutron
 from .context import get as get_from_context, session
 from .keypair import Keypair
@@ -166,7 +168,7 @@ class Server(object):
 
         if id is not None:
             self._preexisting = True
-            self.server = self.nova.servers.get(id)
+            self.server = self.conn.compute._get_resource(OpenStackServer, id)
         elif lease is not None:
             if key is None:
                 key = Keypair().key_name
@@ -178,7 +180,9 @@ class Server(object):
                 net_ids=net_ids,
                 **kwargs
             )
-            self.server = self.nova.servers.create(**server_kwargs)
+            self.server = self.conn.compute._get_resource(
+                OpenStackServer, None, **server_kwargs
+            )
         else:
             raise ValueError("Missing required argument: 'id' or 'lease' required.")
 
@@ -265,7 +269,7 @@ class Server(object):
     def delete(self):
         """Delete this server instance."""
         self.conn.compute.delete_server(self.server)
-        self.conn.compute.wait_for_server(self.server, status='DELETED')
+        self.conn.compute.wait_for_delete(self.server)
 
     def rebuild(self, image_ref):
         """Rebuild this server instance.
@@ -502,9 +506,8 @@ def wait_for_active(server_id, timeout=(60 * 20)):
             Defaults to 20 minutes.
 
     """
-    from openstack.compute.v2.server import Server
     compute = connection().compute
-    server = compute._get_resource(Server, server_id)
+    server = compute._get_resource(OpenStackServer, server_id)
     return compute.wait_for_server(server, wait=timeout)
 
 
