@@ -168,7 +168,7 @@ class Server(object):
 
         if id is not None:
             self._preexisting = True
-            self.server = self.conn.compute._get_resource(OpenStackServer, id)
+            self.server = self.conn.compute.get_server(id)
         elif lease is not None:
             if key is None:
                 key = Keypair().key_name
@@ -180,9 +180,7 @@ class Server(object):
                 net_ids=net_ids,
                 **kwargs
             )
-            self.server = self.conn.compute._get_resource(
-                OpenStackServer, None, **server_kwargs
-            )
+            self.server = self.conn.compute.create_server(**server_kwargs)
         else:
             raise ValueError("Missing required argument: 'id' or 'lease' required.")
 
@@ -507,7 +505,7 @@ def wait_for_active(server_id, timeout=(60 * 20)):
 
     """
     compute = connection().compute
-    server = compute._get_resource(OpenStackServer, server_id)
+    server = compute.get_server(server_id)
     return compute.wait_for_server(server, wait=timeout)
 
 
