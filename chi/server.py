@@ -37,6 +37,7 @@ __all__ = [
 
     'associate_floating_ip',
     'detach_floating_ip',
+    'get_host_ip',
 
     'wait_for_active',
     'wait_for_tcp',
@@ -487,6 +488,14 @@ def detach_floating_ip(server_id, floating_ip_address):
     connection().compute.remove_floating_ip_from_server(
         server_id, floating_ip_address)
 
+def get_host_ip(server_id):
+    """Get the Fixed IP of a server by ID.
+    
+    Args:
+        server_id (str): The ID of the server.
+        
+    """
+    return get_server(server_id).interface_list()[0].to_dict()["fixed_ips"][0]["ip_address"]
 
 def wait_for_active(server_id, timeout=(60 * 20)):
     """Wait for the server to go in to the ACTIVE state.
