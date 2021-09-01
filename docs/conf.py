@@ -113,6 +113,13 @@ notebook_examples = [
             "tests/test_server.py:example_wait_for_connectivity",
         ],
     ),
+    (
+        "Launching a container",
+        "notebooks/container.ipynb",
+        [
+            "tests/test_container.py:example_create_container",
+        ],
+    ),
 ]
 
 nbsphinx_execute = "never"
