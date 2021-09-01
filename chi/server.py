@@ -495,7 +495,14 @@ def get_host_ip(server_id):
         server_id (str): The ID of the server.
         
     """
-    return get_server(server_id).interface_list()[0].to_dict()["fixed_ips"][0]["ip_address"]
+    server = get_server(server_id)
+    interface_list = server.interface_list()
+    interface = interface_list[0]
+    interface_dict = interface.to_dict()
+    fixed_ips = interface_dict['fixed_ips']
+    fixed_ip = fixed_ips[0]
+    ip_address = fixed_ip['ip_address']
+    return ip_address
 
 def wait_for_active(server_id, timeout=(60 * 20)):
     """Wait for the server to go in to the ACTIVE state.
