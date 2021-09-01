@@ -46,6 +46,7 @@ def create_container(
     name: "str",
     image: "str" = None,
     image_driver: "str" = DEFAULT_IMAGE_DRIVER,
+    device_profiles: "list[str]" = None,
     environment: "dict" = None,
     exposed_ports: "list[str]" = [],
     runtime: "str" = None,
@@ -67,6 +68,11 @@ def create_container(
             image. Defaults to "docker", meaning the image is assumed to be a
             Docker registry repository. Specify "glance" to launch a snapshot
             image by passing the Glance Image ID in the ``image`` argument.
+        device_profiles (list[str]): An optional list of device profiles to
+            request be configured on the container when it is created. Edge
+            devices may have differing sets of supported device profiles, so
+            it is important to understand which profiles are supported by the
+            target device for your container.
         environment (dict): A set of environment variables to pass to the
             container.
         exposed_ports (list[str]): A list of ports to expose on the container.
@@ -110,6 +116,7 @@ def create_container(
         image=image,
         image_driver=image_driver,
         nets=nets,
+        device_profiles=device_profiles,
         exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
         environment=environment,
         runtime=runtime,
