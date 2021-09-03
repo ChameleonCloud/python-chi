@@ -1,52 +1,50 @@
-from datetime import datetime
-from operator import attrgetter
 import socket
 import time
+from datetime import datetime
+from operator import attrgetter
 
 from novaclient.exceptions import NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
-
 from openstack.compute.v2.server import Server as OpenStackServer
 
-from .clients import connection, glance, nova, neutron
-from .context import get as get_from_context, session
+from .clients import connection, glance, neutron, nova
+from .context import get as get_from_context
+from .context import session
 from .image import get_image, get_image_id
 from .keypair import Keypair
-from .network import (get_network_id, get_or_create_floating_ip,
-                      get_floating_ip, get_free_floating_ip)
+from .network import (
+    get_floating_ip,
+    get_free_floating_ip,
+    get_network_id,
+    get_or_create_floating_ip,
+)
 from .util import random_base32, sshkey_fingerprint
 
-
 __all__ = [
-    'get_flavor',
-    'get_flavor_id',
-    'show_flavor',
-    'show_flavor_by_name',
-    'list_flavors',
-
-    'get_server',
-    'get_server_id',
-    'list_servers',
-    'delete_server',
-    'show_server',
-    'show_server_by_name',
-
-    'create_server',
-
-    'associate_floating_ip',
-    'detach_floating_ip',
-
-    'wait_for_active',
-    'wait_for_tcp',
-
-    'update_keypair',
+    "get_flavor",
+    "get_flavor_id",
+    "show_flavor",
+    "show_flavor_by_name",
+    "list_flavors",
+    "get_server",
+    "get_server_id",
+    "list_servers",
+    "delete_server",
+    "show_server",
+    "show_server_by_name",
+    "create_server",
+    "associate_floating_ip",
+    "detach_floating_ip",
+    "wait_for_active",
+    "wait_for_tcp",
+    "update_keypair",
 ]
 
-DEFAULT_IMAGE = 'CC-CentOS7'
-DEFAULT_NETWORK = 'sharednet1'
-BAREMETAL_FLAVOR = 'baremetal'
+DEFAULT_IMAGE = "CC-CentOS7"
+DEFAULT_NETWORK = "sharednet1"
+BAREMETAL_FLAVOR = "baremetal"
 
 
 class ServerError(RuntimeError):
@@ -62,7 +60,7 @@ def instance_create_args(
     flavor=None,
     key=None,
     net_ids=None,
-    **kwargs
+    **kwargs,
 ):
     if name is None:
         name = "instance-{}".format(random_base32(6))
@@ -71,7 +69,9 @@ def instance_create_args(
         "name": name,
         "flavor": flavor,
         "image": image,
-        "scheduler_hints": {"reservation": reservation, },
+        "scheduler_hints": {
+            "reservation": reservation,
+        },
         "key_name": key,
     }
 
@@ -145,8 +145,7 @@ class Server(object):
             :meth:`~novaclient.v2.servers.ServerManager.create` function.
     """
 
-    def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE,
-                 **kwargs):
+    def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE, **kwargs):
         kwargs.setdefault("session", session())
         self.session = kwargs.pop("session")
         self.conn = connection(session=self.session)
@@ -181,12 +180,11 @@ class Server(object):
                 flavor=self.flavor,
                 key=key,
                 net_ids=net_ids,
-                **kwargs
+                **kwargs,
             )
             self.server = self.conn.compute.create_server(**server_kwargs)
         else:
-            raise ValueError(
-                "Missing required argument: 'id' or 'lease' required.")
+            raise ValueError("Missing required argument: 'id' or 'lease' required.")
 
         self.id = self.server.id
         self.name = self.server.name
@@ -260,8 +258,7 @@ class Server(object):
         if self.ip is None:
             return
 
-        self.conn.compute.remove_floating_ip_from_server(
-            self.server.id, self.ip)
+        self.conn.compute.remove_floating_ip_from_server(self.server.id, self.ip)
         if self._fip_created:
             self.neutron.delete_floatingip(self._fip["id"])
 
@@ -288,6 +285,7 @@ class Server(object):
 ##########
 # Flavors
 ##########
+
 
 def get_flavor(ref) -> NovaFlavor:
     """Get a flavor by its ID or name.
@@ -321,7 +319,7 @@ def get_flavor_id(name) -> str:
     """
     flavor = next((f for f in nova().flavors.list() if f.name == name), None)
     if not flavor:
-        raise NotFound(f'No flavors found matching name {name}')
+        raise NotFound(f"No flavors found matching name {name}")
     return flavor
 
 
@@ -353,7 +351,7 @@ def show_flavor_by_name(name) -> NovaFlavor:
     return show_flavor(flavor_id)
 
 
-def list_flavors() -> 'list[NovaFlavor]':
+def list_flavors() -> "list[NovaFlavor]":
     """Get a list of all available flavors.
 
     Returns:
@@ -365,6 +363,7 @@ def list_flavors() -> 'list[NovaFlavor]':
 ##########
 # Servers
 ##########
+
 
 def get_server(ref) -> NovaServer:
     """Get a server by its ID.
@@ -484,8 +483,7 @@ def detach_floating_ip(server_id, floating_ip_address):
             remove from the server.
 
     """
-    connection().compute.remove_floating_ip_from_server(
-        server_id, floating_ip_address)
+    connection().compute.remove_floating_ip_from_server(server_id, floating_ip_address)
 
 
 def wait_for_active(server_id, timeout=(60 * 20)):
@@ -540,9 +538,13 @@ def wait_for_tcp(host, port, timeout=(60 * 20)):
         except OSError as ex:
             time.sleep(0.01)
             if time.perf_counter() - start_time >= timeout:
-                raise TimeoutError((
-                    f'Waited too long for the port {port} on host {host} to '
-                    'start accepting connections.')) from ex
+                raise TimeoutError(
+                    (
+                        f"Waited too long for the port {port} on host {host} to "
+                        "start accepting connections."
+                    )
+                ) from ex
+
 
 ############
 # Key pairs
@@ -583,21 +585,30 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
         if existing.fingerprint == sshkey_fingerprint(public_key):
             return existing
         _nova.keypairs.delete(key_name)
-        return _nova.keypairs.create(
-            key_name, public_key=public_key, key_type="ssh")
+        return _nova.keypairs.create(key_name, public_key=public_key, key_type="ssh")
     except NotFound:
-        return _nova.keypairs.create(
-            key_name, public_key=public_key, key_type="ssh")
+        return _nova.keypairs.create(key_name, public_key=public_key, key_type="ssh")
 
 
 ##########
 # Wizards
 ##########
 
-def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
-                  network_name=DEFAULT_NETWORK, nics=[], image_id=None,
-                  image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=None, count=1, hypervisor_hostname=None) -> 'Union[NovaServer,list[NovaServer]]':
+
+def create_server(
+    server_name,
+    reservation_id=None,
+    key_name=None,
+    network_id=None,
+    network_name=DEFAULT_NETWORK,
+    nics=[],
+    image_id=None,
+    image_name=DEFAULT_IMAGE,
+    flavor_id=None,
+    flavor_name=None,
+    count=1,
+    hypervisor_hostname=None,
+) -> "Union[NovaServer,list[NovaServer]]":
     """Launch a new server instance.
 
     Args:
@@ -635,13 +646,13 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         ValueError: if an invalid count is provided.
     """
     if count < 1:
-        raise ValueError('Must launch at least one server.')
+        raise ValueError("Must launch at least one server.")
     if not key_name:
         key_name = update_keypair().id
     if not network_id:
         network_id = get_network_id(network_name)
     if not nics:
-        nics = [{'net-id': network_id, 'v4-fixed-ip': ''}]
+        nics = [{"net-id": network_id, "v4-fixed-ip": ""}]
     if not image_id:
         image_id = get_image_id(image_name)
     if not flavor_id:
@@ -650,11 +661,11 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         else:
             flavor_id = next((f.id for f in list_flavors()), None)
             if not flavor_id:
-                raise NotFound('Could not auto-select flavor to use')
+                raise NotFound("Could not auto-select flavor to use")
 
     scheduler_hints = {}
     if reservation_id:
-        scheduler_hints['reservation'] = reservation_id
+        scheduler_hints["reservation"] = reservation_id
 
     server = nova().servers.create(
         name=server_name,
@@ -665,12 +676,37 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         nics=nics,
         min_count=count,
         max_count=count,
-        hypervisor_hostname=hypervisor_hostname
+        hypervisor_hostname=hypervisor_hostname,
     )
     if count > 1:
-        matching = list_servers(search_opts={'name': f'{server_name}-'})
+        matching = list_servers(search_opts={"name": f"{server_name}-"})
         # In case there are others matching the name, just get the latest
         # batch of instances.
-        return sorted(matching, key=attrgetter('created'), reverse=True)[:count]
+        return sorted(matching, key=attrgetter("created"), reverse=True)[:count]
     else:
         return server
+
+
+def ensure_server(server_name: "str", *args, **kwargs) -> "Server":
+    """Get a server with name if it exists, create a new one if not.
+
+    Args:
+        server_ref (str): The name or ID of the server.
+        all kwargs of create_server.
+
+    Returns:
+        The existing server if found, a new server if not.
+    """
+    try:
+        server_obj = get_server(server_name)
+    except Exception as ex:
+        print(ex)
+        try:
+            server_obj = create_server(server_name, **kwargs)
+        except Exception as ex:
+            print(ex)
+            raise
+        else:
+            return server_obj
+    else:
+        return server_obj

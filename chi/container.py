@@ -14,10 +14,10 @@
 
 import io
 import logging
-from re import I
 import tarfile
 import time
 import typing
+from re import I
 
 from .clients import zun
 from .network import bind_floating_ip, get_free_floating_ip, get_network_id
@@ -158,6 +158,31 @@ def get_container(container_ref: "str") -> "Container":
         The container, if found.
     """
     return zun().containers.get(container_ref)
+
+
+def ensure_container(container_name: "str", **kwargs) -> "Container":
+    """Get a container with name if it exists, create a new one if not.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        all kwargs of create_container.
+
+    Returns:
+        The existing container if found, a new container if not.
+    """
+    try:
+        container_obj = get_container(container_name)
+    except Exception as ex:
+        print(ex)
+        try:
+            container_obj = create_container(name=container_name, **kwargs)
+        except Exception as ex:
+            print(ex)
+            raise
+        else:
+            return container_obj
+    else:
+        return container_obj
 
 
 def snapshot_container(

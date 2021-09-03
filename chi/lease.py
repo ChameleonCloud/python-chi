@@ -1,18 +1,18 @@
-from datetime import timedelta
 import json
+import logging
 import numbers
 import sys
 import time
+from datetime import timedelta
 
 from blazarclient.exception import BlazarClientException
 
 from .clients import blazar, neutron
-from .context import get as get_from_context, session
-from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
+from .context import get as get_from_context
+from .context import session
+from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .server import Server, ServerError
 from .util import random_base32, utcnow
-
-import logging
 
 LOG = logging.getLogger(__name__)
 
@@ -699,6 +699,36 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
         reservations=reservations,
         events=[],
     )
+
+
+def ensure_lease(lease_name: "str", **kwargs):
+    """Get a lease with name if it is valid, create a new one if not.
+
+    Args:
+        lease_name (str): The name or ID of the lease.
+        all kwargs of create_lease
+
+    Returns:
+        The existing lease if found, a new lease if not.
+    """
+
+    bad_lease_status = ["Terminated", "Error"]
+
+    try:
+        lease_obj = get_lease(lease_name)
+        assert lease_obj["status"] not in bad_lease_status
+    except Exception as ex:
+        print(ex)
+        print("trying to create new lease")
+        try:
+            lease_obj = create_lease(lease_name, **kwargs)
+        except Exception as ex:
+            print(ex)
+            raise
+        else:
+            return lease_obj
+    else:
+        return lease_obj
 
 
 def delete_lease(ref):
