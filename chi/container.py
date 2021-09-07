@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import io
 import logging
-from re import I
 import tarfile
 import time
 import typing
@@ -231,6 +231,20 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
     data = fd.read()
     fd.close()
     return zun().containers.put_archive(container_ref, dest, data)
+
+
+def download(container_ref: "str", source: "str", dest: "str"):
+    """Download a file or directory from a running container.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        source (str): The (container) path of the file or directory.
+        dest (str): The (local) path to download to.
+    """
+    res = zun().containers.get_archive(container_ref, source)
+    fd = io.BytesIO(base64.b64decode(res["data"]))
+    with tarfile.open(fileobj=fd, mode="r") as tar:
+        tar.extractall(dest)
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
