@@ -1,8 +1,10 @@
 from datetime import timedelta
 import json
 import numbers
+import re
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from blazarclient.exception import BlazarClientException
 
@@ -14,7 +16,17 @@ from .util import random_base32, utcnow
 
 import logging
 
+if TYPE_CHECKING:
+    from typing import Pattern
+
 LOG = logging.getLogger(__name__)
+
+
+class ErrorParsers:
+    NOT_ENOUGH_RESOURCES: "Pattern" = (
+        r"not enough (?P<resource_type>([\w\s\-\._]+)) available"
+    )
+
 
 __all__ = [
     "add_node_reservation",
@@ -691,13 +703,26 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
     if not reservations:
         raise ValueError("No reservations provided.")
 
-    return blazar().lease.create(
-        name=lease_name,
-        start=start_date,
-        end=end_date,
-        reservations=reservations,
-        events=[],
-    )
+    try:
+        return blazar().lease.create(
+            name=lease_name,
+            start=start_date,
+            end=end_date,
+            reservations=reservations,
+            events=[],
+        )
+    except BlazarClientException as ex:
+        msg: "str" = ex.args[0]
+        msg = msg.lower()
+
+        match = ErrorParsers.NOT_ENOUGH_RESOURCES.match(msg)
+        if match:
+            LOG.error(
+                f"There were not enough unreserved {match.group('resource_type')} "
+                "to satisfy your request."
+            )
+        else:
+            LOG.error(msg)
 
 
 def delete_lease(ref):
