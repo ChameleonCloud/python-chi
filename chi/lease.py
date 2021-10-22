@@ -361,7 +361,13 @@ class Lease(object):
         return server
 
 
-def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE):
+def add_node_reservation(
+    reservation_list,
+    count=1,
+    resource_properties=[],
+    node_type=None,
+    architecture=None,
+):
     """Add a node reservation to a reservation list.
 
     Args:
@@ -369,12 +375,41 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
             The list will be extended in-place.
         count (int): The number of nodes of the given type to request.
             (Default 1).
-        node_type (str): The node type to request. (Default "compute_skylake").
-            If None, the reservation will not target any particular node type.
+        resource_properties (list): A list of resource property constraints. These take
+            the form [<operation>, <search_key>, <search_value>], e.g.::
+
+              ["==", "$node_type", "some-node-type"]: filter the reservation to only
+                nodes with a `node_type` matching "some-node-type".
+              [">", "$architecture.smt_size", 40]: filter to nodes having more than 40
+                (hyperthread) cores.
+
+        node_type (str): The node type to request. If None, the reservation will not
+            target any particular node type. If `resource_properties` is defined, the
+            node type constraint is added to the existing property constraints.
+        architecture (str): The node architecture to request. If `resource_properties`
+            is defined, the architecture constraint is added to the existing property
+            constraints.
     """
-    resource_properties = []
+    user_constraints = (resource_properties or []).copy()
+    extra_constraints = []
     if node_type:
-        resource_properties.extend(["==", "$node_type", node_type])
+        extra_constraints.append(["==", "$node_type", node_type])
+    if architecture:
+        extra_constraints.append(["==", "$architecture.platform_type", architecture])
+
+    if user_constraints:
+        if user_constraints[0] == "and":
+            # Already a compound constraint
+            resource_properties = user_constraints + extra_constraints
+        else:
+            resource_properties = ["and", user_constraints] + extra_constraints
+    else:
+        if len(extra_constraints) < 2:
+            # Possibly a compount constraint if multiple kwarg helpers used
+            resource_properties = extra_constraints[0] if extra_constraints else []
+        else:
+            resource_properties = ["and"] + extra_constraints
+
     reservation_list.append(
         {
             "resource_type": "physical:host",
@@ -386,7 +421,9 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
     )
 
 
-def get_node_reservation(lease_ref, count=None, node_type=None):
+def get_node_reservation(
+    lease_ref, count=None, resource_properties=None, node_type=None, architecture=None
+):
     """Retrieve a reservation ID for a node reservation.
 
     The reservation ID is useful to have when launching bare metal instances.
@@ -395,7 +432,12 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
         lease_ref (str): The ID or name of the lease.
         count (int): An optional count of nodes the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
+        resource_properties (list): An optional set of resource property constraints
+            the desired reservation was made under. Use this if you have multiple
+            reservations under a lease.
         node_type (str): An optional node type the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+        architecture (str): An optional node architecture the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
 
     Returns:
@@ -412,7 +454,15 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
             int(res.get(key)) == count for key in ["min_count", "max_count"]
         ):
             return False
-        if node_type is not None and node_type not in res.get("resource_properties"):
+        resource_properties = res.get("resource_properties")
+        if node_type is not None and node_type not in resource_properties:
+            return False
+        if architecture is not None and architecture not in resource_properties:
+            return False
+        if (
+            resource_properties is not None
+            and json.dumps(resource_properties) != resource_properties
+        ):
             return False
         return True
 
