@@ -34,7 +34,6 @@ __all__ = [
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 NODE_TYPES = {
-    "compute_haswell",
     "compute_skylake",
     "compute_haswell_ib",
     "compute_cascadelake",
@@ -50,7 +49,7 @@ NODE_TYPES = {
     "atom",
     "arm64",
 }
-DEFAULT_NODE_TYPE = "compute_haswell"
+DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_LEASE_LENGTH = timedelta(days=1)
 DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
 
@@ -149,7 +148,7 @@ def lease_create_nodetype(*args, **kwargs):
     Wrapper for :py:func:`lease_create_args` that adds the
     ``resource_properties`` payload to specify node type.
 
-    :param str node_type: Node type to filter by, ``compute_haswell``, et al.
+    :param str node_type: Node type to filter by, ``compute_skylake``, et al.
     :raises ValueError: if there is no `node_type` named argument.
     """
     try:
@@ -169,7 +168,7 @@ class Lease(object):
 
     .. code-block:: python
 
-        with Lease(session, node_type='compute_haswell') as lease:
+        with Lease(session, node_type='compute_skylake') as lease:
             instance = lease.create_server()
             ...
 
@@ -358,7 +357,7 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
             The list will be extended in-place.
         count (int): The number of nodes of the given type to request.
             (Default 1).
-        node_type (str): The node type to request. (Default "compute_haswell").
+        node_type (str): The node type to request. (Default "compute_skylake").
             If None, the reservation will not target any particular node type.
     """
     resource_properties = []
