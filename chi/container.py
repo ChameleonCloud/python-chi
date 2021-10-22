@@ -270,7 +270,9 @@ def _wait_for_status(
 
     while True:
         container = get_container(container_ref)
-        if container.status == status:
+        if container.status == "Error":
+            raise RuntimeError("Container went in to error state")
+        elif container.status == status:
             return container
         time.sleep(5)
         if time.perf_counter() - start_time >= timeout:
