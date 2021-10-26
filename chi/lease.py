@@ -454,14 +454,14 @@ def get_node_reservation(
             int(res.get(key)) == count for key in ["min_count", "max_count"]
         ):
             return False
-        resource_properties = res.get("resource_properties")
-        if node_type is not None and node_type not in resource_properties:
+        rp = res.get("resource_properties")
+        if node_type is not None and node_type not in rp:
             return False
-        if architecture is not None and architecture not in resource_properties:
+        if architecture is not None and architecture not in rp:
             return False
         if (
             resource_properties is not None
-            and json.dumps(resource_properties) != resource_properties
+            and json.dumps(rp) != resource_properties
         ):
             return False
         return True
