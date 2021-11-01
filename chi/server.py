@@ -44,7 +44,7 @@ __all__ = [
     'update_keypair',
 ]
 
-DEFAULT_IMAGE = 'CC-CentOS7'
+DEFAULT_IMAGE = 'CC-Ubuntu20.04'
 DEFAULT_NETWORK = 'sharednet1'
 BAREMETAL_FLAVOR = 'baremetal'
 
