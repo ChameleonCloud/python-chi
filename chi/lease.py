@@ -459,10 +459,7 @@ def get_node_reservation(
             return False
         if architecture is not None and architecture not in rp:
             return False
-        if (
-            resource_properties is not None
-            and json.dumps(rp) != resource_properties
-        ):
+        if resource_properties is not None and json.dumps(rp) != resource_properties:
             return False
         return True
 
@@ -494,8 +491,12 @@ def get_device_reservation(lease_ref, count=None, device_model=None, device_name
     def _find_device_reservation(res):
         if res.get("resource_type") != "device":
             return False
+        # FIXME(jason): Blazar's device plugin uses "min" and "max", but the
+        # standard seems to be "min_count" and "max_count"; this should be fixed in
+        # Blazar's device plugin.
         if count is not None and not all(
-            int(res.get(key)) == count for key in ["min_count", "max_count"]
+            (key not in res) or int(res.get(key)) == count
+            for key in ["min_count", "max_count", "min", "max"]
         ):
             return False
         resource_properties = res.get("resource_properties")
