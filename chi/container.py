@@ -48,7 +48,7 @@ def create_container(
     image_driver: "str" = DEFAULT_IMAGE_DRIVER,
     device_profiles: "list[str]" = None,
     environment: "dict" = None,
-    exposed_ports: "list[str]" = [],
+    exposed_ports: "list[str]" = None, 
     runtime: "str" = None,
     nets: "list[dict]" = None,
     network_id: "str" = None,
@@ -108,6 +108,10 @@ def create_container(
     if reservation_id:
         hints["reservation"] = reservation_id
 
+    # Support simpler syntax for exposed_ports
+    if exposed_ports and isinstance(exposed_ports, list):
+        exposed_ports = {port_def: {} for port_def in exposed_ports}
+
     # Note: ``host`` is not defined as an arg because there is some special
     # handling of it in the Zun client; it is not sent if it is not on kwargs.
     # If it is on kwargs it is expected to be non-None.
@@ -117,7 +121,7 @@ def create_container(
         image_driver=image_driver,
         nets=nets,
         device_profiles=device_profiles,
-        exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
+        exposed_ports=exposed_ports,
         environment=environment,
         runtime=runtime,
         hints=hints,
