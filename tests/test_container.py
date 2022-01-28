@@ -76,7 +76,7 @@ def test_example_create_container(mocker):
         hints={"reservation": "reservation-id"},
         nets=[{"network": "network-id"}],
         environment=None,
-        exposed_ports={},
+        exposed_ports=None,
         runtime=None,
         device_profiles=None,
     )
