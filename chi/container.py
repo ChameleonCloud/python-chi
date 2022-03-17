@@ -104,7 +104,7 @@ def create_container(
             network_id = get_network_id(network_name)
         nets = [{"network": network_id}]
 
-    hints = {}
+    hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
 
