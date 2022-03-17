@@ -124,7 +124,6 @@ def create_container(
         exposed_ports=exposed_ports,
         environment=environment,
         runtime=runtime,
-        hints=hints,
         **kwargs,
     )
 
