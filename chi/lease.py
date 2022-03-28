@@ -23,7 +23,7 @@ LOG = logging.getLogger(__name__)
 
 
 class ErrorParsers:
-    NOT_ENOUGH_RESOURCES: "Pattern" = (
+    NOT_ENOUGH_RESOURCES: "Pattern" = re.compile(
         r"not enough (?P<resource_type>([\w\s\-\._]+)) available"
     )
 
