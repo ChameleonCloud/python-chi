@@ -467,7 +467,7 @@ def get_node_reservation(
     return res["id"]
 
 
-def get_device_reservation(lease_ref, count=None, device_model=None, device_name=None):
+def get_device_reservation(lease_ref, count=None, machine_name=None, device_model=None, device_name=None):
     """Retrieve a reservation ID for a device reservation.
 
     The reservation ID is useful to have when requesting containers.
@@ -476,6 +476,8 @@ def get_device_reservation(lease_ref, count=None, device_model=None, device_name
         lease_ref (str): The ID or name of the lease.
         count (int): An optional count of devices the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
+        machine_name (str): An optional device machine name the desired reservation
+            was made for. Use this if you have multiple reservations under a lease.
         device_model (str): An optional device model the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
         device_name (str): An optional device name the desired reservation was
@@ -500,6 +502,8 @@ def get_device_reservation(lease_ref, count=None, device_model=None, device_name
         ):
             return False
         resource_properties = res.get("resource_properties")
+        if machine_name is not None and machine_name not in resource_properties:
+            return False
         if device_model is not None and device_model not in resource_properties:
             return False
         if device_name is not None and device_name not in resource_properties:
@@ -619,13 +623,17 @@ def add_fip_reservation(reservation_list, count=1):
 
 
 def add_device_reservation(
-    reservation_list, count=1, device_model=None, device_name=None
+    reservation_list, count=1, machine_name=None, device_model=None, device_name=None 
 ):
     """Add an IoT/edge device reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
         count (int): The number of devices to request.
+        machine_name (str): The device machine name to reserve. This should match
+            a "machine_name" property of the devices registered in Blazar. This
+            is the easiest way to reserve a particular device type, e.g.
+            "raspberrypi4-64".
         device_model (str): The model of device to reserve. This should match
             a "model" property of the devices registered in Blazar.
         device_name (str): The name of a specific device to reserve. If this
@@ -649,7 +657,9 @@ def add_device_reservation(
                 "Cannot reserve multiple devices if device_name is a constraint."
             )
         resource_properties.append(["==", "$name", device_name])
-    elif device_model:
+    if machine_name:
+        resource_properties.append(["==", "$machine_name", machine_name]) 
+    if device_model:
         resource_properties.append(["==", "$model", device_model])
 
     if len(resource_properties) == 1:
