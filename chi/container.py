@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 import io
 import logging
 import tarfile
@@ -226,7 +225,7 @@ def download(container_ref: "str", source: "str", dest: "str"):
         dest (str): The (local) path to download to.
     """
     res = zun().containers.get_archive(container_ref, source)
-    fd = io.BytesIO(base64.b64decode(res["data"]))
+    fd = io.BytesIO(res["data"])
     with tarfile.open(fileobj=fd, mode="r") as tar:
         tar.extractall(dest)
 
