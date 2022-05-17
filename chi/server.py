@@ -526,6 +526,8 @@ def wait_for_tcp(host, port, timeout=(60 * 20), sleep_time=5):
         port (int): Port number.
         timeout (int): How long to wait before raising errors, in seconds.
             Defaults to 20 minutes.
+        sleep_time (int): How long to wait between each attempt in seconds.
+            Defaults to 5 seconds.
 
     Raises:
         TimeoutError: If the port isn't accepting connection after time
