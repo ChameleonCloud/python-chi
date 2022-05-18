@@ -514,7 +514,7 @@ def wait_for_active(server_id, timeout=(60 * 20)):
     return compute.wait_for_server(server, wait=timeout)
 
 
-def wait_for_tcp(host, port, timeout=(60 * 20)):
+def wait_for_tcp(host, port, timeout=(60 * 20), sleep_time=5):
     """Wait until a port on a server starts accepting TCP connections.
 
     The implementation is taken from `wait_for_tcp_port.py
@@ -526,6 +526,8 @@ def wait_for_tcp(host, port, timeout=(60 * 20)):
         port (int): Port number.
         timeout (int): How long to wait before raising errors, in seconds.
             Defaults to 20 minutes.
+        sleep_time (int): How long to wait between each attempt in seconds.
+            Defaults to 5 seconds.
 
     Raises:
         TimeoutError: If the port isn't accepting connection after time
@@ -538,7 +540,7 @@ def wait_for_tcp(host, port, timeout=(60 * 20)):
             with socket.create_connection((host, port), timeout=timeout):
                 break
         except OSError as ex:
-            time.sleep(0.01)
+            time.sleep(sleep_time)
             if time.perf_counter() - start_time >= timeout:
                 raise TimeoutError((
                     f'Waited too long for the port {port} on host {host} to '
