@@ -598,7 +598,11 @@ def add_network_reservation(
             "network_name": network_name,
             "network_description": ",".join(desc_parts),
             "resource_properties": json.dumps(
-                ["==", "$physical_network", physical_network]
+                [
+                    "and",
+                    ["==", "$physical_network", physical_network],
+                    ["==", "$usage", "none"]
+                ]
             ),
             "network_properties": "",
         }
@@ -623,7 +627,7 @@ def add_fip_reservation(reservation_list, count=1):
 
 
 def add_device_reservation(
-    reservation_list, count=1, machine_name=None, device_model=None, device_name=None 
+    reservation_list, count=1, machine_name=None, device_model=None, device_name=None
 ):
     """Add an IoT/edge device reservation to a reservation list.
 
@@ -658,7 +662,7 @@ def add_device_reservation(
             )
         resource_properties.append(["==", "$name", device_name])
     if machine_name:
-        resource_properties.append(["==", "$machine_name", machine_name]) 
+        resource_properties.append(["==", "$machine_name", machine_name])
     if device_model:
         resource_properties.append(["==", "$model", device_model])
 
