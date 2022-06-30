@@ -54,6 +54,7 @@ __all__ = [
 ]
 
 PUBLIC_NETWORK = 'public'
+DEFAULT_PHYSICAL_NETWORK = 'physnet1'
 
 
 def _resolve_id(resource, name) -> str:
@@ -121,7 +122,7 @@ def get_network_id(name) -> str:
 
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None,
-                   vswitch_name=None, provider='physnet1',
+                   vswitch_name=None, provider=DEFAULT_PHYSICAL_NETWORK,
                    port_security_enabled=True) -> dict:
     """Create a network.
 
@@ -820,7 +821,7 @@ class wizard(object):
             of_controller_ip=of_controller_ip,
             of_controller_port=of_controller_port,
             vswitch_name=vswitch_name,
-            provider='physnet1'
+            provider=DEFAULT_PHYSICAL_NETWORK
         )
         subnet = create_subnet(subnet_name, network['id'])
         router = create_router(router_name, gateway=gateway)

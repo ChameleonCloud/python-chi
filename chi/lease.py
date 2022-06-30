@@ -10,7 +10,7 @@ from blazarclient.exception import BlazarClientException
 
 from .clients import blazar, neutron
 from .context import get as get_from_context, session
-from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
+from .network import get_network_id, PUBLIC_NETWORK, DEFAULT_PHYSICAL_NETWORK, list_floating_ips
 from .server import Server, ServerError
 from .util import random_base32, utcnow
 
@@ -63,7 +63,9 @@ NODE_TYPES = {
 }
 DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_LEASE_LENGTH = timedelta(days=1)
-DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
+# The default properties can be configured in blazar, and may differ among sites.
+# If we do not send resource properties, then blazar will use the right defaults.
+DEFAULT_NETWORK_RESOURCE_PROPERTIES = ""
 
 
 def lease_create_args(
@@ -565,7 +567,7 @@ def add_network_reservation(
     of_controller_ip=None,
     of_controller_port=None,
     vswitch_name=None,
-    physical_network="physnet1",
+    physical_network=DEFAULT_PHYSICAL_NETWORK,
 ):
     """Add a network reservation to a reservation list.
 
@@ -592,18 +594,17 @@ def add_network_reservation(
     if vswitch_name:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
+    if physical_network != DEFAULT_PHYSICAL_NETWORK:
+        resource_properties = json.dumps(["==", "$physical_network", physical_network])
+    else:
+        resource_properties = DEFAULT_NETWORK_RESOURCE_PROPERTIES
+
     reservation_list.append(
         {
             "resource_type": "network",
             "network_name": network_name,
             "network_description": ",".join(desc_parts),
-            "resource_properties": json.dumps(
-                [
-                    "and",
-                    ["==", "$physical_network", physical_network],
-                    ["==", "$usage", "none"]
-                ]
-            ),
+            "resource_properties": resource_properties,
             "network_properties": "",
         }
     )
