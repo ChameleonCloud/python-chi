@@ -2,6 +2,9 @@ from datetime import datetime
 
 import pytest
 
+from chi.lease import DEFAULT_NETWORK_RESOURCE_PROPERTIES
+
+
 @pytest.fixture()
 def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
@@ -122,7 +125,7 @@ def test_example_reserve_network(mocker, now):
             'network_name': 'myLeaseNetwork',
             'network_description': '',
             'network_properties': '',
-            'resource_properties': '["==", "$physical_network", "physnet1"]',
+            'resource_properties': DEFAULT_NETWORK_RESOURCE_PROPERTIES,
         }]
     )
 
@@ -240,7 +243,7 @@ def test_example_reserve_multiple_resources(mocker, now):
             'network_name': 'myLeaseNetwork',
             'network_description': '',
             'network_properties': '',
-            'resource_properties': '["==", "$physical_network", "physnet1"]',
+            'resource_properties': DEFAULT_NETWORK_RESOURCE_PROPERTIES,
         }, {
             'resource_type': 'virtual:floatingip',
             'amount': 1,
