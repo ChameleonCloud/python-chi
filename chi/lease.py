@@ -598,7 +598,8 @@ def add_network_reservation(
         resource_properties = json.dumps(
             [
                 "and",
-                ["==", "$physical_network", physical_network], ["==", "$usage_type", ""]
+                ["==", "$physical_network", physical_network],
+                ["!=", "$usage_type", "storage"]
             ]
         )
     else:
