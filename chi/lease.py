@@ -595,7 +595,12 @@ def add_network_reservation(
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
     if physical_network != DEFAULT_PHYSICAL_NETWORK:
-        resource_properties = json.dumps(["==", "$physical_network", physical_network])
+        resource_properties = json.dumps(
+            [
+                "and",
+                ["==", "$physical_network", physical_network], ["==", "$usage_type", ""]
+            ]
+        )
     else:
         resource_properties = DEFAULT_NETWORK_RESOURCE_PROPERTIES
 
