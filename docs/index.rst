@@ -63,6 +63,8 @@ For more details about the modules available refer to their respective pages.
    modules/network
    modules/image
    modules/container
+   modules/share
+   modules/ssh
 
 .. toctree::
    :caption: Examples

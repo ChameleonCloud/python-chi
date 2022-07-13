@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from blazarclient.client import Client as BlazarClient
     from glanceclient.client import Client as GlanceClient
     from gnocchiclient.v1.client import Client as GnocchiClient
+    from manilaclient.client import Client as ManilaClient
     from neutronclient.v2_0.client import Client as NeutronClient
     from novaclient.client import Client as NovaClient
     from ironicclient import client as IronicClient
@@ -106,6 +107,21 @@ def gnocchi(session=None) -> "GnocchiClient":
     return GnocchiClient(
         adapter_options=adapter_options, session_options=session_options
     )
+
+
+def manila(session=None) -> "ManilaClient":
+    """Get a preconfigured client for Manila, the share service.
+
+    Args:
+        session (Session): An authentication session object. By default a
+            new session is created via :func:`chi.session`.
+
+    Returns:
+        A new Manila client.
+    """
+    from manilaclient.client import Client as ManilaClient
+
+    return ManilaClient("2", session=(session or session_factory()))
 
 
 def neutron(session=None) -> "NeutronClient":
