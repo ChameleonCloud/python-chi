@@ -1,6 +1,67 @@
 CHANGES
 =======
 
+v0.17.4
+-------
+
+* fix test\_ssh
+* add support for manila - share service
+* Update CODEOWNERS
+
+v0.17.3
+-------
+
+* Add KVM site override
+
+v0.17.2
+-------
+
+* Document sleep\_time parameter
+* Increase wait\_for\_tcp sleep time, add kwarg
+
+v0.17.1
+-------
+
+* fix bug with download encoding
+
+v0.17.0
+-------
+
+* Fixup handling of empty args, compat w/ v2
+
+v0.16.0
+-------
+
+* support reserving based on machine name
+* fix blazar not enough hosts error
+
+v0.15.7
+-------
+
+* add platform version handling
+
+v0.15.6
+-------
+
+* Fixup hint setting
+
+v0.15.5
+-------
+
+* allow passing other hints to container launch
+
+v0.15.4
+-------
+
+* Fix bug with detecting device reservations by count
+* fixup container test
+
+v0.15.3
+-------
+
+* Don't default exposed\_ports to empty dict
+* Update changelog
+
 v0.15.2
 -------
 
