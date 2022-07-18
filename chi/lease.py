@@ -361,10 +361,27 @@ class Lease(object):
         return server
 
 
+def _format_resource_properties(user_constraints, extra_constraints):
+    if user_constraints:
+        if user_constraints[0] == "and":
+            # Already a compound constraint
+            resource_properties = user_constraints + extra_constraints
+        else:
+            resource_properties = ["and", user_constraints] + extra_constraints
+    else:
+        if len(extra_constraints) < 2:
+            # Possibly a compount constraint if multiple kwarg helpers used
+            resource_properties = extra_constraints[0] if extra_constraints else []
+        else:
+            resource_properties = ["and"] + extra_constraints
+
+    return resource_properties
+
+
 def add_node_reservation(
     reservation_list,
     count=1,
-    resource_properties=[],
+    resource_properties=None,
     node_type=None,
     architecture=None,
 ):
@@ -397,18 +414,9 @@ def add_node_reservation(
     if architecture:
         extra_constraints.append(["==", "$architecture.platform_type", architecture])
 
-    if user_constraints:
-        if user_constraints[0] == "and":
-            # Already a compound constraint
-            resource_properties = user_constraints + extra_constraints
-        else:
-            resource_properties = ["and", user_constraints] + extra_constraints
-    else:
-        if len(extra_constraints) < 2:
-            # Possibly a compount constraint if multiple kwarg helpers used
-            resource_properties = extra_constraints[0] if extra_constraints else []
-        else:
-            resource_properties = ["and"] + extra_constraints
+    resource_properties = _format_resource_properties(
+        user_constraints, extra_constraints
+    )
 
     reservation_list.append(
         {
@@ -565,6 +573,7 @@ def add_network_reservation(
     of_controller_ip=None,
     of_controller_port=None,
     vswitch_name=None,
+    resource_properties=None,
     physical_network="physnet1",
 ):
     """Add a network reservation to a reservation list.
@@ -581,6 +590,8 @@ def add_network_reservation(
             this network. See `the virtual forwarding context documentation
             <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_sdn.html#corsa-dp2000-virtual-forwarding-contexts-network-layout-and-advanced-features>`_
             for more details.
+        resource_properties (list): A list of resource property constraints. These take
+            the form [<operation>, <search_key>, <search_value>]
         physical_network (str): The physical provider network to reserve from.
             This only needs to be changed if you are reserving a `stitchable
             network <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_stitching.html>`_.
@@ -592,14 +603,21 @@ def add_network_reservation(
     if vswitch_name:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
+    user_constraints = (resource_properties or []).copy()
+    extra_constraints = []
+    if physical_network:
+        extra_constraints.append(["==", "$physical_network", physical_network])
+
+    resource_properties = _format_resource_properties(
+        user_constraints, extra_constraints
+    )
+
     reservation_list.append(
         {
             "resource_type": "network",
             "network_name": network_name,
             "network_description": ",".join(desc_parts),
-            "resource_properties": json.dumps(
-                ["==", "$physical_network", physical_network]
-            ),
+            "resource_properties": json.dumps(resource_properties),
             "network_properties": "",
         }
     )
