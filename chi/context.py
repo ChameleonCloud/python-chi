@@ -1,18 +1,16 @@
-from itertools import chain
+import logging
 import os
 import sys
 import time
 
-from keystoneauth1.identity.v3 import OidcAccessToken
-from keystoneauth1 import loading
-from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
-from keystoneauth1 import session
-from oslo_config import cfg
 import requests
+from keystoneauth1 import loading
+from keystoneauth1 import session
+from keystoneauth1.identity.v3 import OidcAccessToken
+from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
+from oslo_config import cfg
 
 from . import jupyterhub
-
-import logging
 
 LOG = logging.getLogger(__name__)
 
@@ -313,13 +311,13 @@ def use_site(site_name):
     set("auth_url", f'{site["web"]}:5000/v3')
     set("region_name", site["name"])
 
-    output = [
+    output = "\n".join([
         f"Now using {site_name}:",
         f'URL: {site.get("web")}',
         f'Location: {site.get("location")}',
         f'Support contact: {site.get("user_support_contact")}',
-    ]
-    print("\n".join(output))
+    ])
+    print(output)
 
 
 def session():
