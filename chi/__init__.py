@@ -10,7 +10,7 @@ from .clients import (
     nova,
     zun,
 )
-from .context import reset, set, get, params, session, use_site
+from .context import reset, set, get, params, session, use_site, use_node
 
 
 __all__ = [
