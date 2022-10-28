@@ -320,6 +320,18 @@ def use_site(site_name):
     print(output)
 
 
+def use_node(node_type, data):
+    """ Configure the global request context to target a particular CHI node.
+    More accurate description TBD.
+    """
+    output = "\n".join([
+        f"Now using {node_type}:",
+        f'Data: {data.gpu}'
+        # 'data' is mock data, TBD
+    ])
+    print(output)
+
+
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
 

@@ -8,8 +8,9 @@ from IPython.core.display import display
 import chi
 
 
-def get_nodes():
-    """ Compute a tuple of available/unavailable nodes and their data.
+def get_nodes(display=True):
+    """ Compute a tuple of available/unavailable nodes and their data
+    and display availability for all nodes.
 
     Returns:
         ( ["all node_types"], { "avail_node": "data" }, { "unavail_node":
@@ -42,11 +43,53 @@ def get_nodes():
             unavailable_nodes.pop(node_type)
             available_nodes[node_type] = data
 
-    # Display availability for all nodes
-    print(f'Available nodes: {list(available_nodes.keys())}\n'
-          f'Unavailable nodes: {list(unavailable_nodes.keys())}')
+    # Display availability for all nodes if requested (default)
+    if display:
+        print(f'Available nodes: {list(available_nodes.keys())}\n'
+              f'Unavailable nodes: {list(unavailable_nodes.keys())}')
 
     return list(all_nodes.keys()), available_nodes, unavailable_nodes
+
+
+def choose_node():
+    """ Return IPyWidget Select object for user to select from
+    list of available nodes.
+
+    Display helpful information (TBD) when user selects a node.
+    """
+    def node_dropdown_callback(change):
+        update_selected_node(change["new"])
+
+    def update_selected_node(node_type):
+        node_output.clear_output()
+        with node_output:
+            chi.use_node(node_type, available_nodes[node_type])
+
+    # The code below is USED in production only; NOT USED in dev
+    # all_nodes, available_nodes = \
+    #     get_nodes(display=False)[0], get_nodes(display=False)[1],
+
+    # The code below is NOT USED in production; USED in dev only
+    # Mock node_types and their data
+    avail_node_1_data = lambda: None
+    avail_node_1_data.gpu = "some_gpu_name"
+    avail_node_2_data = lambda: None
+    avail_node_2_data.gpu = "some_gpu_name_2"
+    available_nodes = {"avail_node_1": avail_node_1_data,
+                       "avail_node_2": avail_node_2_data}
+
+    # Display message and exit if all nodes unavailable
+    if not list(available_nodes.keys()):
+        print("All nodes are currently reserved. Please try again later.")
+        return
+
+    node_output = widgets.Output()
+    node_chooser = widgets.Select(options=available_nodes.keys())
+
+    # update selected note on callback
+    node_chooser.observe(node_dropdown_callback, names='value')
+
+    return widgets.VBox([node_chooser, node_output])
 
 
 def get_sites():
