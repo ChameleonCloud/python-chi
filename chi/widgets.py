@@ -51,7 +51,7 @@ def get_nodes(display=True):
     return list(all_nodes.keys()), available_nodes, unavailable_nodes
 
 
-def choose_node():
+def choose_node_type():
     """ Return IPyWidget Select object for user to select from
     list of available nodes.
 
