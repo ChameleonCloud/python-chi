@@ -8,6 +8,47 @@ from IPython.core.display import display
 import chi
 
 
+def get_nodes():
+    """ Compute a tuple of available/unavailable nodes and their data.
+
+    Returns:
+        ( ["all node_types"], { "avail_node": "data" }, { "unavail_node":
+        "data" }
+    """
+    client = chi.blazar()
+    allocations = client.host.list_allocations()
+    hosts, states = {host["id"]: host for host in client.host.list()}, {}
+    for alloc in allocations:
+        uid = alloc["resource_id"]
+        host = hosts[uid]
+        host["reservations"] = alloc["reservations"]
+        states[uid] = host
+
+    all_nodes, unavailable_nodes, available_nodes = {}, {}, {}
+
+    # Assume all unavail, then remove from set if avail
+    for uid, data in hosts.items():
+        node_type = data['node_type']
+        unavailable_nodes[node_type] = data
+        free = data['reservable']
+
+        # Initialize dict schema: { "node_type" : (# avail, # unavail) }
+        all_nodes.setdefault(node_type, (0, 0))
+        all_nodes[node_type] = (all_nodes[node_type][0] + free,
+                                all_nodes[node_type][1] + (not free))
+
+        # update available/unavailable nodes accordingly
+        if all_nodes[node_type][0]:
+            unavailable_nodes.pop(node_type)
+            available_nodes[node_type] = data
+
+    # Display availability for all nodes
+    print(f'Available nodes: {list(available_nodes.keys())}\n'
+          f'Unavailable nodes: {list(unavailable_nodes.keys())}')
+
+    return list(all_nodes.keys()), available_nodes, unavailable_nodes
+
+
 def get_sites():
     """ Return list of available sites. """
     api_ret = requests.get("https://api.chameleoncloud.org/sites.json")
@@ -87,3 +128,8 @@ def choose_project():
     update_selected_project(project_chooser.value)
 
     return widgets.VBox([project_chooser, project_output])
+
+
+def setup():
+    """ Display selectable list of available projects and sites. """
+    display(widgets.HBox([choose_project(), choose_site()]))
