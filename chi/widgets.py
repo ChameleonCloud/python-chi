@@ -2,6 +2,7 @@ from os import environ
 
 import ipywidgets as widgets
 import jwt
+import pandas as pd
 import requests
 from IPython.core.display import display
 
@@ -13,8 +14,11 @@ def get_nodes(display=True):
     and display availability for all nodes.
 
     Returns:
-        ( ["all node_types"], { "avail_node": "data" }, { "unavail_node":
-        "data" }
+        if display=True:
+            pandas df
+        if display=False:
+            ( ["all node_types"], { "avail_node": "data" }, { "unavail_node":
+            "data" }
     """
     client = chi.blazar()
     allocations = client.host.list_allocations()
@@ -45,8 +49,12 @@ def get_nodes(display=True):
 
     # Display availability for all nodes if requested (default)
     if display:
-        print(f'Available nodes: {list(available_nodes.keys())}\n'
-              f'Unavailable nodes: {list(unavailable_nodes.keys())}')
+        num_avail, num_unavail = map(list, zip(*all_nodes.values()))
+        list(all_nodes.values())
+        d = {'Type': list(all_nodes.keys()),
+             'In Use': num_avail,
+             'Free': num_unavail}
+        return pd.DataFrame(data=d)
 
     return list(all_nodes.keys()), available_nodes, unavailable_nodes
 
