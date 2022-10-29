@@ -59,12 +59,35 @@ def get_nodes(display=True):
     return list(all_nodes.keys()), available_nodes, unavailable_nodes
 
 
-def choose_node_type():
+def custom_type_error(expected, received):
+    raise TypeError(f"Expected type '{expected.__name__}', got "
+                    f"'{received.__name__}' instead")
+
+
+def choose_node(gpu: bool = None, gpu_count: int = None, ssd: bool = None,
+                storage_size_gb: int = None, architecture: str = None):
     """ Return IPyWidget Select object for user to select from
     list of available nodes.
 
+    Parameters: (all optional, default None)
+
     Display helpful information (TBD) when user selects a node.
     """
+    # TODO: replace temporary arg typechecking
+    if type(gpu) is not bool and gpu is not None:
+        custom_type_error(bool, type(gpu))
+    if type(gpu_count) is not int and gpu_count is not None:
+        custom_type_error(int, type(gpu_count))
+    if type(storage_size_gb) is not int and storage_size_gb is not None:
+        custom_type_error(int, type(storage_size_gb))
+    if type(ssd) is not bool and ssd is not None:
+        custom_type_error(bool, type(ssd))
+    if type(architecture) is not str and architecture is not None:
+        custom_type_error(str, type(architecture))
+    if gpu_count and gpu_count < 0:
+        print("Gpu count too low")
+        # TODO: raise some error
+
     def node_dropdown_callback(change):
         update_selected_node(change["new"])
 
@@ -73,26 +96,49 @@ def choose_node_type():
         with node_output:
             chi.use_node(node_type, available_nodes[node_type])
 
-    # The code below is USED in production only; NOT USED in dev
-    # all_nodes, available_nodes = \
-    #     get_nodes(display=False)[0], get_nodes(display=False)[1],
+    # Get all available nodes and define ret_nodes
+    available_nodes, ret_nodes = get_nodes(display=False)[1], {}
 
-    # The code below is NOT USED in production; USED in dev only
-    # Mock node_types and their data
-    avail_node_1_data = lambda: None
-    avail_node_1_data.gpu = "some_gpu_name"
-    avail_node_2_data = lambda: None
-    avail_node_2_data.gpu = "some_gpu_name_2"
-    available_nodes = {"avail_node_1": avail_node_1_data,
-                       "avail_node_2": avail_node_2_data}
+    # Assume that if someone queries for # gpus, they want nodes with GPUs
+    if gpu_count:
+        gpu = True
+        # TODO: Implement GPU_COUNT argument logic
+
+    # GPU argument logic
+    if gpu is None:  # default
+        print("Displaying all available nodes:")
+        ret_nodes = available_nodes
+    else:
+        gpu_nodes, non_gpu_nodes = {}, {}
+        for node, data in available_nodes.items():
+            try:
+                if data['gpu.gpu'] == 'True':
+                    gpu_nodes[node] = data
+                if data['gpu.gpu'] == 'False':
+                    non_gpu_nodes[node] = data
+            except KeyError:
+                # if gpu key does not exist, assume that it has no gpu
+                non_gpu_nodes[node] = data
+                continue
+        if gpu:
+            print("Displaying all nodes with GPUs:")
+            ret_nodes = gpu_nodes
+        elif not gpu:
+            print("Displaying all nodes without GPUs:")
+            ret_nodes = non_gpu_nodes
+
+    # TODO: Implement storage_size_gb argument logic
+    # TODO: Implement ssd argument logic
+    # TODO: Implement architecture argument logic
 
     # Display message and exit if all nodes unavailable
-    if not list(available_nodes.keys()):
-        print("All nodes are currently reserved. Please try again later.")
+    if not list(ret_nodes.keys()):
+        print("All nodes of the given parameters are currently reserved. "
+              "Please try again later.")
         return
 
     node_output = widgets.Output()
-    node_chooser = widgets.Select(options=available_nodes.keys())
+    node_chooser = widgets.Select(options=ret_nodes.keys())
 
     # update selected note on callback
     node_chooser.observe(node_dropdown_callback, names='value')
@@ -123,6 +169,7 @@ def choose_site():
     """ Return IPyWidget Select object for user to select from
     list of available sites.
     """
+
     def site_dropdown_callback(change):
         site_dict = change["new"]
         site_name = site_dict.get("name")
@@ -155,6 +202,7 @@ def choose_project():
     """ Return IPyWidget Select object for user to select from
     list of available projects.
     """
+
     def project_dropdown_callback(change):
         update_selected_project(change["new"])
 
