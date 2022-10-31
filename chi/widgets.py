@@ -12,6 +12,15 @@ import chi
 from .context import get
 
 
+def get_node_ids(site):
+    """ Get the UIDs associated with each node_type for a given site.
+
+    Not currently used.
+    """
+    discovery = get_discovery(site)
+    return [(key, discovery[key]['uid']) for key in discovery.keys()]
+
+
 def get_site():
     """ Get user's currently selected site. """
     return get("region_name")
@@ -81,7 +90,6 @@ def get_nodes(display=True):
     all_nodes, unavailable_nodes, available_nodes = {}, {}, {}
 
     discovery = get_discovery(get_site())
-
     # Assume all unavail, then remove from set if avail
     for uid, blazar_data in hosts.items():
         node_type = blazar_data['node_type']
@@ -92,9 +100,9 @@ def get_nodes(display=True):
         all_nodes.setdefault(node_type, (0, 0))
         all_nodes[node_type] = (all_nodes[node_type][0] + free,
                                 all_nodes[node_type][1] + (not free))
-
         # update available/unavailable nodes accordingly
         if all_nodes[node_type][0]:
+            print(node_type)
             available_nodes[node_type] = unavailable_nodes[node_type]
             unavailable_nodes.pop(node_type)
 
