@@ -4,9 +4,58 @@ import ipywidgets as widgets
 import jwt
 import pandas as pd
 import requests
+import json
 from IPython.core.display import display
 
 import chi
+
+from .context import get
+
+
+def get_site():
+    """ Get user's currently selected site. """
+    return get("region_name")
+
+
+def get_discovery(site_name: str = None):
+    """ GET Chameleon resource registry node data for a specific site or
+    all sites. Returns the name of the site(s), each node in that site(s),
+    and the data associated with that node.
+
+    Returns:
+        { 'uid' : { 'node_type': { discovery data} } }
+    """
+    if site_name == 'CHI@Edge':  # handle edge case
+        return None
+    r = requests.get('https://api.chameleoncloud.org/sites/')
+    jsonified = json.loads(r.text)
+    name_uid = {jsonified['items'][i]['name']: jsonified['items'][i]['uid']
+                for i in range(len(jsonified['items']))}
+
+    if site_name:  # get site-specific discovery data
+        if site_name not in name_uid:
+            raise KeyError(f'{site_name} is an invalid site name')
+        r = requests.get('https://api.chameleoncloud.org/sites/' +
+                         name_uid[site_name] + '/clusters/chameleon/nodes')
+        data = json.loads(r.text)['items']
+        return {data[i]['node_type']: data[i] for i in range(len(data))}
+
+    discovery_data, nodes = {}, {}
+    for count, name_uid in enumerate(name_uid.items(), 0):  # get all discovery data
+        name, uid = name_uid
+        if uid == "edge":
+            continue
+        r = requests.get('https://api.chameleoncloud.org/sites/' + uid +
+                            '/clusters/chameleon/nodes')
+        data = json.loads(r.text)['items'][count]
+        node_type = data['node_type']
+        if node_type not in nodes.keys():
+            nodes[node_type] = data
+            continue
+        nodes[node_type] = data
+        discovery_data[name] = nodes
+
+    return discovery_data
 
 
 def get_nodes(display=True):
@@ -17,8 +66,8 @@ def get_nodes(display=True):
         if display=True:
             pandas df
         if display=False:
-            ( ["all node_types"], { "avail_node": "data" }, { "unavail_node":
-            "data" }
+            ( { "avail_node": "blazar/disco data" }, { "unavail_node":
+            "blazar/disco data" }
     """
     client = chi.blazar()
     allocations = client.host.list_allocations()
@@ -31,11 +80,13 @@ def get_nodes(display=True):
 
     all_nodes, unavailable_nodes, available_nodes = {}, {}, {}
 
+    discovery = get_discovery(get_site())
+
     # Assume all unavail, then remove from set if avail
-    for uid, data in hosts.items():
-        node_type = data['node_type']
-        unavailable_nodes[node_type] = data
-        free = data['reservable']
+    for uid, blazar_data in hosts.items():
+        node_type = blazar_data['node_type']
+        free = blazar_data['reservable']
+        unavailable_nodes[node_type] = [free, blazar_data['reservations']]
 
         # Initialize dict schema: { "node_type" : (# avail, # unavail) }
         all_nodes.setdefault(node_type, (0, 0))
@@ -44,8 +95,8 @@ def get_nodes(display=True):
 
         # update available/unavailable nodes accordingly
         if all_nodes[node_type][0]:
+            available_nodes[node_type] = unavailable_nodes[node_type]
             unavailable_nodes.pop(node_type)
-            available_nodes[node_type] = data
 
     # Display availability for all nodes if requested (default)
     if display:
@@ -56,7 +107,7 @@ def get_nodes(display=True):
              'Free': num_unavail}
         return pd.DataFrame(data=d)
 
-    return list(all_nodes.keys()), available_nodes, unavailable_nodes
+    return available_nodes, unavailable_nodes
 
 
 def custom_type_error(expected, received):
