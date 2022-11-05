@@ -124,29 +124,38 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
 
     avail_nodes = get_nodes(display=False)[0]
 
-    def find_gpu(nodes, count: int = None):
+    def find_gpu(nodes, req_count: int = None):
         """ Find all nodes with GPUs, and restrict the set to nodes with
         a certain number of GPUs if specified.
         """
-        # find all with GPUs
-        if count:
-            print("Implement me")
-            # out of those with GPUs, find with GPU == count GPUs
-
-        return nodes  # TODO: Change me
+        new_nodes = {}
+        for node_type, data in nodes.items():
+            if req_count is None:
+                if "gpu" in data and data["gpu"]["gpu"] is True:
+                    new_nodes[node_type] = data
+            elif req_count == 0 and ("gpu" not in data or
+                                     data["gpu"]["gpu"] is False):
+                new_nodes[node_type] = data
+            elif req_count > 0 and "gpu" in data and data["gpu"]["gpu"] is \
+                    True:
+                true_count = data['gpu']['gpu_count']
+                if true_count == req_count:
+                    new_nodes[node_type] = data
+        return new_nodes
 
     # GPU_COUNT logic
     if gpu_count is None:
         pass
-    elif gpu_count > 0:
-        print("gpu_count is > 0")
+    elif type(gpu_count) is int and gpu_count > 0:
+        if gpu is False:
+            raise ValueError(f"Can't have gpu=False, gpu_count={gpu_count}")
         avail_nodes = find_gpu(avail_nodes, gpu_count)
     elif gpu_count == 0:
-        print("gpu_count is 0 ")
         if gpu is True:
-            raise TypeError("Can't have gpu=True, gpu_count=0")
+            raise ValueError("Can't have gpu=True, gpu_count=0")
+        gpu = False
     else:
-        raise TypeError(f"Invalid parameter gpu_count={gpu_count}")
+        raise ValueError(f"Invalid parameter gpu_count={gpu_count}")
 
     # GPU logic
     if gpu is None:
@@ -158,7 +167,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         print("gpu is false")
         avail_nodes = find_gpu(avail_nodes, 0)
     else:
-        raise TypeError(f"Invalid parameter gpu={gpu}")
+        raise ValueError(f"Invalid parameter gpu={gpu}")
 
     # TODO: implement STORAGE_SIZE_GB
     # TODO: implement SSD
