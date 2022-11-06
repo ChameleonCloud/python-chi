@@ -320,15 +320,15 @@ def use_site(site_name):
     print(output)
 
 
-def use_node(node_type, data):
+def use_node(node_type, data, verbose):
     """ Configure the global request context to target a particular CHI node.
     More accurate description TBD.
     """
     output = "\n".join([
-        f"Now using {node_type}:",
-        f'Data: {data.gpu}'
-        # 'data' is mock data, TBD
+        f"Now using {node_type}",
     ])
+    if verbose:
+        output += f':\n{data}'
     print(output)
 
 

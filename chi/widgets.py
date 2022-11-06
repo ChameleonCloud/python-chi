@@ -108,7 +108,7 @@ def get_nodes(display=True):
 
 def choose_node(gpu: bool = None, gpu_count: int = None,
                 ssd: bool = None, storage_size_gb: int = None,
-                architecture: str = None):
+                architecture: str = None, verbose=False):
     """ Return IPyWidget Select object for user to select from
     list of available nodes of the given parameters.
 
@@ -120,7 +120,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     def update_selected_node(node_type):
         node_output.clear_output()
         with node_output:
-            chi.use_node(node_type, avail_nodes[node_type])
+            chi.use_node(node_type, avail_nodes[node_type], verbose)
 
     avail_nodes = get_nodes(display=False)[0]
 
@@ -201,14 +201,6 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         avail_nodes = find_architecture(avail_nodes, architecture)
     else:
         raise ValueError(f"Invalid parameter architecture={architecture}")
-
-    # SSD logic
-
-    # TODO: print out useful statistics about a node when selected
-    # 1) Total storage
-    # 2) SSD (true or false)
-    # 3) GPU (true or false, and stats about GPU is true)
-    # 4) Architecture
 
     if not list(avail_nodes.keys()):
         print("All nodes of the given parameters are currently reserved. "
