@@ -154,6 +154,14 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
                 new_nodes[node_type] = data
         return new_nodes
 
+    def find_architecture(nodes, req_arc):
+        """ Find all nodes with an architecture platform type of REQ_ARC. """
+        new_nodes = {}
+        for node_type, data in nodes.items():
+            if data['architecture']['platform_type'] == req_arc:
+                new_nodes[node_type] = data
+        return new_nodes
+
     # GPU_COUNT logic
     if gpu_count is None:
         pass
@@ -186,9 +194,15 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     else:
         raise ValueError(f"Invalid parameter ssd={storage_size_gb}")
 
-    # SSD logic:
+    # ARCHITECTURE logic
+    if architecture is None:
+        pass
+    elif type(architecture) is str:
+        avail_nodes = find_architecture(avail_nodes, architecture)
+    else:
+        raise ValueError(f"Invalid parameter architecture={architecture}")
 
-    # ARCHITECTURE logic:
+    # SSD logic
 
     # TODO: print out useful statistics about a node when selected
     # 1) Total storage
