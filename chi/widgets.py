@@ -125,8 +125,8 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     avail_nodes = get_nodes(display=False)[0]
 
     def find_gpu(nodes, req_count: int = None):
-        """ Find all nodes with GPUs, and restrict the set to nodes with
-        a certain number of GPUs if specified.
+        """ Find all nodes with or without GPUs, and restrict the set to nodes
+            with a certain number of GPUs if specified.
         """
         new_nodes = {}
         for node_type, data in nodes.items():
@@ -141,6 +141,17 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
                 true_count = data['gpu']['gpu_count']
                 if true_count == req_count:
                     new_nodes[node_type] = data
+        return new_nodes
+
+    def minimum_storage(nodes, req_storage: int):
+        """ Find all nodes with a minimum total storage of REQ_STORAGE. """
+        new_nodes = {}
+        for node_type, data in nodes.items():
+            total_storage = 0
+            for device in data['storage_devices']:
+                total_storage += int(device['humanized_size'][:-3])
+            if total_storage >= req_storage:
+                new_nodes[node_type] = data
         return new_nodes
 
     # GPU_COUNT logic
@@ -161,17 +172,29 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     if gpu is None:
         pass
     elif gpu is True and gpu_count is None:
-        print("gpu is true and gpu_count is none")
         avail_nodes = find_gpu(avail_nodes)
     elif gpu is False:
-        print("gpu is false")
         avail_nodes = find_gpu(avail_nodes, 0)
     else:
         raise ValueError(f"Invalid parameter gpu={gpu}")
 
-    # TODO: implement STORAGE_SIZE_GB
-    # TODO: implement SSD
-    # TODO: implement architecture
+    # STORAGE_SIZE_GB logic: at least STORAGE_SIZE_GB in total storage
+    if storage_size_gb is None:
+        pass
+    elif type(storage_size_gb) is int and storage_size_gb >= 0:
+        avail_nodes = minimum_storage(avail_nodes, storage_size_gb)
+    else:
+        raise ValueError(f"Invalid parameter ssd={storage_size_gb}")
+
+    # SSD logic:
+
+    # ARCHITECTURE logic:
+
+    # TODO: print out useful statistics about a node when selected
+    # 1) Total storage
+    # 2) SSD (true or false)
+    # 3) GPU (true or false, and stats about GPU is true)
+    # 4) Architecture
 
     if not list(avail_nodes.keys()):
         print("All nodes of the given parameters are currently reserved. "
