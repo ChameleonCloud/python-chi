@@ -162,6 +162,21 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
                 new_nodes[node_type] = data
         return new_nodes
 
+    def find_ssd(nodes, ssd_req: bool):
+        """ Find all nodes with or without at least 1 SSD. """
+        new_nodes = {}
+        for node_type, data in nodes.items():
+            for device in data['storage_devices']:
+                if "media_type" in device:
+                    ssd_present = device['media_type'] == 'SSD'
+                    if ssd_req and ssd_present:
+                        new_nodes[node_type] = data
+                    if not ssd_req and not ssd_present:
+                        new_nodes[node_type] = data
+                elif not ssd_req:
+                    new_nodes[node_type] = data
+        return new_nodes
+
     # GPU_COUNT logic
     if gpu_count is None:
         pass
@@ -201,6 +216,14 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         avail_nodes = find_architecture(avail_nodes, architecture)
     else:
         raise ValueError(f"Invalid parameter architecture={architecture}")
+
+    # SSD logic: at least 1 SSD
+    if ssd is None:
+        pass
+    elif type(ssd) is bool:
+        avail_nodes = find_ssd(avail_nodes, ssd)
+    else:
+        raise ValueError(f"Invalid parameter ssd={ssd}")
 
     if not list(avail_nodes.keys()):
         print("All nodes of the given parameters are currently reserved. "
