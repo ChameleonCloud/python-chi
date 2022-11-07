@@ -41,6 +41,7 @@ extra_opts = [
     cfg.StrOpt("image", help=("Name of disk image to use when launching instances")),
     cfg.StrOpt("keypair-private-key", help="Path to the SSH private key file"),
     cfg.StrOpt("keypair-public-key", help="Path to the SSH public key file"),
+    cfg.StrOpt("node_type", help="Type of currently selected bare metal node")
 ]
 global_options = session_opts + adapter_opts + extra_opts
 global_option_names = [opt.dest for opt in global_options]
@@ -216,7 +217,6 @@ def get(key):
         cfg.NoSuchOptError: if the parameter is not supported.
     """
     global _auth_plugin
-
     if key in global_option_names:
         key = _check_deprecated(key)
         return cfg.CONF[CONF_GROUP][key]
@@ -324,6 +324,7 @@ def use_node(node_type, data, verbose):
     """ Configure the global request context to target a particular CHI node.
     More accurate description TBD.
     """
+    set("node_type", node_type)
     output = "\n".join([
         f"Now using {node_type}",
     ])

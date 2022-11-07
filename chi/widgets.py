@@ -25,6 +25,12 @@ def get_site():
     return get("region_name")
 
 
+def get_node():
+    """ Get user's currently selected node. """
+    node = get("node_type")
+    return node
+
+
 def get_discovery(site_name: str = None):
     """ Get Chameleon resource registry node data for all sites or a single
     specific site. Returns the name of the site(s), each node in that site(s),
@@ -225,13 +231,16 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     else:
         raise ValueError(f"Invalid parameter ssd={ssd}")
 
-    if not list(avail_nodes.keys()):
+    if not avail_nodes.keys():
         print("All nodes of the given parameters are currently reserved. "
               "Please try again later.")
         return
 
     node_output = widgets.Output()
     node_chooser = widgets.Select(options=avail_nodes.keys())
+
+    # initialize values before selection is made
+    update_selected_node(node_chooser.value)
 
     # update selected note on callback
     node_chooser.observe(node_dropdown_callback, names='value')
