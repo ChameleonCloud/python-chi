@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import json
 from IPython.core.display import display
+from requests import HTTPError
 
 import chi
 
@@ -46,7 +47,14 @@ def get_discovery(site_name: str = None):
     """
     if site_name == 'CHI@Edge':
         return None
+
     r = requests.get('https://api.chameleoncloud.org/sites/')
+    try:
+        r.raise_for_status()
+    except HTTPError:
+        raise HTTPError("Failed to fetch discovery data. "
+                        "Please try again later.")
+
     r_json = json.loads(r.text)
     name_uid = {r_json['items'][i]['name']: r_json['items'][i]['uid']
                 for i in range(len(r_json['items']))}
@@ -56,6 +64,11 @@ def get_discovery(site_name: str = None):
             raise KeyError(f'{site_name} is an invalid site name')
         r = requests.get('https://api.chameleoncloud.org/sites/' +
                          name_uid[site_name] + '/clusters/chameleon/nodes')
+        try:
+            r.raise_for_status()
+        except HTTPError:
+            raise HTTPError(f"Failed to fetch discovery data for {site_name}."
+                            " Please try again later.")
         data = json.loads(r.text)['items']
         return {data[i]['node_name']: data[i] for i in range(len(data))}
 
@@ -66,6 +79,11 @@ def get_discovery(site_name: str = None):
             continue
         r = requests.get('https://api.chameleoncloud.org/sites/' + uid +
                          '/clusters/chameleon/nodes')
+        try:
+            r.raise_for_status()
+        except HTTPError:
+            raise HTTPError("Failed to fetch discovery data. "
+                            "Please try again later.")
         data = json.loads(r.text)['items'][count]
         discovery_data[name] = {data['node_name']: data}
     return discovery_data
@@ -253,8 +271,8 @@ def get_sites():
     api_ret = requests.get("https://api.chameleoncloud.org/sites.json")
     try:
         api_ret.raise_for_status()
-    except Exception:
-        print("failed to fetch sites")
+    except HTTPError:
+        raise HTTPError("Failed to fetch sites. Please try again later.")
 
     sites_ret = api_ret.json().get("items")
     return sites_ret
