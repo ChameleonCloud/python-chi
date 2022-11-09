@@ -1,68 +1,63 @@
-from chi import widgets
+from json import dumps
+
 import pytest
+import requests
+from requests import HTTPError
 
-# TODO: Implement tests
-
-""" Look for data that can be reused and assign that under a pytest fixture
-
-SITE = some default site (used as a parameter for get_discovery, get_node_ids)
-DISCOVERY = mock discovery return data
-CLIENT = mocked chi.blazar() client
-HOSTS = mock blazar return data
-OS_ACCESS_TOKEN = mock access token from the environment
-REGION_NAME = some value to set as the region name, to be returned from get("region_name")
-GET_NODE = none
-"""
+import chi
+from chi import widgets
 
 
-def test_get_site():
-    # Check that get(REGION_NAME) returns the user's currently selected site
-    return True
+@pytest.fixture()
+def sites_request():
+    return str(dumps(
+        {"items": [{"email_contact": "example@domain.org",
+                    "latitude": 0,
+                    "longitude": 0,
+                    "location": "None",
+                    "name": "CHI@Test1",
+                    "uid": "test1"},
+                   {"email_contact": "example@domain.org",
+                    "latitude": 0,
+                    "longitude": 0,
+                    "location": "None",
+                    "name": "CHI@Test2",
+                    "uid": "test2"}]}
+    ))
 
 
-def test_get_node():
-    # Check that get(NODE_TYPE) returns the user's currently selected site
-    return True
+@pytest.fixture()
+def site():
+    return 'CHI@Test1'
 
 
-def test_get_discovery():
-    # Check for a HTTPError if the request fails (3x in total)
-    return True
+@pytest.fixture()
+def node():
+    return 'test_node_type_1'
 
 
-def test_get_nodes():
-    # Test that the blazar network can be accessed
-    # blazar = mocker.patch('chi.lease.blazar')()
-    print("WIP")
+def test_get_site(site):
+    chi.set('region_name', site)
+    assert widgets.get_site() == site
 
 
-def test_choose_node():
-    # Test for all ValueErrors (7 total)
-    # Test for return value of None when all nodes of given parameters reserved
-    print("WIP")
+def test_get_node(node):
+    chi.set("node_type", node)
+    assert widgets.get_node() == node
 
 
-def test_get_sites():
-    # Mock the api get request
-    # Check for a HTTPError if the request fails
-    print("WIP")
+def test_get_discovery(requests_mock,
+                       sites_request):
+    sites_url = 'https://api.chameleoncloud.org/sites/'
+    requests_mock.get(sites_url, text="", status_code=404)
+    with pytest.raises(HTTPError):
+        bad_req = requests.get(sites_url)
+        bad_req.raise_for_status()
 
+    requests_mock.get(sites_url, text=sites_request)
+    assert requests.get(sites_url).text == sites_request
 
-def test_get_projects():
-    # Get the mock access token from the environment
-    # Mock jwt.decode call, which stores "project_names" attribute
-    # Check that the project names are as defined in the environment
-    print("WIP")
-
-
-def test_choose_site():
-    print("WIP")
-
-
-def test_choose_project():
-    print("WIP")
-
-
-def test_setup():
-    # test that the function can call test_choose_site and test_choose_project
-    print("WIP")
+    # TODO: handle bad request from widgets.get_discovery(site)
+    # TODO: check valid case of widgets.get_discovery(site)
+    # TODO: handle bad request to /clusters/chameleon/notes
+    # TODO: check valid case of widgets.get_discovery()
