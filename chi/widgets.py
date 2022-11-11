@@ -92,8 +92,9 @@ def get_discovery(site_name: str = None):
         except HTTPError:
             raise HTTPError("Failed to fetch discovery data. "
                             "Please try again later.")
-        data = json.loads(r.text)['items'][count]
-        discovery_data[name] = {data['node_name']: data}
+        data = json.loads(r.text)['items']
+        for i in range(len(data)):
+            discovery_data[name] = {data[i]['node_name']: data[i]}
     return discovery_data
 
 
