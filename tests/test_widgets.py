@@ -2,6 +2,7 @@ from json import dumps, loads
 
 import pytest
 import requests
+from ipywidgets import Select, Output, VBox
 from requests import HTTPError
 
 import chi
@@ -130,3 +131,34 @@ def test_get_sites(requests_mock, sites_request, site_names):
         widgets.get_sites()
     requests_mock.get(sites_url, text=sites_request)
     assert dumps(widgets.get_sites()) == sites_request[10:-1]
+
+
+def test_get_projects(mocker):
+    mocker.patch("jwt.decode", return_value={'project_names': [
+        'test_project']})
+    assert widgets.get_projects() == ['test_project']
+
+
+def test_choose_site(mocker, site_names, requests_mock, sites_request):
+    sites_url = 'https://api.chameleoncloud.org/sites.json'
+    requests_mock.get(sites_url, text=sites_request)
+    mocker.patch("chi.widgets.get_sites", return_value=[
+        {'name': site_names[0]}, {'name': site_names[1]}])
+    mocker.patch("chi.context.set", return_value=None)
+    mocker.patch("chi.context._sites",
+                 {site_names[0]: {"name": site_names[0],
+                                  "web": "https://www.google.com",
+                                  "location": "None",
+                                  "user_support_contact": "None"}})
+    choose_site = widgets.choose_site()
+    widget_options = [choose_site.children[0].options[i][0] for i in
+                      range(len(site_names))]
+    assert widget_options == site_names
+
+
+def test_choose_project(mocker):
+    mocker.patch("jwt.decode", return_value={'project_names': [
+        'test_project']})
+    choose_project = widgets.choose_project()
+    widget_options = choose_project.children[0].options[0]
+    assert widget_options == 'test_project'
