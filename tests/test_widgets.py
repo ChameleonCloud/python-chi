@@ -121,3 +121,12 @@ def test_get_discovery(requests_mock, sites_request, site_names, node_names,
 
     with pytest.raises(ValueError):
         widgets.get_discovery("invalid_site_name")
+
+
+def test_get_sites(requests_mock, sites_request, site_names):
+    sites_url = 'https://api.chameleoncloud.org/sites.json'
+    requests_mock.get(sites_url, text="", status_code=404)
+    with pytest.raises(HTTPError):
+        widgets.get_sites()
+    requests_mock.get(sites_url, text=sites_request)
+    assert dumps(widgets.get_sites()) == sites_request[10:-1]
