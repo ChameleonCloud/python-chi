@@ -53,10 +53,10 @@ def get_discovery(site_name: str = None):
         HTTPError: If request for discovery data failed.
         ValueError: If ``site_name`` is invalid.
     """
-    if site_name == 'CHI@Edge':
+    if site_name == "CHI@Edge":
         return None
 
-    r = requests.get('https://api.chameleoncloud.org/sites/')
+    r = requests.get("https://api.chameleoncloud.org/sites/")
     try:
         r.raise_for_status()
     except HTTPError:
@@ -64,29 +64,29 @@ def get_discovery(site_name: str = None):
                         "Please try again later.")
 
     r_json = json.loads(r.text)
-    name_uid = {r_json['items'][i]['name']: r_json['items'][i]['uid']
-                for i in range(len(r_json['items']))}
+    name_uid = {r_json["items"][i]["name"]: r_json["items"][i]["uid"]
+                for i in range(len(r_json["items"]))}
 
     if site_name:
         if site_name not in name_uid:
-            raise ValueError(f'{site_name} is an invalid site name')
-        r = requests.get('https://api.chameleoncloud.org/sites/' +
-                         name_uid[site_name] + '/clusters/chameleon/nodes')
+            raise ValueError(f"{site_name} is an invalid site name")
+        r = requests.get("https://api.chameleoncloud.org/sites/" +
+                         name_uid[site_name] + "/clusters/chameleon/nodes")
         try:
             r.raise_for_status()
         except HTTPError:
             raise HTTPError(f"Failed to fetch discovery data for {site_name}."
                             " Please try again later.")
-        data = json.loads(r.text)['items']
-        return {data[i]['node_name']: data[i] for i in range(len(data))}
+        data = json.loads(r.text)["items"]
+        return {data[i]["node_name"]: data[i] for i in range(len(data))}
 
     discovery_data = {}
     for count, name_uid in enumerate(name_uid.items(), 0):
         name, uid = name_uid
         if uid == "edge":
             continue
-        r = requests.get('https://api.chameleoncloud.org/sites/' + uid +
-                         '/clusters/chameleon/nodes')
+        r = requests.get("https://api.chameleoncloud.org/sites/" + uid +
+                         "/clusters/chameleon/nodes")
         try:
             r.raise_for_status()
         except HTTPError:
@@ -94,7 +94,7 @@ def get_discovery(site_name: str = None):
                             "Please try again later.")
         data = json.loads(r.text)['items']
         for i in range(len(data)):
-            discovery_data[name] = {data[i]['node_name']: data[i]}
+            discovery_data[name] = {data[i]["node_name"]: data[i]}
     return discovery_data
 
 
@@ -127,15 +127,14 @@ def get_nodes(display: bool = True):
         return None
 
     for uid, blazar_data in hosts.items():
-        node_name = blazar_data['node_name']
-        node_type = discovery[node_name]['node_type']
-        free = blazar_data['reservable']
+        node_name = blazar_data["node_name"]
+        node_type = discovery[node_name]["node_type"]
+        free = blazar_data["reservable"]
 
         # initialize dict schema: { "node_type" : (# avail, # unavail) }
         all_nodes.setdefault(node_type, (0, 0))
         all_nodes[node_type] = (all_nodes[node_type][0] + free,
                                 all_nodes[node_type][1] + (not free))
-
         node_data = discovery[node_name]
 
         if all_nodes[node_type][0]:
@@ -145,9 +144,9 @@ def get_nodes(display: bool = True):
 
     if display:
         num_avail, num_unavail = map(list, zip(*all_nodes.values()))
-        d = {'Type': list(all_nodes.keys()),
-             'Free': num_avail,
-             'In Use': num_unavail}
+        d = {"Type": list(all_nodes.keys()),
+             "Free": num_avail,
+             "In Use": num_unavail}
         return pd.DataFrame(data=d)
 
     return avail_nodes, unavail_nodes
@@ -180,6 +179,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         IllegalArgumentError: If any combination of or single parameter(s)
         have an invalid type.
     """
+
     def node_dropdown_callback(change):
         update_selected_node(change["new"])
 
@@ -193,8 +193,8 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     avail_nodes = get_nodes(display=False)[0]
 
     def _find_gpu_helper(nodes, req_count: int = None):
-        """ Find all nodes with or without GPUs, and restrict the set to nodes
-            with a certain number of GPUs if specified.
+        """Find all nodes with or without GPUs, and restrict the set to nodes
+        with a certain number of GPUs if specified.
         """
         new_nodes = {}
         for node_type, data in nodes.items():
@@ -206,7 +206,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
                 new_nodes[node_type] = data
             elif req_count > 0 and "gpu" in data and data["gpu"]["gpu"] is \
                     True:
-                true_count = data['gpu']['gpu_count']
+                true_count = data["gpu"]["gpu_count"]
                 if true_count == req_count:
                     new_nodes[node_type] = data
         return new_nodes
@@ -216,8 +216,8 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         new_nodes = {}
         for node_type, data in nodes.items():
             total_storage = 0
-            for device in data['storage_devices']:
-                total_storage += int(device['humanized_size'][:-3])
+            for device in data["storage_devices"]:
+                total_storage += int(device["humanized_size"][:-3])
             if total_storage >= req_storage:
                 new_nodes[node_type] = data
         return new_nodes
@@ -226,7 +226,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         """Find all nodes with an architecture platform type of REQ_ARC."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            if data['architecture']['platform_type'] == req_arc:
+            if data["architecture"]["platform_type"] == req_arc:
                 new_nodes[node_type] = data
         return new_nodes
 
@@ -234,9 +234,9 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         """Find all nodes with or without at least 1 SSD."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            for device in data['storage_devices']:
+            for device in data["storage_devices"]:
                 if "media_type" in device:
-                    ssd_present = device['media_type'] == 'SSD'
+                    ssd_present = device["media_type"] == "SSD"
                     if ssd_req and ssd_present:
                         new_nodes[node_type] = data
                     if not ssd_req and not ssd_present:
@@ -312,11 +312,11 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
     node_output = widgets.Output()
     node_chooser = widgets.Select(options=avail_nodes.keys())
 
+    # update selected node on callback
+    node_chooser.observe(node_dropdown_callback, names="value")
+
     # initialize values before selection is made
     update_selected_node(node_chooser.value)
-
-    # update selected note on callback
-    node_chooser.observe(node_dropdown_callback, names='value')
 
     return widgets.VBox([node_chooser, node_output])
 
@@ -361,6 +361,7 @@ def choose_site():
     Returns:
         IPyWidget Select object with sites as options.
     """
+
     def site_dropdown_callback(change):
         site_dict = change["new"]
         site_name = site_dict.get("name")
@@ -381,7 +382,7 @@ def choose_site():
     )
 
     # update selected site on callback
-    site_chooser.observe(site_dropdown_callback, names='value')
+    site_chooser.observe(site_dropdown_callback, names="value")
 
     # initialize values before selection is made
     update_selected_site(site_chooser.label)
@@ -396,6 +397,7 @@ def choose_project():
     Returns:
         IPyWidget Select object with projects as options.
     """
+
     def project_dropdown_callback(change):
         update_selected_project(change["new"])
 
@@ -414,7 +416,7 @@ def choose_project():
     )
 
     # update selected project on callback
-    project_chooser.observe(project_dropdown_callback, names='value')
+    project_chooser.observe(project_dropdown_callback, names="value")
 
     # initialize values before selection is made
     update_selected_project(project_chooser.value)
@@ -427,6 +429,6 @@ def setup():
     dropdowns of all available projects and sites.
 
     Returns:
-        IPyWidget HBox object of Select objects
+        IPyWidget HBox object of Select objects.
     """
     display(widgets.HBox([choose_project(), choose_site()]))
