@@ -1,0 +1,424 @@
+CHANGES
+=======
+
+v0.17.4
+-------
+
+* fix test\_ssh
+* add support for manila - share service
+* Update CODEOWNERS
+
+v0.17.3
+-------
+
+* Add KVM site override
+
+v0.17.2
+-------
+
+* Document sleep\_time parameter
+* Increase wait\_for\_tcp sleep time, add kwarg
+
+v0.17.1
+-------
+
+* fix bug with download encoding
+
+v0.17.0
+-------
+
+* Fixup handling of empty args, compat w/ v2
+
+v0.16.0
+-------
+
+* support reserving based on machine name
+* fix blazar not enough hosts error
+
+v0.15.7
+-------
+
+* add platform version handling
+
+v0.15.6
+-------
+
+* Fixup hint setting
+
+v0.15.5
+-------
+
+* allow passing other hints to container launch
+
+v0.15.4
+-------
+
+* Fix bug with detecting device reservations by count
+* fixup container test
+
+v0.15.3
+-------
+
+* Don't default exposed\_ports to empty dict
+* Update changelog
+
+v0.15.2
+-------
+
+* Change default image to Ubuntu 20.04
+
+v0.15.1
+-------
+
+* fix get node reservation from lease (#26)
+* Update changelog/authors
+
+v0.15.0
+-------
+
+* Support specifying arbitrary host constraints
+* Put better message on 'not enough X' on lease create
+* Exit early if container goes into error state
+* Replace references of compute\_haswell with compute\_skylake (#10)
+* Update CODEOWNERS
+* Create CODEOWNERS
+* Add container.download function
+* Add example notebook for container
+* Add test for create\_container
+* Add device profiles documentation
+* Migrate legacy \`chi.Server\` objects to own a \`openstack.compute.v2.server.Server\` object instead of a \`novaclient.v2.servers.Server\` object (#16)
+* add cascadelake and cascadelake\_r as node types (#14)
+
+v0.14.0
+-------
+
+* [novaclient server] add hypervisor\_hostname for creating instance (#15)
+
+v0.13.0
+-------
+
+* Add missing docs
+* Support specifying image\_driver
+* Default snapshot tag to latest
+
+v0.12.1
+-------
+
+* Wait longer for container create
+* Fixup host handling
+* Fixup device lease props
+
+v0.12.0
+-------
+
+* Add device reservation helpers
+
+v0.11.4
+-------
+
+* Add in hack for setting site to CHI@Edge
+* Add docs for runtime/host capability
+* Implement upload function for containers (#11)
+* Implement WIP upload function
+
+v0.11.3
+-------
+
+* Fixup
+
+v0.11.2
+-------
+
+* Add associate\_floating\_ip to container
+
+v0.11.1
+-------
+
+* Rename key\_name to keypair\_name
+* Change back to relative import
+* Adding more module indexes
+* Advertise tests as package
+
+v0.11.0
+-------
+
+* Add support for Zun/containers
+
+v0.10.3
+-------
+
+* Fix issue with fetching lease by name
+
+v0.10.2
+-------
+
+* Fix import error on Lease init
+
+v0.10.1
+-------
+
+* add ironic client to chi \_\_init\_\_
+* Nuke network by name or ID
+
+v0.10.0
+-------
+
+* Add getter for reserved floating IPs
+* Update return type of wait\_for\_active
+* Update docs
+* Add docs for use\_site
+
+v0.9.0
+------
+
+* Add docs for parent module
+* Allow specifying multiple port addresses
+* Fix reservation parsing
+
+v0.8.1
+------
+
+* Add keystone as export
+* Update mail map
+* Remove Python 2 compat
+* Fix doc x-ref
+
+v0.8.0
+------
+
+* Add wait\_for\_active to lease
+* Fixup wait\_for\_active
+* Enable new example
+* Fix tests
+* Fix up floating IP allocation when using connection
+* Update fip association functions to use ID
+* Automatically allocate new floating IP if no free
+* Fix issue when refreshing tokens
+* Add server wait functions
+* Use nova version >2.10
+* Fix generator syntax error
+* Add keypair management by default
+* Pick first flavor if none specified
+* Fix issue with creating subnets w/ gateway/allocation pools (#8)
+
+v0.7.4
+------
+
+* Fixup syntax error
+
+v0.7.3
+------
+
+* Update AUTHORS
+* Network function bug roundup (#6)
+
+v0.7.2
+------
+
+* Fixup return structure for get\_\* neutron calls
+
+v0.7.1
+------
+
+* Fixup list\_\* neutron functions
+* Update functions used
+* Add docs for create\_server
+* Look up server ID as attribute
+* Fix issue enumerating glance images
+* Add link to open notebooks on Jupyter
+* Cast to list before checking length
+* Allow specifying no node\_type
+* Fixup docs for create\_server
+* Ignore more ipynb checkpoint locations
+* Cleaned up ipynb files
+* Removing wizard function imports from network module
+* Strip extra whitespace
+* Put in common auth cells first
+* Remove dead code
+* Add docs for FIP reservation fn
+* Add unit test badge
+* Use Python 3.8
+* Add unit test GHA
+* Install test requirements for RTD
+* Adjust whitespace
+* Update docs
+* Fixup notebook generation
+
+v0.7.0
+------
+
+* Finish notebook generation
+* Add tests for lease examples
+* Add docs for chi.image
+* Deprecate reservation\_api\_examples
+* Fixup
+* Ensure wizards documented
+* Add more documentation
+* Install missing requirements
+* Remove incompatible html theme options
+* Don't explicitly depend on openstack module
+* Fixup autodoc for chi modules
+* Make home page nicer
+* Add new iteration of documentation
+* Add documentation for server module
+* Integrate functional changes to modules
+
+v0.6.0
+------
+
+* Add use\_site to make switching sites easier
+
+v0.5.1
+------
+
+* Fix issue with Server representation compat
+* Update Server object to use openstacksdk
+* Update changelog
+
+v0.5.0
+------
+
+* Add support for building wheels
+* Add factory for OpenStackSDK connection handler
+
+v0.4.4
+------
+
+* Fixup setting interface/region\_name for KS client
+
+v0.4.3
+------
+
+* Add params() to list context params
+* Add Keystone client
+
+v0.4.2
+------
+
+* Add ironic client
+
+v0.4.1
+------
+
+* Fixup automatic access token refresh logic
+* Changelog update
+
+v0.4.0
+------
+
+* Remove Python 2.7 from tests
+* Refresh access\_token before auth request
+* Lazy-import OS clients
+* Support all Keystone auth methods
+* Add pruth to list of authors
+* Update LICENSE
+
+v0.3.0
+------
+
+* fixed reserve network descrption building
+* update
+* added separate config file
+* actually added the new files for autogen notebooks
+* added autogen notebooks
+* clean up
+* added some error handling to the some examples
+* added example functions for servers, networking, and reservations
+* Release 0.2.5
+
+v0.2.5
+------
+
+* Add support for username/password authentication
+* Update release notes
+* Add mailmap
+* Release 0.2.4
+
+v0.2.4
+------
+
+* Move packages from options to files
+* Make README valid
+
+v0.2.3
+------
+
+* Explicitly mark chi as package
+
+v0.2.2
+------
+
+* v0.2.2
+* Add support for docs
+* Fix 'missing flavor' error
+* Support for complex leases
+* v0.2.1
+
+v0.2.1
+------
+
+* Update classifiers to comply with whitelist
+* Update changelog and remove version
+
+v0.2.0
+------
+
+* Prepare for packaging on pypi
+* Extend Connection as subclass
+* Fix Gnocchi library instantiation
+* Gracefully handle double-associating IP
+* Fix typo with variable
+* Expose clients, don't make session singleton
+* Loosen python version dependencies
+* Better exclusion of pytest caches
+* Add more tests for context
+* Override strict host checking
+* Use implicit session via context
+* Fix issues with compat when printing server
+* Change variable names
+* Simplify SSH connection functionality
+* Pass openstack env to tests
+* Remove VERSION file
+* Update AUTHORS
+* Add more starting tests
+* Adding context management, basic test
+* Update setup
+* Add region name to lease string rep
+* Fix some edge cases with auth
+* Fix up function signatures
+* Add auth helper and dependencies
+* Reorganization and cleanup
+* Don't automatically delete pre-existing servers
+* Support server 'with' context
+* Python syntax error
+* Support instantiating server by ID
+* Update code for compatibility with old and new lease status
+* Pass region name to clients
+* Fix syntax
+* Add imports to allow usage of new print function
+* delete all instances before terminating lease
+* missing comma in NODE\_TYPES causes test failures
+* Update node types for ccmanage
+* Functional documentation for now
+* Add logo, quicknode docs
+* Add documentation
+* Drop old code
+* Nova client no longer letting us use it to bind IPs
+* Skip binding an IP if selected
+* Update SSH\_KEY variable name
+* Fix double net argument
+* Accept "net\_name" kwarg for servers
+* Scan for public floating IP network
+* Re-enable node type selection for leases
+* Fix support for newer blazarclient
+* Add sequester option to Lease, support newer blazarclient
+* Ignore host key
+* Fix key\_filename arg location
+* Get SSH key path from envvar if set
+* Tolerate TENANT/PROJECT interchangeably in config
+* Add network selection to Server object
+* Start to generalize build, tolerate Python 3.5
+* Capture errors separately (some weren't working?)
+* More automatic
+* Add stack automation bits from old nodebooks
+* Initial commit

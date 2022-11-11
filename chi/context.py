@@ -294,6 +294,13 @@ def use_site(site_name):
                 "location": "Distributed",
                 "user_support_contact": "https://groups.google.com/g/chameleon-edge-users",
             }
+        elif site_name == "KVM@TACC":
+            site = {
+                "name": "KVM@TACC",
+                "web": "https://kvm.tacc.chameleoncloud.org",
+                "location": "Austin, Texas, USA",
+                "user_support_contact": "help@chameleoncloud.org",
+            }
         else:
             raise ValueError(
                 (

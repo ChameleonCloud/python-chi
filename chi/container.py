@@ -45,17 +45,11 @@ __all__ = [
 def create_container(
     name: "str",
     image: "str" = None,
-    image_driver: "str" = DEFAULT_IMAGE_DRIVER,
-    device_profiles: "list[str]" = None,
-    environment: "dict" = None,
-    exposed_ports: "list[str]" = [],
-    runtime: "str" = None,
-    nets: "list[dict]" = None,
-    network_id: "str" = None,
-    network_name: "str" = DEFAULT_NETWORK,
+    exposed_ports: "list[str]" = None,
     reservation_id: "str" = None,
     start: "bool" = True,
     start_timeout: "int" = None,
+    platform_version: "int" = 2,
     **kwargs,
 ) -> "Container":
     """Create a container instance.
@@ -64,10 +58,6 @@ def create_container(
         name (str): The name to give the container.
         image (str): The Docker image, with or without tag information. If no
             tag is provided, "latest" is assumed.
-        image_driver (str): The image storage driver to use to retrieve the
-            image. Defaults to "docker", meaning the image is assumed to be a
-            Docker registry repository. Specify "glance" to launch a snapshot
-            image by passing the Glance Image ID in the ``image`` argument.
         device_profiles (list[str]): An optional list of device profiles to
             request be configured on the container when it is created. Edge
             devices may have differing sets of supported device profiles, so
@@ -78,15 +68,6 @@ def create_container(
         exposed_ports (list[str]): A list of ports to expose on the container.
             TCP or UDP can be provided with a slash prefix, e.g., "80/tcp" vs.
             "53/udp". If no protocol is provided, TCP is assumed.
-        nets (list[dict]): A set of network configurations. This is an advanced
-            invocation; typically ``network_id`` or ``network_name`` should be
-            enough, and is much simpler. Refer to the `Zun documentation
-            <https://docs.openstack.org/api-ref/application-container/?expanded=create-new-container-detail#create-new-container>`_
-            for information about this parameter.
-        network_id (str): The ID of a network to launch the container on.
-        network_name (str): The name of a network to launch the container on.
-            This has no effect if ``network_id`` is already provided. Default
-            "containernet1".
         host (str): The Zun host to launch a container on. If not specified,
             the host is chosen by Zun.
         runtime (str): The container runtime to use. This should only be
@@ -98,41 +79,44 @@ def create_container(
         **kwargs: Additional keyword arguments to send to the Zun client's
             container create call.
     """
-
-    if not nets:
-        if not network_id:
-            network_id = get_network_id(network_name)
-        nets = [{"network": network_id}]
-
-    hints = {}
+    hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
+    if platform_version:
+        hints["platform_version"] = platform_version
 
-    # Note: ``host`` is not defined as an arg because there is some special
+    # Support simpler syntax for exposed_ports
+    if exposed_ports and isinstance(exposed_ports, list):
+        exposed_ports = {port_def: {} for port_def in exposed_ports}
+    # Only set exposed_ports on the parent invocation if it is non-empty. Otherwise,
+    # end-users cannot specify security groups; the client will send an explicit 'null'
+    # value for this key, which will fail validation in the API layer, which expects the
+    # key to be missing if security groups are specified.
+    if exposed_ports:
+        kwargs["exposed_ports"] = exposed_ports
+
+    # Note: most documented args are not on the function signature because there is some special
     # handling of it in the Zun client; it is not sent if it is not on kwargs.
     # If it is on kwargs it is expected to be non-None.
     container = zun().containers.create(
         name=name,
         image=image,
-        image_driver=image_driver,
-        nets=nets,
-        device_profiles=device_profiles,
-        exposed_ports={port_def: {} for port_def in (exposed_ports or [])},
-        environment=environment,
-        runtime=runtime,
-        hints=hints,
         **kwargs,
     )
 
-    if start:
-        timeout = start_timeout or (60 * 30)
-        LOG.info(f"Waiting up to {timeout}s for container creation ...")
-        # Wait for a while, the image may need to download. 30 minutes is
-        # _quite_ a long time, but the user can interrupt or choose a smaller
-        # timeout.
+    # Wait for a while, the image may need to download. 30 minutes is
+    # _quite_ a long time, but the user can interrupt or choose a smaller
+    # timeout.
+    timeout = start_timeout or (60 * 30)
+    LOG.info(f"Waiting up to {timeout}s for container creation ...")
+
+    if platform_version == 2:
+        container = _wait_for_status(container.uuid, "Running", timeout=timeout)
+    else:
         container = _wait_for_status(container.uuid, "Created", timeout=timeout)
-        LOG.info("Starting container ...")
-        zun().containers.start(container.uuid)
+        if start:
+            LOG.info("Starting container ...")
+            zun().containers.start(container.uuid)
 
     return container
 
@@ -258,6 +242,20 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
     return zun().containers.put_archive(container_ref, dest, data)
 
 
+def download(container_ref: "str", source: "str", dest: "str"):
+    """Download a file or directory from a running container.
+
+    Args:
+        container_ref (str): The name or ID of the container.
+        source (str): The (container) path of the file or directory.
+        dest (str): The (local) path to download to.
+    """
+    res = zun().containers.get_archive(container_ref, source)
+    fd = io.BytesIO(res["data"])
+    with tarfile.open(fileobj=fd, mode="r") as tar:
+        tar.extractall(dest)
+
+
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
     """Wait for a container to transition to the running state.
 
@@ -281,7 +279,9 @@ def _wait_for_status(
 
     while True:
         container = get_container(container_ref)
-        if container.status == status:
+        if container.status == "Error":
+            raise RuntimeError("Container went in to error state")
+        elif container.status == status:
             return container
         time.sleep(5)
         if time.perf_counter() - start_time >= timeout:

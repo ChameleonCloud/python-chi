@@ -1,20 +1,32 @@
 import json
-import logging
 import numbers
+import re
 import sys
 import time
+from typing import TYPE_CHECKING
 from datetime import timedelta
 
 from blazarclient.exception import BlazarClientException
 
 from .clients import blazar, neutron
-from .context import get as get_from_context
-from .context import session
-from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
+from .context import get as get_from_context, session
+from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
 from .server import Server, ServerError
 from .util import random_base32, utcnow
 
+import logging
+
+if TYPE_CHECKING:
+    from typing import Pattern
+
 LOG = logging.getLogger(__name__)
+
+
+class ErrorParsers:
+    NOT_ENOUGH_RESOURCES: "Pattern" = re.compile(
+        r"not enough (?P<resource_type>([\w\s\-\._]+)) available"
+    )
+
 
 __all__ = [
     "add_node_reservation",
@@ -50,7 +62,7 @@ NODE_TYPES = {
     "atom",
     "arm64",
 }
-DEFAULT_NODE_TYPE = "compute_haswell"
+DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_LEASE_LENGTH = timedelta(days=1)
 DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
 
@@ -149,7 +161,7 @@ def lease_create_nodetype(*args, **kwargs):
     Wrapper for :py:func:`lease_create_args` that adds the
     ``resource_properties`` payload to specify node type.
 
-    :param str node_type: Node type to filter by, ``compute_haswell``, et al.
+    :param str node_type: Node type to filter by, ``compute_skylake``, et al.
     :raises ValueError: if there is no `node_type` named argument.
     """
     try:
@@ -169,7 +181,7 @@ class Lease(object):
 
     .. code-block:: python
 
-        with Lease(session, node_type='compute_haswell') as lease:
+        with Lease(session, node_type='compute_skylake') as lease:
             instance = lease.create_server()
             ...
 
@@ -350,7 +362,30 @@ class Lease(object):
         return server
 
 
-def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE):
+def _format_resource_properties(user_constraints, extra_constraints):
+    if user_constraints:
+        if user_constraints[0] == "and":
+            # Already a compound constraint
+            resource_properties = user_constraints + extra_constraints
+        else:
+            resource_properties = ["and", user_constraints] + extra_constraints
+    else:
+        if len(extra_constraints) < 2:
+            # Possibly a compount constraint if multiple kwarg helpers used
+            resource_properties = extra_constraints[0] if extra_constraints else []
+        else:
+            resource_properties = ["and"] + extra_constraints
+
+    return resource_properties
+
+
+def add_node_reservation(
+    reservation_list,
+    count=1,
+    resource_properties=None,
+    node_type=None,
+    architecture=None,
+):
     """Add a node reservation to a reservation list.
 
     Args:
@@ -358,12 +393,32 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
             The list will be extended in-place.
         count (int): The number of nodes of the given type to request.
             (Default 1).
-        node_type (str): The node type to request. (Default "compute_haswell").
-            If None, the reservation will not target any particular node type.
+        resource_properties (list): A list of resource property constraints. These take
+            the form [<operation>, <search_key>, <search_value>], e.g.::
+
+              ["==", "$node_type", "some-node-type"]: filter the reservation to only
+                nodes with a `node_type` matching "some-node-type".
+              [">", "$architecture.smt_size", 40]: filter to nodes having more than 40
+                (hyperthread) cores.
+
+        node_type (str): The node type to request. If None, the reservation will not
+            target any particular node type. If `resource_properties` is defined, the
+            node type constraint is added to the existing property constraints.
+        architecture (str): The node architecture to request. If `resource_properties`
+            is defined, the architecture constraint is added to the existing property
+            constraints.
     """
-    resource_properties = []
+    user_constraints = (resource_properties or []).copy()
+    extra_constraints = []
     if node_type:
-        resource_properties.extend(["==", "$node_type", node_type])
+        extra_constraints.append(["==", "$node_type", node_type])
+    if architecture:
+        extra_constraints.append(["==", "$architecture.platform_type", architecture])
+
+    resource_properties = _format_resource_properties(
+        user_constraints, extra_constraints
+    )
+
     reservation_list.append(
         {
             "resource_type": "physical:host",
@@ -375,7 +430,9 @@ def add_node_reservation(reservation_list, count=1, node_type=DEFAULT_NODE_TYPE)
     )
 
 
-def get_node_reservation(lease_ref, count=None, node_type=None):
+def get_node_reservation(
+    lease_ref, count=None, resource_properties=None, node_type=None, architecture=None
+):
     """Retrieve a reservation ID for a node reservation.
 
     The reservation ID is useful to have when launching bare metal instances.
@@ -384,7 +441,12 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
         lease_ref (str): The ID or name of the lease.
         count (int): An optional count of nodes the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
+        resource_properties (list): An optional set of resource property constraints
+            the desired reservation was made under. Use this if you have multiple
+            reservations under a lease.
         node_type (str): An optional node type the desired reservation was
+            made for. Use this if you have multiple reservations under a lease.
+        architecture (str): An optional node architecture the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
 
     Returns:
@@ -401,7 +463,12 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
             int(res.get(key)) == count for key in ["min_count", "max_count"]
         ):
             return False
-        if node_type is not None and node_type not in res.get("resource_properties"):
+        rp = res.get("resource_properties")
+        if node_type is not None and node_type not in rp:
+            return False
+        if architecture is not None and architecture not in rp:
+            return False
+        if resource_properties is not None and json.dumps(rp) != resource_properties:
             return False
         return True
 
@@ -409,7 +476,7 @@ def get_node_reservation(lease_ref, count=None, node_type=None):
     return res["id"]
 
 
-def get_device_reservation(lease_ref, count=None, device_model=None, device_name=None):
+def get_device_reservation(lease_ref, count=None, machine_name=None, device_model=None, device_name=None):
     """Retrieve a reservation ID for a device reservation.
 
     The reservation ID is useful to have when requesting containers.
@@ -418,6 +485,8 @@ def get_device_reservation(lease_ref, count=None, device_model=None, device_name
         lease_ref (str): The ID or name of the lease.
         count (int): An optional count of devices the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
+        machine_name (str): An optional device machine name the desired reservation
+            was made for. Use this if you have multiple reservations under a lease.
         device_model (str): An optional device model the desired reservation was
             made for. Use this if you have multiple reservations under a lease.
         device_name (str): An optional device name the desired reservation was
@@ -433,11 +502,17 @@ def get_device_reservation(lease_ref, count=None, device_model=None, device_name
     def _find_device_reservation(res):
         if res.get("resource_type") != "device":
             return False
+        # FIXME(jason): Blazar's device plugin uses "min" and "max", but the
+        # standard seems to be "min_count" and "max_count"; this should be fixed in
+        # Blazar's device plugin.
         if count is not None and not all(
-            int(res.get(key)) == count for key in ["min_count", "max_count"]
+            (key not in res) or int(res.get(key)) == count
+            for key in ["min_count", "max_count", "min", "max"]
         ):
             return False
         resource_properties = res.get("resource_properties")
+        if machine_name is not None and machine_name not in resource_properties:
+            return False
         if device_model is not None and device_model not in resource_properties:
             return False
         if device_name is not None and device_name not in resource_properties:
@@ -499,6 +574,7 @@ def add_network_reservation(
     of_controller_ip=None,
     of_controller_port=None,
     vswitch_name=None,
+    resource_properties=None,
     physical_network="physnet1",
 ):
     """Add a network reservation to a reservation list.
@@ -515,6 +591,8 @@ def add_network_reservation(
             this network. See `the virtual forwarding context documentation
             <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_sdn.html#corsa-dp2000-virtual-forwarding-contexts-network-layout-and-advanced-features>`_
             for more details.
+        resource_properties (list): A list of resource property constraints. These take
+            the form [<operation>, <search_key>, <search_value>]
         physical_network (str): The physical provider network to reserve from.
             This only needs to be changed if you are reserving a `stitchable
             network <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_stitching.html>`_.
@@ -526,14 +604,21 @@ def add_network_reservation(
     if vswitch_name:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
+    user_constraints = (resource_properties or []).copy()
+    extra_constraints = []
+    if physical_network:
+        extra_constraints.append(["==", "$physical_network", physical_network])
+
+    resource_properties = _format_resource_properties(
+        user_constraints, extra_constraints
+    )
+
     reservation_list.append(
         {
             "resource_type": "network",
             "network_name": network_name,
             "network_description": ",".join(desc_parts),
-            "resource_properties": json.dumps(
-                ["==", "$physical_network", physical_network]
-            ),
+            "resource_properties": json.dumps(resource_properties),
             "network_properties": "",
         }
     )
@@ -557,13 +642,17 @@ def add_fip_reservation(reservation_list, count=1):
 
 
 def add_device_reservation(
-    reservation_list, count=1, device_model=None, device_name=None
+    reservation_list, count=1, machine_name=None, device_model=None, device_name=None
 ):
     """Add an IoT/edge device reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
         count (int): The number of devices to request.
+        machine_name (str): The device machine name to reserve. This should match
+            a "machine_name" property of the devices registered in Blazar. This
+            is the easiest way to reserve a particular device type, e.g.
+            "raspberrypi4-64".
         device_model (str): The model of device to reserve. This should match
             a "model" property of the devices registered in Blazar.
         device_name (str): The name of a specific device to reserve. If this
@@ -587,7 +676,9 @@ def add_device_reservation(
                 "Cannot reserve multiple devices if device_name is a constraint."
             )
         resource_properties.append(["==", "$name", device_name])
-    elif device_model:
+    if machine_name:
+        resource_properties.append(["==", "$machine_name", machine_name])
+    if device_model:
         resource_properties.append(["==", "$model", device_model])
 
     if len(resource_properties) == 1:
@@ -692,13 +783,26 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
     if not reservations:
         raise ValueError("No reservations provided.")
 
-    return blazar().lease.create(
-        name=lease_name,
-        start=start_date,
-        end=end_date,
-        reservations=reservations,
-        events=[],
-    )
+    try:
+        return blazar().lease.create(
+            name=lease_name,
+            start=start_date,
+            end=end_date,
+            reservations=reservations,
+            events=[],
+        )
+    except BlazarClientException as ex:
+        msg: "str" = ex.args[0]
+        msg = msg.lower()
+
+        match = ErrorParsers.NOT_ENOUGH_RESOURCES.match(msg)
+        if match:
+            LOG.error(
+                f"There were not enough unreserved {match.group('resource_type')} "
+                "to satisfy your request."
+            )
+        else:
+            LOG.error(msg)
 
 
 def ensure_lease(lease_name: "str", **kwargs):

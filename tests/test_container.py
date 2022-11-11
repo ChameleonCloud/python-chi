@@ -54,17 +54,12 @@ def example_create_container():
 def test_example_create_container(mocker):
     zun = mocker.patch("chi.container.zun")()
 
-    def get_network_id(network_name):
-        assert network_name == DEFAULT_NETWORK
-        return "network-id"
-
-    mocker.patch("chi.container.get_network_id", side_effect=get_network_id)
     mocker.patch("chi.lease.get_device_reservation", return_value="reservation-id")
     Container = namedtuple("Container", ["uuid", "name", "status"])
     mocker.patch(
         # Fake that the container is already created
         "chi.container.get_container",
-        return_value=Container("fake-uuid", "my-container", "Created"),
+        return_value=Container("fake-uuid", "my-container", "Running"),
     )
 
     example_create_container()
@@ -72,11 +67,5 @@ def test_example_create_container(mocker):
     zun.containers.create.assert_called_once_with(
         name="my_container",
         image="centos:8",
-        image_driver=DEFAULT_IMAGE_DRIVER,
-        hints={"reservation": "reservation-id"},
-        nets=[{"network": "network-id"}],
-        environment=None,
-        exposed_ports={},
-        runtime=None,
-        device_profiles=None,
+        hints={"reservation": "reservation-id", "platform_version": 2},
     )
