@@ -2,7 +2,7 @@ from json import dumps, loads
 
 import pytest
 import requests
-from ipywidgets import Select, Output, VBox
+from chi.widgets import IllegalArgumentError
 from requests import HTTPError
 
 import chi
@@ -16,7 +16,7 @@ def site_names():
 
 @pytest.fixture()
 def node_types():
-    return ['test_node_type_1', 'test_node_type_1']
+    return ['test_node_type_1', 'test_node_type_2']
 
 
 @pytest.fixture()
@@ -57,7 +57,8 @@ def discovery_request_one(node_names, node_types, node_uids):
                     "storage_devices": [
                         {"media_type": "SSD", "humanized_size": "250 GB"}],
                     "type": "node",
-                    "uid": node_uids[0]}]}
+                    "uid": node_uids[0]}],
+         }
     ))
 
 
@@ -76,14 +77,20 @@ def discovery_request_two(node_names, node_types, node_uids):
     ))
 
 
-def test_get_site(site):
-    chi.set('region_name', site)
-    assert widgets.get_site() == site
+@pytest.fixture()
+def blazar_request(node_uids, node_names, node_types):
+    return [{'hypervisor_hostname': node_uids[0], 'node_name': node_names[0],
+             'node_type': node_types[0], 'reservable': True}]
 
 
-def test_get_node(node):
-    chi.set("node_type", node)
-    assert widgets.get_node() == node
+def test_get_site(site_names):
+    chi.set('region_name', site_names[0])
+    assert widgets.get_site() == site_names[0]
+
+
+def test_get_node(node_types):
+    chi.set("node_type", node_types[0])
+    assert widgets.get_node() == node_types[0]
 
 
 def test_get_discovery(requests_mock, sites_request, site_names, node_names,
@@ -122,6 +129,41 @@ def test_get_discovery(requests_mock, sites_request, site_names, node_names,
 
     with pytest.raises(ValueError):
         widgets.get_discovery("invalid_site_name")
+
+
+def test_get_nodes(requests_mock, site_names, sites_request, node_uids,
+                   node_types, discovery_request_one, discovery_request_two,
+                   mocker, blazar_request):
+    with pytest.raises(IllegalArgumentError):
+        widgets.get_nodes(None)
+
+    # setup
+    chi.set('region_name', site_names[0])
+    sites_url = 'https://api.chameleoncloud.org/sites/'
+    requests_mock.get(sites_url, text=sites_request)
+    node_urls = ['https://api.chameleoncloud.org/sites/' + uid
+                 + '/clusters/chameleon/nodes' for uid in node_uids]
+    requests_mock.get(node_urls[0], text=discovery_request_one)
+    requests_mock.get(node_urls[1], text=discovery_request_two)
+
+    def blazar(request):
+        mock_blazar = lambda: None
+        mock_list = lambda: None
+        mock_list.list = lambda: request
+        mock_blazar.host = mock_list
+        return mock_blazar
+
+    mocker.patch('chi.blazar', return_value=blazar(blazar_request))
+
+    mock_avail_nodes = {node_types[0]: loads(discovery_request_one[11:-2])}
+    mock_unavail_nodes = {}
+    get_nodes_ret_val = (mock_avail_nodes, mock_unavail_nodes)
+    assert widgets.get_nodes(display=False) == get_nodes_ret_val
+
+    assert widgets.get_nodes(display=True).get("Type").tolist() == \
+           [node_types[0]]
+    assert widgets.get_nodes(display=True).get("Free").tolist() == [1]
+    assert widgets.get_nodes(display=True).get("In Use").tolist() == [0]
 
 
 def test_get_sites(requests_mock, sites_request, site_names):
