@@ -678,26 +678,28 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         return server
 
 
-def ensure_server(server_name: "str", *args, **kwargs) -> "Server":
+def ensure_server(server_name: str, **kwargs) -> "Server":
     """Get a server with name if it exists, create a new one if not.
 
     Args:
-        server_ref (str): The name or ID of the server.
+        server_name(str): The name or ID of the server.
         all kwargs of create_server.
 
     Returns:
         The existing server if found, a new server if not.
     """
     try:
-        server_obj = get_server(server_name)
-    except Exception as ex:
-        print(ex)
+        current_server = get_server(server_name)
+    except Exception:
+        print(f"Unable to get server named {server_name}")
         try:
-            server_obj = create_server(server_name, **kwargs)
+            new_server = create_server(server_name, **kwargs)
         except Exception as ex:
-            print(ex)
-            raise
+            print(f"Unable to construct new server named {server_name}")
+            raise ex
         else:
-            return server_obj
+            print(f"Using new server named {server_name}")
+            return new_server
     else:
-        return server_obj
+        print(f"Using existing server named {server_name}")
+        return current_server

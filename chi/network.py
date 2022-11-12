@@ -159,6 +159,35 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     return network['network']
 
 
+def ensure_network(network_name: str, **kwargs):
+    """Get a network with name if it exists, create a new one if not.
+
+    Args:
+        network_name(str): The name or ID of the network.
+        all kwargs of create_network.
+
+    Returns:
+        The existing network if found, a new network if not.
+    """
+    try:
+        current_network = get_network(network_name)
+    except Exception:
+        print(f"Unable to get network named {network_name}")
+        try:
+            new_network = create_network(network_name=network_name, **kwargs)
+        except Exception as ex:
+            print(f"Unable to construct new network named {network_name}")
+            raise ex
+        else:
+            print(f"Using new network named {network_name}")
+            return new_network
+    else:
+        print(f"Using existing network named {network_name}")
+        return current_network
+
+
+
+
 def delete_network(network_id):
     """Delete the network.
 
@@ -263,6 +292,33 @@ def create_subnet(subnet_name, network_id,
     })
 
     return subnet_rtn['subnets'][0]
+
+
+def ensure_subnet(subnet_name: str, **kwargs):
+    """Get a subnet with name if it exists, create a new one if not.
+
+    Args:
+        subnet_name (str): The name or ID of the subnet.
+        all kwargs of create_subnet.
+
+    Returns:
+        The existing subnet if found, a new subnet if not.
+    """
+    try:
+        current_subnet = get_subnet(subnet_name)
+    except Exception:
+        print(f"Unable to get subnet named {subnet_name}")
+        try:
+            new_subnet = create_subnet(subnet_name=subnet_name, **kwargs)
+        except Exception as ex:
+            print(f"Unable to construct new subnet named {subnet_name}")
+            raise ex
+        else:
+            print(f"Using new subnet named {subnet_name}")
+            return new_subnet
+    else:
+        print(f"Using existing subnet named {subnet_name}")
+        return current_subnet
 
 
 def delete_subnet(subnet_id):
@@ -380,6 +436,33 @@ def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_addres
     return neutron().create_port(body={'port': port})
 
 
+def ensure_port(port_name: str, **kwargs):
+    """Get a port with name if it exists, create a new one if not.
+
+    Args:
+        port_name (str): The name or ID of the port.
+        all kwargs of create_port.
+
+    Returns:
+        The existing port if found, a new port if not.
+    """
+    try:
+        current_port = get_port(port_name)
+    except Exception:
+        print(f"Unable to get port named {port_name}")
+        try:
+            new_port = create_port(port_name=port_name, **kwargs)
+        except Exception as ex:
+            print(f"Unable to construct new port named {port_name}")
+            raise ex
+        else:
+            print(f"Using new port named {port_name}")
+            return new_port
+    else:
+        print(f"Using existing port named {port_name}")
+        return current_port
+
+
 def update_port(port_id, subnet_id=None, ip_address=None):
     raise NotImplementedError()
 
@@ -455,6 +538,33 @@ def create_router(router_name, gw_network_name=None) -> dict:
 
     response = neutron().create_router(body={"router": router})
     return response["router"]
+
+
+def ensure_router(router_name: str, **kwargs):
+    """Get a router with name if it exists, create a new one if not.
+
+    Args:
+        router_name (str): The name or ID of the router.
+        all kwargs of create_router.
+
+    Returns:
+        The existing router if found, a new router if not.
+    """
+    try:
+        current_router = get_router(router_name)
+    except Exception:
+        print(f"Unable to get router named {router_name}")
+        try:
+            new_router = create_router(router_name=router_name, **kwargs)
+        except Exception as ex:
+            print(f"Unable to construct new router named {router_name}")
+            raise ex
+        else:
+            print(f"Using new router named {router_name}")
+            return new_router
+    else:
+        print(f"Using existing router named {router_name}")
+        return current_router
 
 
 def delete_router(router_id):

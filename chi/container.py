@@ -79,6 +79,7 @@ def create_container(
         **kwargs: Additional keyword arguments to send to the Zun client's
             container create call.
     """
+    ensure_container(container_name=name, )
     hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
@@ -144,29 +145,31 @@ def get_container(container_ref: "str") -> "Container":
     return zun().containers.get(container_ref)
 
 
-def ensure_container(container_name: "str", **kwargs) -> "Container":
+def ensure_container(container_name: str, **kwargs) -> "Container":
     """Get a container with name if it exists, create a new one if not.
 
     Args:
-        container_ref (str): The name or ID of the container.
+        container_name (str): The name or ID of the container.
         all kwargs of create_container.
 
     Returns:
         The existing container if found, a new container if not.
     """
     try:
-        container_obj = get_container(container_name)
-    except Exception as ex:
-        print(ex)
+        current_container = get_container(container_name)
+    except Exception:
+        print(f"Unable to get container named {container_name}")
         try:
-            container_obj = create_container(name=container_name, **kwargs)
+            new_container = create_container(name=container_name, **kwargs)
         except Exception as ex:
-            print(ex)
-            raise
+            print(f"Unable to construct new container named {container_name}")
+            raise ex
         else:
-            return container_obj
+            print(f"Using new container named {container_name}")
+            return new_container
     else:
-        return container_obj
+        print(f"Using existing container named {container_name}")
+        return current_container
 
 
 def snapshot_container(

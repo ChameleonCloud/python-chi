@@ -760,7 +760,7 @@ def get_lease_id(lease_name) -> str:
     return matching[0]["id"]
 
 
-def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
+def create_lease(lease_name, reservations=None, start_date=None, end_date=None):
     """Create a new lease with some requested reservations.
 
     Args:
@@ -819,20 +819,21 @@ def ensure_lease(lease_name: "str", **kwargs):
     bad_lease_status = ["Terminated", "Error"]
 
     try:
-        lease_obj = get_lease(lease_name)
-        assert lease_obj["status"] not in bad_lease_status
-    except Exception as ex:
-        print(ex)
-        print("trying to create new lease")
+        current_lease = get_lease(lease_name)
+        assert current_lease["status"] not in bad_lease_status
+    except Exception:
+        print(f"Unable to get lease named {lease_name}")
         try:
-            lease_obj = create_lease(lease_name, **kwargs)
+            new_lease = create_lease(lease_name, **kwargs)
         except Exception as ex:
-            print(ex)
-            raise
+            print(f"Unable to construct new lease named {lease_name}")
+            raise ex
         else:
-            return lease_obj
+            print(f"Using new lease named {lease_name}")
+            return new_lease
     else:
-        return lease_obj
+        print(f"Using existing lease named {lease_name}")
+        return current_lease
 
 
 def delete_lease(ref):

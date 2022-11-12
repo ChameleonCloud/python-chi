@@ -49,6 +49,33 @@ def create_share(size, name=None, description=None, metadata=None,
     return share
 
 
+def ensure_share(share_name: str, **kwargs):
+    """Get a share with name if it exists, create a new one if not.
+
+    Args:
+        share_name (str): The name or ID of the share.
+        all kwargs of create_share.
+
+    Returns:
+        The existing share if found, a new share if not.
+    """
+    try:
+        current_share = get_share(share_name)
+    except Exception:
+        print(f"Unable to get share named {share_name}")
+        try:
+            new_share = create_share(name=share_name, **kwargs)
+        except Exception as ex:
+            print(f"Unable to construct new share named {share_name}")
+            raise ex
+        else:
+            print(f"Using new share named {share_name}")
+            return new_share
+    else:
+        print(f"Using existing share named {share_name}")
+        return current_share
+
+
 def delete_share(share):
     """Delete a share.
 
