@@ -10,3 +10,4 @@ python-manilaclient
 python-neutronclient
 python-novaclient
 python-zunclient
+ipywidgets
