@@ -599,7 +599,8 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
 def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
                   network_name=DEFAULT_NETWORK, nics=[], image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=None, count=1, hypervisor_hostname=None) -> 'Union[NovaServer,list[NovaServer]]':
+                  flavor_name=None, count=1, hypervisor_hostname=None,
+                  wrapped_call: bool = False, **kwargs) -> 'Union[NovaServer,list[NovaServer]]':
     """Launch a new server instance.
 
     Args:
@@ -628,6 +629,10 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         count (int): The number of instances to launch. When launching bare
             metal server instances, this number must be less than or equal to
             the total number of hosts reserved. (Default 1).
+        wrapped_call (bool): Whether the function was called from within
+            its associated ensure wrapper. Set to True to bypass ensure
+            wrapper call (not recommended). (Default False).
+        all kwargs of ensure_server.
 
     Returns:
         The created server instance. If ``count`` was larger than 1, then a
@@ -636,6 +641,8 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
     Raises:
         ValueError: if an invalid count is provided.
     """
+    if not wrapped_call:
+        ensure_server(server_name=server_name, **kwargs)
     if count < 1:
         raise ValueError('Must launch at least one server.')
     if not key_name:
@@ -693,7 +700,9 @@ def ensure_server(server_name: str, **kwargs) -> "Server":
     except Exception:
         print(f"Unable to get server named {server_name}")
         try:
-            new_server = create_server(server_name, **kwargs)
+            new_server = create_server(server_name=server_name,
+                                       wrapped_call=True,
+                                       **kwargs)
         except Exception as ex:
             print(f"Unable to construct new server named {server_name}")
             raise ex
