@@ -178,13 +178,13 @@ def ensure_network(network_name: str, **kwargs):
     """
     try:
         current_network = get_network(network_name)
-    except Exception:
+    except NotFound:
         print(f"Unable to get network named {network_name}")
         try:
             new_network = create_network(network_name=network_name,
                                          wrapped_call=True, **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new network named {network_name}")
+            print(f"Unable to create new network named {network_name}")
             raise ex
         else:
             print(f"Using new network named {network_name}")
@@ -327,7 +327,7 @@ def ensure_subnet(subnet_name: str, **kwargs):
             new_subnet = create_subnet(subnet_name=subnet_name,
                                        wrapped_call=True, **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new subnet named {subnet_name}")
+            print(f"Unable to create  new subnet named {subnet_name}")
             raise ex
         else:
             print(f"Using new subnet named {subnet_name}")
@@ -476,7 +476,7 @@ def ensure_port(port_name: str, **kwargs):
             new_port = create_port(port_name=port_name, wrapped_call=True,
                                    **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new port named {port_name}")
+            print(f"Unable to create new port named {port_name}")
             raise ex
         else:
             print(f"Using new port named {port_name}")
@@ -590,7 +590,7 @@ def ensure_router(router_name: str, **kwargs):
             new_router = create_router(router_name=router_name,
                                        wrapped_call=True, **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new router named {router_name}")
+            print(f"Unable to create new router named {router_name}")
             raise ex
         else:
             print(f"Using new router named {router_name}")

@@ -834,7 +834,7 @@ def ensure_lease(lease_name: "str", **kwargs):
             new_lease = create_lease(lease_name=lease_name, wrapped_call=True,
                                      **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new lease named {lease_name}")
+            print(f"Unable to create new lease named {lease_name}")
             raise ex
         else:
             print(f"Using new lease named {lease_name}")

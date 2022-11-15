@@ -19,6 +19,8 @@ import time
 import typing
 from re import I
 
+from zunclient.common.apiclient.exceptions import NotFound
+
 from .clients import zun
 from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 
@@ -162,14 +164,14 @@ def ensure_container(container_name: str, **kwargs) -> "Container":
     """
     try:
         current_container = get_container(container_name)
-    except Exception:
+    except NotFound:
         print(f"Unable to get container named {container_name}")
         try:
             new_container = create_container(name=container_name,
                                              wrapped_call=True,
                                              **kwargs)
         except Exception as ex:
-            print(f"Unable to construct new container named {container_name}")
+            print(f"Unable to create new container named {container_name}")
             raise ex
         else:
             print(f"Using new container named {container_name}")
