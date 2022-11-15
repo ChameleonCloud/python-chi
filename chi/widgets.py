@@ -1,4 +1,3 @@
-import json
 from os import environ
 
 import ipywidgets as widgets
@@ -7,10 +6,13 @@ import keystoneauth1.exceptions.http
 import pandas as pd
 import requests
 from IPython.core.display import display
-from requests import HTTPError
 
 import chi
 from .context import get
+
+
+SITES_URL = "https://api.chameleoncloud.org/sites/"
+NODES_SUFFIX = "/clusters/chameleon/nodes"
 
 
 class IllegalArgumentError(ValueError):
@@ -56,28 +58,18 @@ def get_discovery(site_name: str = None):
     if site_name == "CHI@Edge":
         return None
 
-    r = requests.get("https://api.chameleoncloud.org/sites/")
-    try:
-        r.raise_for_status()
-    except HTTPError:
-        raise HTTPError("Failed to fetch discovery data. "
-                        "Please try again later.")
-
-    r_json = json.loads(r.text)
+    r = requests.get(SITES_URL)
+    r.raise_for_status()
+    r_json = r.json()
     name_uid = {r_json["items"][i]["name"]: r_json["items"][i]["uid"]
                 for i in range(len(r_json["items"]))}
 
     if site_name:
         if site_name not in name_uid:
             raise ValueError(f"{site_name} is an invalid site name")
-        r = requests.get("https://api.chameleoncloud.org/sites/" +
-                         name_uid[site_name] + "/clusters/chameleon/nodes")
-        try:
-            r.raise_for_status()
-        except HTTPError:
-            raise HTTPError(f"Failed to fetch discovery data for {site_name}."
-                            " Please try again later.")
-        data = json.loads(r.text)["items"]
+        r = requests.get(SITES_URL + name_uid[site_name] + NODES_SUFFIX)
+        r.raise_for_status()
+        data = r.json()["items"]
         return {data[i]["node_name"]: data[i] for i in range(len(data))}
 
     discovery_data = {}
@@ -85,14 +77,9 @@ def get_discovery(site_name: str = None):
         name, uid = name_uid
         if uid == "edge":
             continue
-        r = requests.get("https://api.chameleoncloud.org/sites/" + uid +
-                         "/clusters/chameleon/nodes")
-        try:
-            r.raise_for_status()
-        except HTTPError:
-            raise HTTPError("Failed to fetch discovery data. "
-                            "Please try again later.")
-        data = json.loads(r.text)['items']
+        r = requests.get(SITES_URL + uid + NODES_SUFFIX)
+        r.raise_for_status()
+        data = r.json()['items']
         for i in range(len(data)):
             discovery_data[name] = {data[i]["node_name"]: data[i]}
     return discovery_data
@@ -330,11 +317,8 @@ def get_sites():
     Raises:
         HTTPError: If request for user's site data failed.
     """
-    api_ret = requests.get("https://api.chameleoncloud.org/sites.json")
-    try:
-        api_ret.raise_for_status()
-    except HTTPError:
-        raise HTTPError("Failed to fetch sites. Please try again later.")
+    api_ret = requests.get(SITES_URL[:-1] + ".json")
+    api_ret.raise_for_status()
     sites_ret = api_ret.json().get("items")
 
     for i in range(len(sites_ret) - 1):

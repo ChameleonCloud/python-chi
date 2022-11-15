@@ -13,3 +13,5 @@ python-zunclient
 ipywidgets
 pyjwt
 pandas
+ipython
+requests

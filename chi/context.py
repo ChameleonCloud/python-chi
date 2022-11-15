@@ -325,9 +325,7 @@ def use_node(node_type, data, verbose):
     More accurate description TBD.
     """
     set("node_type", node_type)
-    output = "\n".join([
-        f"Now using {node_type}",
-    ])
+    output = f"Now using {node_type}"
     if verbose:
         output += f':\n{data}'
     print(output)
