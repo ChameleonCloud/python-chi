@@ -2,11 +2,12 @@ from datetime import datetime
 from operator import attrgetter
 import socket
 import time
+from typing import Union
 
 from novaclient.exceptions import NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
-from novaclient.v2.servers import Server as NovaServer
+from novaclient.v2.servers import Server as NovaServer, Server
 
 from openstack.compute.v2.server import Server as OpenStackServer
 
@@ -597,10 +598,10 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
 ##########
 
 def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
-                  network_name=DEFAULT_NETWORK, nics=[], image_id=None,
+                  network_name=DEFAULT_NETWORK, nics=None, image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
                   flavor_name=None, count=1, hypervisor_hostname=None,
-                  wrapped_call: bool = False, **kwargs) -> 'Union[NovaServer,list[NovaServer]]':
+                  **kwargs) -> "Union[NovaServer,list[NovaServer]]":
     """Launch a new server instance.
 
     Args:
@@ -629,9 +630,6 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         count (int): The number of instances to launch. When launching bare
             metal server instances, this number must be less than or equal to
             the total number of hosts reserved. (Default 1).
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
         all kwargs of ensure_server.
 
     Returns:
@@ -641,8 +639,9 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
     Raises:
         ValueError: if an invalid count is provided.
     """
-    if not wrapped_call:
-        ensure_server(server_name=server_name, **kwargs)
+    if nics is None:
+        nics = []
+    ensure_server(server_name=server_name, **kwargs)
     if count < 1:
         raise ValueError('Must launch at least one server.')
     if not key_name:
@@ -685,7 +684,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         return server
 
 
-def ensure_server(server_name: str, **kwargs) -> "Server":
+def ensure_server(server_name: 'str', **kwargs) -> "Server":
     """Get a server with name if it exists, create a new one if not.
 
     Args:
@@ -700,9 +699,7 @@ def ensure_server(server_name: str, **kwargs) -> "Server":
     except NotFound:
         print(f"Unable to get server named {server_name}")
         try:
-            new_server = create_server(server_name=server_name,
-                                       wrapped_call=True,
-                                       **kwargs)
+            new_server = create_server(server_name=server_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new server named {server_name}")
             raise ex

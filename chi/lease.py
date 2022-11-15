@@ -761,7 +761,7 @@ def get_lease_id(lease_name) -> str:
 
 
 def create_lease(lease_name, reservations=None, start_date=None,
-                 end_date=None, wrapped_call: bool = False, **kwargs):
+                 end_date=None, **kwargs):
     """Create a new lease with some requested reservations.
 
     Args:
@@ -770,16 +770,12 @@ def create_lease(lease_name, reservations=None, start_date=None,
         start_date (datetime): The start date of the lease. (Defaults to now.)
         end_date (datetime): The end date of the lease. (Defaults to 1 day from
             the lease start date.)
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
         all kwargs of ensure_lease.
 
     Returns:
         The created lease representation.
     """
-    if not wrapped_call:
-        ensure_lease(lease_name=lease_name, **kwargs)
+    ensure_lease(lease_name, **kwargs)
     if not (start_date or end_date):
         start_date, end_date = lease_duration(days=1)
     elif not end_date:
@@ -812,17 +808,16 @@ def create_lease(lease_name, reservations=None, start_date=None,
             LOG.error(msg)
 
 
-def ensure_lease(lease_name: "str", **kwargs):
+def ensure_lease(lease_name: str, **kwargs):
     """Get a lease with name if it is valid, create a new one if not.
 
     Args:
         lease_name (str): The name or ID of the lease.
-        all kwargs of create_lease
+        all kwargs of create_lease.
 
     Returns:
         The existing lease if found, a new lease if not.
     """
-
     bad_lease_status = ["Terminated", "Error"]
 
     try:
@@ -831,8 +826,7 @@ def ensure_lease(lease_name: "str", **kwargs):
     except Exception:
         print(f"Unable to get lease named {lease_name}")
         try:
-            new_lease = create_lease(lease_name=lease_name, wrapped_call=True,
-                                     **kwargs)
+            new_lease = create_lease(lease_name=lease_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new lease named {lease_name}")
             raise ex

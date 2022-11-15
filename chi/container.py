@@ -17,7 +17,6 @@ import logging
 import tarfile
 import time
 import typing
-from re import I
 
 from zunclient.common.apiclient.exceptions import NotFound
 
@@ -52,7 +51,6 @@ def create_container(
     start: "bool" = True,
     start_timeout: "int" = None,
     platform_version: "int" = 2,
-    wrapped_call: bool = False,
     **kwargs,
 ) -> "Container":
     """Create a container instance.
@@ -79,14 +77,10 @@ def create_container(
             such as the "nvidia" runtime provided by NVIDIA Jetson Nano/TX2.
         start (bool): Whether to automatically start the container after it
             is created. Default True.
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
         **kwargs: Additional keyword arguments to send to the Zun client's
             container create call.
     """
-    if not wrapped_call:
-        ensure_container(container_name=name, **kwargs)
+    ensure_container(container_name=name, **kwargs)
     hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
@@ -167,9 +161,7 @@ def ensure_container(container_name: str, **kwargs) -> "Container":
     except NotFound:
         print(f"Unable to get container named {container_name}")
         try:
-            new_container = create_container(name=container_name,
-                                             wrapped_call=True,
-                                             **kwargs)
+            new_container = create_container(name=container_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new container named {container_name}")
             raise ex

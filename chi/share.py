@@ -25,7 +25,7 @@ def _get_default_share_type_id():
 
 
 def create_share(size, name=None, description=None, metadata=None,
-                 is_public=False, wrapped_call: bool = False, **kwargs):
+                 is_public=False, **kwargs):
     """Create a share.
 
     Args:
@@ -33,16 +33,12 @@ def create_share(size, name=None, description=None, metadata=None,
         name (str): name of new share.
         description (str): description of a share.
         is_public (bool): whether to set share as public or not.
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
-        all kwargs of ensure_container.
+        all kwargs of ensure_share.
 
     Returns:
         The created share.
     """
-    if not wrapped_call:
-        ensure_share(share_name=name, **kwargs)
+    ensure_share(share_name=name, **kwargs)
     share = manila().shares.create(
         share_proto="NFS",
         size=size,
@@ -70,8 +66,7 @@ def ensure_share(share_name: str, **kwargs):
     except NotFound:
         print(f"Unable to get share named {share_name}")
         try:
-            new_share = create_share(name=share_name, wrapped_call=True,
-                                     **kwargs)
+            new_share = create_share(name=share_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new share named {share_name}")
             raise ex

@@ -122,8 +122,7 @@ def get_network_id(name) -> str:
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None,
                    vswitch_name=None, provider='physnet1',
-                   port_security_enabled=True, wrapped_call: bool = False,
-                   **kwargs) -> dict:
+                   port_security_enabled=True, **kwargs) -> dict:
     """Create a network.
 
     For an OpenFlow network include the IP and port of an OpenFlow controller
@@ -140,13 +139,9 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
         vswitch_name (str): The virtual switch to use name.
         provider (str): the provider network to use when specifying stitchable
             VLANs (i.e. ExoGENI). Default: 'physnet1'
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
-        all kwargs of ensure_container.
+        all kwargs of ensure_network.
     """
-    if not wrapped_call:
-        ensure_network(network_name=network_name, **kwargs)
+    ensure_network(network_name=network_name, **kwargs)
     desc_parts = []
     if of_controller_ip and of_controller_port:
         desc_parts.append(f'OFController={of_controller_ip}:{of_controller_port}')
@@ -181,8 +176,7 @@ def ensure_network(network_name: str, **kwargs):
     except NotFound:
         print(f"Unable to get network named {network_name}")
         try:
-            new_network = create_network(network_name=network_name,
-                                         wrapped_call=True, **kwargs)
+            new_network = create_network(network_name=network_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new network named {network_name}")
             raise ex
@@ -264,8 +258,7 @@ def create_subnet(subnet_name, network_id,
                   cidr='192.168.1.0/24',
                   allocation_pool_start=None,
                   allocation_pool_end=None,
-                  gateway_ip=None,
-                  wrapped_call: bool = False, **kwargs) -> dict:
+                  gateway_ip=None, **kwargs) -> dict:
     """Create a subnet on a network.
 
     Args:
@@ -275,16 +268,12 @@ def create_subnet(subnet_name, network_id,
         gateway_ip (str): The subnet's gateway address. If not defined,
             the first address in the subnet will be automatically chosen as
             the gateway.
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
-        all kwargs of ensure_container.
+        all kwargs of ensure_subnet.
 
     Returns:
         The new subnet representation.
     """
-    if not wrapped_call:
-        ensure_subnet(subnet_name=subnet_name, **kwargs)
+    ensure_subnet(subnet_name=subnet_name, **kwargs)
     subnet = {
         'name': subnet_name,
         'cidr': cidr,
@@ -324,8 +313,7 @@ def ensure_subnet(subnet_name: str, **kwargs):
     except Exception:
         print(f"Unable to get subnet named {subnet_name}")
         try:
-            new_subnet = create_subnet(subnet_name=subnet_name,
-                                       wrapped_call=True, **kwargs)
+            new_subnet = create_subnet(subnet_name=subnet_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create  new subnet named {subnet_name}")
             raise ex
@@ -395,8 +383,8 @@ def get_port_id(name) -> str:
     return _resolve_id('ports', name)
 
 
-def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_address=None,
-               port_security_enabled=True, wrapped_call: bool = False, **kwargs) -> dict:
+def create_port(port_name, network_id, fixed_ips=None, subnet_id=None,
+                ip_address=None, port_security_enabled=True, **kwargs) -> dict:
     """Create a new port on a network.
 
     This function has a short-form and a long-form invocation. In the short form,
@@ -431,16 +419,12 @@ def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_addres
         port_security_enabled (bool): Whether to enable `port security
             <https://wiki.openstack.org/wiki/Neutron/ML2PortSecurityExtensionDriver>`_.
             In general this should be kept on. (Default True).
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
-        all kwargs of ensure_container.
+        all kwargs of ensure_port.
 
     Returns:
         The created port representation.
     """
-    if not wrapped_call:
-        ensure_port(port_name=port_name, **kwargs)
+    ensure_port(port_name=port_name, **kwargs)
     port = {
         'name': port_name,
         'network_id': network_id,
@@ -473,8 +457,7 @@ def ensure_port(port_name: str, **kwargs):
     except Exception:
         print(f"Unable to get port named {port_name}")
         try:
-            new_port = create_port(port_name=port_name, wrapped_call=True,
-                                   **kwargs)
+            new_port = create_port(port_name=port_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new port named {port_name}")
             raise ex
@@ -544,24 +527,19 @@ def get_router_id(name) -> str:
     return _resolve_id('routers', name)
 
 
-def create_router(router_name, gw_network_name=None,
-                  wrapped_call: bool = False, **kwargs) -> dict:
+def create_router(router_name, gw_network_name=None, **kwargs) -> dict:
     """Create a router, with or without a public gateway.
 
     Args:
         router_name (str): The new router name.
         gw_network_name (str): The name of the public gateway requested to
             provide subnets connected this router NAT to the Internet.
-        wrapped_call (bool): Whether the function was called from within
-            its associated ensure wrapper. Set to True to bypass ensure
-            wrapper call (not recommended). (Default False).
-        all kwargs of ensure_container.
+        all kwargs of ensure_router.
 
     Returns:
         The created router representation.
     """
-    if not wrapped_call:
-        ensure_router(router_name=router_name, **kwargs)
+    ensure_router(router_name=router_name, **kwargs)
     router = {"name": router_name, "admin_state_up": True}
 
     if gw_network_name:
@@ -587,8 +565,7 @@ def ensure_router(router_name: str, **kwargs):
     except Exception:
         print(f"Unable to get router named {router_name}")
         try:
-            new_router = create_router(router_name=router_name,
-                                       wrapped_call=True, **kwargs)
+            new_router = create_router(router_name=router_name, **kwargs)
         except Exception as ex:
             print(f"Unable to create new router named {router_name}")
             raise ex
