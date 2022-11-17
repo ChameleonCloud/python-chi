@@ -6,7 +6,7 @@ from requests import HTTPError
 
 import chi
 from chi import widgets
-from chi.widgets import IllegalArgumentError
+from chi.context import SITES_URL, SITES_URL_JSON, NODES_SUFFIX
 
 
 @pytest.fixture()
@@ -48,7 +48,7 @@ def sites_request(site_names, node_uids):
 
 
 @pytest.fixture()
-def discovery_request_one(node_names, node_types, node_uids):
+def resource_request_one(node_names, node_types, node_uids):
     return str(dumps(
         {"items": [{"architecture": {"platform_type": "x86_64"},
                     "node_name": node_names[0],
@@ -63,7 +63,7 @@ def discovery_request_one(node_names, node_types, node_uids):
 
 
 @pytest.fixture()
-def discovery_request_two(node_names, node_types, node_uids):
+def resource_request_two(node_names, node_types, node_uids):
     return str(dumps(
         {"items": [{"architecture": {"platform_type": "x86_64"},
                     "node_name": node_names[1],
@@ -83,68 +83,61 @@ def blazar_request(node_uids, node_names, node_types):
              "node_type": node_types[0], "reservable": True}]
 
 
-def test_get_site(site_names):
+def test_get_selected_site(site_names):
     chi.set("region_name", site_names[0])
-    assert widgets.get_site() == site_names[0]
+    assert widgets.get_selected_site() == site_names[0]
 
 
-def test_get_node(node_types):
+def test_get_selected_node_type(node_types):
     chi.set("node_type", node_types[0])
-    assert widgets.get_node() == node_types[0]
+    assert widgets.get_selected_node_type() == node_types[0]
 
 
-def test_get_discovery(requests_mock, sites_request, site_names, node_names,
-                       discovery_request_one, discovery_request_two,
-                       node_uids):
-    sites_url = "https://api.chameleoncloud.org/sites/"
-    requests_mock.get(sites_url, text='', status_code=404)
+def test_get_resource_data(requests_mock, sites_request, site_names,
+                           node_names, resource_request_one, node_uids,
+                           resource_request_two):
+    requests_mock.get(SITES_URL, text='', status_code=404)
     with pytest.raises(HTTPError):
-        widgets.get_discovery()
+        widgets.get_resource_data()
 
-    requests_mock.get(sites_url, text=sites_request)
-    assert requests.get(sites_url).text == sites_request
+    requests_mock.get(SITES_URL, text=sites_request)
+    assert requests.get(SITES_URL).text == sites_request
 
-    node_urls = ["https://api.chameleoncloud.org/sites/" + uid
-                 + "/clusters/chameleon/nodes" for uid in node_uids]
+    node_urls = [SITES_URL + uid + NODES_SUFFIX for uid in node_uids]
     requests_mock.get(node_urls[0], text='', status_code=404)
     with pytest.raises(HTTPError):
-        widgets.get_discovery()
+        widgets.get_resource_data()
     with pytest.raises(HTTPError):
-        widgets.get_discovery(site_names[0])
+        widgets.get_resource_data(site_names[0])
 
-    requests_mock.get(node_urls[0], text=discovery_request_one)
-    requests_mock.get(node_urls[1], text=discovery_request_two)
-    assert requests.get(node_urls[0]).text == discovery_request_one
-    assert requests.get(node_urls[1]).text == discovery_request_two
+    requests_mock.get(node_urls[0], text=resource_request_one)
+    requests_mock.get(node_urls[1], text=resource_request_two)
+    assert requests.get(node_urls[0]).text == resource_request_one
+    assert requests.get(node_urls[1]).text == resource_request_two
 
     all_sites_ret_val = {site_names[0]: {
-        node_names[0]: loads(discovery_request_one[11:-2])}, site_names[1]: {
-        node_names[1]: loads(discovery_request_two[11:-2])}}
-    assert widgets.get_discovery() == all_sites_ret_val
+        node_names[0]: loads(resource_request_one[11:-2])}, site_names[1]: {
+        node_names[1]: loads(resource_request_two[11:-2])}}
+    assert widgets.get_resource_data() == all_sites_ret_val
 
     site_one_ret_val = list(all_sites_ret_val.items())[0][1]
-    assert widgets.get_discovery(site_names[0]) == site_one_ret_val
+    assert widgets.get_resource_data(site_names[0]) == site_one_ret_val
     site_two_ret_val = list(all_sites_ret_val.items())[0][1]
-    assert widgets.get_discovery(site_names[0]) == site_two_ret_val
+    assert widgets.get_resource_data(site_names[0]) == site_two_ret_val
 
     with pytest.raises(ValueError):
-        widgets.get_discovery("invalid_site_name")
+        widgets.get_resource_data("invalid_site_name")
 
 
 def test_get_nodes(requests_mock, site_names, sites_request, node_uids,
-                   node_types, discovery_request_one, discovery_request_two,
+                   node_types, resource_request_one, resource_request_two,
                    mocker, blazar_request):
-    with pytest.raises(IllegalArgumentError):
-        widgets.get_nodes(None)
-
     # setup
     chi.set("region_name", site_names[0])
-    sites_url = "https://api.chameleoncloud.org/sites/"
-    requests_mock.get(sites_url, text=sites_request)
-    node_urls = ["https://api.chameleoncloud.org/sites/" + uid
-                 + "/clusters/chameleon/nodes" for uid in node_uids]
-    requests_mock.get(node_urls[0], text=discovery_request_one)
-    requests_mock.get(node_urls[1], text=discovery_request_two)
+    requests_mock.get(SITES_URL, text=sites_request)
+    node_urls = [SITES_URL + uid + NODES_SUFFIX for uid in node_uids]
+    requests_mock.get(node_urls[0], text=resource_request_one)
+    requests_mock.get(node_urls[1], text=resource_request_two)
 
     def blazar(request):
         mock_blazar = lambda: None
@@ -154,9 +147,10 @@ def test_get_nodes(requests_mock, site_names, sites_request, node_uids,
         return mock_blazar
 
     mocker.patch("chi.blazar", return_value=blazar(blazar_request))
-    mock_avail_nodes = {node_types[0]: loads(discovery_request_one[11:-2])}
+    mock_avail_nodes = {node_types[0]: loads(resource_request_one[11:-2])}
     mock_unavail_nodes = {}
-    get_nodes_ret_val = (mock_avail_nodes, mock_unavail_nodes)
+    get_nodes_ret_val = {"avail": mock_avail_nodes,
+                         "unavail": mock_unavail_nodes}
     assert widgets.get_nodes(display=False) == get_nodes_ret_val
 
     assert widgets.get_nodes(display=True).get("Type").tolist() == \
@@ -165,17 +159,16 @@ def test_get_nodes(requests_mock, site_names, sites_request, node_uids,
     assert widgets.get_nodes(display=True).get("In Use").tolist() == [0]
 
 
-def test_choose_node(requests_mock, site_names, sites_request, node_uids,
-                     node_types, discovery_request_one, discovery_request_two,
-                     mocker, blazar_request):
+def test_choose_node_type(requests_mock, site_names, sites_request, node_uids,
+                          node_types, resource_request_one, blazar_request,
+                          resource_request_two, mocker):
     # setup
     chi.set("region_name", site_names[0])
-    sites_url = "https://api.chameleoncloud.org/sites/"
-    requests_mock.get(sites_url, text=sites_request)
-    node_urls = ["https://api.chameleoncloud.org/sites/" + uid
-                 + "/clusters/chameleon/nodes" for uid in node_uids]
-    requests_mock.get(node_urls[0], text=discovery_request_one)
-    requests_mock.get(node_urls[1], text=discovery_request_two)
+    requests_mock.get(SITES_URL, text=sites_request)
+    node_urls = [SITES_URL + uid
+                 + NODES_SUFFIX for uid in node_uids]
+    requests_mock.get(node_urls[0], text=resource_request_one)
+    requests_mock.get(node_urls[1], text=resource_request_two)
 
     def blazar(request):
         mock_blazar = lambda: None
@@ -186,72 +179,63 @@ def test_choose_node(requests_mock, site_names, sites_request, node_uids,
 
     mocker.patch("chi.blazar", return_value=blazar(blazar_request))
 
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(gpu_count=1, gpu=False)
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(gpu_count=0, gpu=True)
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(gpu_count=[])
+    with pytest.raises(ValueError):
+        widgets.choose_node_type(gpu_count=1, has_gpu=False)
+    with pytest.raises(ValueError):
+        widgets.choose_node_type(gpu_count=0, has_gpu=True)
 
     def get_options(vbox):
         return [vbox.children[0].options[i] for i in
                 range(len(vbox.children[0].options))] if vbox else None
 
-    choose_node = widgets.choose_node()
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type()
+    widget_options = get_options(choose_node_type)
     assert widget_options == [node_types[0]]
 
-    choose_node = widgets.choose_node(gpu=True)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(has_gpu=True)
+    widget_options = get_options(choose_node_type)
     assert widget_options == [node_types[0]]
 
-    choose_node = widgets.choose_node(gpu=False)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(has_gpu=False)
+    widget_options = get_options(choose_node_type)
     assert widget_options is None
 
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(gpu="True")
+    with pytest.raises(ValueError):
+        widgets.choose_node_type(gpu_count=-1)
 
-    choose_node = widgets.choose_node(storage_size_gb=225)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(storage_size_gb=225)
+    widget_options = get_options(choose_node_type)
     assert widget_options == [node_types[0]]
 
-    choose_node = widgets.choose_node(storage_size_gb=300)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(storage_size_gb=300)
+    widget_options = get_options(choose_node_type)
     assert widget_options is None
 
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(storage_size_gb=-1)
+    with pytest.raises(ValueError):
+        widgets.choose_node_type(storage_size_gb=-1)
 
-    choose_node = widgets.choose_node(architecture="x86_64")
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(architecture="x86_64")
+    widget_options = get_options(choose_node_type)
     assert widget_options == [node_types[0]]
 
-    choose_node = widgets.choose_node(architecture="does_not_exist")
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(architecture="does_not_exist")
+    widget_options = get_options(choose_node_type)
     assert widget_options is None
 
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(architecture=True)
-
-    choose_node = widgets.choose_node(ssd=True)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(ssd=True)
+    widget_options = get_options(choose_node_type)
     assert widget_options == [node_types[0]]
 
-    choose_node = widgets.choose_node(ssd=False)
-    widget_options = get_options(choose_node)
+    choose_node_type = widgets.choose_node_type(ssd=False)
+    widget_options = get_options(choose_node_type)
     assert widget_options is None
-
-    with pytest.raises(IllegalArgumentError):
-        widgets.choose_node(ssd="True")
 
 
 def test_get_sites(requests_mock, sites_request, site_names):
-    sites_url = "https://api.chameleoncloud.org/sites.json"
-    requests_mock.get(sites_url, text='', status_code=404)
+    requests_mock.get(SITES_URL_JSON, text='', status_code=404)
     with pytest.raises(HTTPError):
         widgets.get_sites()
-    requests_mock.get(sites_url, text=sites_request)
+    requests_mock.get(SITES_URL_JSON, text=sites_request)
     assert dumps(widgets.get_sites()) == sites_request[10:-1]
 
 
@@ -262,8 +246,7 @@ def test_get_projects(mocker):
 
 
 def test_choose_site(mocker, site_names, requests_mock, sites_request):
-    sites_url = "https://api.chameleoncloud.org/sites.json"
-    requests_mock.get(sites_url, text=sites_request)
+    requests_mock.get(SITES_URL_JSON, text=sites_request)
     mocker.patch("chi.widgets.get_sites", return_value=[
         {"name": site_names[0]}, {"name": site_names[1]}])
     mocker.patch("chi.context.set", return_value=None)

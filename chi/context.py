@@ -17,6 +17,9 @@ LOG = logging.getLogger(__name__)
 DEFAULT_AUTH_TYPE = "v3token"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
+SITES_URL = "https://api.chameleoncloud.org/sites/"
+SITES_URL_JSON = SITES_URL[:-1] + ".json"
+NODES_SUFFIX = "/clusters/chameleon/nodes"
 
 
 def default_key_name():

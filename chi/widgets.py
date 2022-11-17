@@ -8,18 +8,10 @@ import requests
 from IPython.core.display import display
 
 import chi
-from .context import get
+from .context import get, SITES_URL, SITES_URL_JSON, NODES_SUFFIX
 
 
-SITES_URL = "https://api.chameleoncloud.org/sites/"
-NODES_SUFFIX = "/clusters/chameleon/nodes"
-
-
-class IllegalArgumentError(ValueError):
-    pass
-
-
-def get_site():
+def get_selected_site():
     """Get the user's selected site by context parameter.
 
     Returns:
@@ -28,16 +20,16 @@ def get_site():
     return get("region_name")
 
 
-def get_node():
+def get_selected_node_type():
     """ Get the user's selected node by context parameter.
 
     Returns:
-        The name of the node, if selected.
+        The node type, if selected.
     """
     return get("node_type")
 
 
-def get_discovery(site_name: str = None):
+def get_resource_data(site_name: str = None):
     """Get the Chameleon resource registry data for every node in all sites or
     in a specific site.
 
@@ -45,14 +37,13 @@ def get_discovery(site_name: str = None):
 
     Args:
         site_name (str): An optional name for a specific site from which to get
-        discovery data. (Default None).
+        resource data. (Default None).
 
     Returns:
-        A dictionary with the discovery data for every node in all sites or
+        A dictionary with the resource data for every node in all sites or
         in a specific site, if specified.
 
     Raises:
-        HTTPError: If request for discovery data failed.
         ValueError: If ``site_name`` is invalid.
     """
     if site_name == "CHI@Edge":
@@ -61,19 +52,20 @@ def get_discovery(site_name: str = None):
     r = requests.get(SITES_URL)
     r.raise_for_status()
     r_json = r.json()
-    name_uid = {r_json["items"][i]["name"]: r_json["items"][i]["uid"]
-                for i in range(len(r_json["items"]))}
+    node_names_to_uids = {r_json["items"][i]["name"]: r_json["items"][i]["uid"]
+                          for i in range(len(r_json["items"]))}
 
     if site_name:
-        if site_name not in name_uid:
+        if site_name not in node_names_to_uids:
             raise ValueError(f"{site_name} is an invalid site name")
-        r = requests.get(SITES_URL + name_uid[site_name] + NODES_SUFFIX)
+        r = requests.get(SITES_URL + node_names_to_uids[site_name] +
+                         NODES_SUFFIX)
         r.raise_for_status()
         data = r.json()["items"]
         return {data[i]["node_name"]: data[i] for i in range(len(data))}
 
-    discovery_data = {}
-    for count, name_uid in enumerate(name_uid.items(), 0):
+    resource_data = {}
+    for name_uid in node_names_to_uids.items():
         name, uid = name_uid
         if uid == "edge":
             continue
@@ -81,8 +73,8 @@ def get_discovery(site_name: str = None):
         r.raise_for_status()
         data = r.json()['items']
         for i in range(len(data)):
-            discovery_data[name] = {data[i]["node_name"]: data[i]}
-    return discovery_data
+            resource_data[name] = {data[i]["node_name"]: data[i]}
+    return resource_data
 
 
 def get_nodes(display: bool = True):
@@ -97,57 +89,59 @@ def get_nodes(display: bool = True):
         tuple of available/unavailable nodes dictionaries.
 
     Raises:
-        IllegalArgumentError: If the ``display`` parameter has an invalid type.
+        Unauthorized: If user lacks required authentication.
     """
-    if type(display) is not bool:
-        raise IllegalArgumentError(f"parameter 'display' expected type 'bool'"
-                                   f", received '{type(display).__name__}'")
     all_nodes, unavail_nodes, avail_nodes, hosts = {}, {}, {}, {}
-    discovery = get_discovery(get_site())
+    resource_data = get_resource_data(get_selected_site())
 
     try:
         client = chi.blazar()
         hosts = {host["hypervisor_hostname"]: host for host in
                  client.host.list()}
     except keystoneauth1.exceptions.http.Unauthorized:
-        print(f"You lack the required authentication to access {get_site()}.")
-        return None
+        raise keystoneauth1.exceptions.http.Unauthorized(
+            f"You lack the required authentication to access "
+            f"{get_selected_site()}. Your user credentials "
+            f"may have expired and need to be refreshed at "
+            f"https://jupyter.chameleoncloud.org/auth/refresh.")
 
     for uid, blazar_data in hosts.items():
         node_name = blazar_data["node_name"]
-        node_type = discovery[node_name]["node_type"]
+        node_type = resource_data[node_name]["node_type"]
         free = blazar_data["reservable"]
 
-        # initialize dict schema: { "node_type" : (# avail, # unavail) }
-        all_nodes.setdefault(node_type, (0, 0))
-        all_nodes[node_type] = (all_nodes[node_type][0] + free,
-                                all_nodes[node_type][1] + (not free))
-        node_data = discovery[node_name]
+        all_nodes.setdefault(node_type, {"avail": 0, "unavail": 0})
+        all_nodes[node_type]["avail"] = all_nodes[node_type]["avail"] + free
+        all_nodes[node_type]["unavail"] = all_nodes[node_type]["unavail"] + (
+            not free)
+        node_data = resource_data[node_name]
 
-        if all_nodes[node_type][0]:
+        if all_nodes[node_type]["avail"]:
             avail_nodes[node_type] = node_data
         else:
             unavail_nodes[node_type] = node_data
 
     if display:
-        num_avail, num_unavail = map(list, zip(*all_nodes.values()))
+        num_avail, num_unavail = map(list, zip(*[(i['avail'], i['unavail'])
+                                                 for i in all_nodes.values()]))
         d = {"Type": list(all_nodes.keys()),
              "Free": num_avail,
              "In Use": num_unavail}
         return pd.DataFrame(data=d)
 
-    return avail_nodes, unavail_nodes
+    return {"avail": avail_nodes, "unavail": unavail_nodes}
 
 
-def choose_node(gpu: bool = None, gpu_count: int = None,
-                ssd: bool = None, storage_size_gb: int = None,
-                architecture: str = None, verbose=False):
+def choose_node_type(has_gpu: bool = None, gpu_count: int = None,
+                     ssd: bool = None,
+                     storage_size_gb: int = None, architecture: str = None,
+                     verbose=False):
     """Display an IPyWidget Select object with a selectable dropdown of all
     available nodes of the given parameters.
 
     Args:
-        gpu (bool): An optional specification to include either nodes with at
-        least 1 GPU or nodes with no GPUs. (Default None).
+        has_gpu (bool): An optional specification to include either nodes with
+        at least 1 GPU or nodes with no GPUs. (Default None).
         gpu_count (int): An optional count of the exact desired number of node
         GPUs. (Default None).
         ssd (bool): An optional specification to include either nodes with at
@@ -163,8 +157,7 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         IPyWidget Select object with nodes as options.
 
     Raises:
-        IllegalArgumentError: If any combination of or single parameter(s)
-        have an invalid type.
+        ValueError: If any parameter(s) or combination thereof are invalid.
     """
 
     def node_dropdown_callback(change):
@@ -175,41 +168,48 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
         with node_output:
             chi.use_node(node_type, avail_nodes[node_type], verbose)
 
-    if get_nodes(display=False) is None:
-        return
-    avail_nodes = get_nodes(display=False)[0]
+    avail_nodes = get_nodes(display=False)["avail"]
 
-    def _find_gpu_helper(nodes, req_count: int = None):
-        """Find all nodes with or without GPUs, and restrict the set to nodes
-        with a certain number of GPUs if specified.
-        """
+    def has_gpu_helper(nodes, req_gpu):
+        """Find all nodes with or without GPUs."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            if req_count is None:
-                if "gpu" in data and data["gpu"]["gpu"] is True:
-                    new_nodes[node_type] = data
-            elif req_count == 0 and ("gpu" not in data or
-                                     data["gpu"]["gpu"] is False):
+            gpu_exists = not ("gpu" not in data or data["gpu"]["gpu"] is False)
+            if gpu_exists and req_gpu:
                 new_nodes[node_type] = data
-            elif req_count > 0 and "gpu" in data and data["gpu"]["gpu"] is \
-                    True:
-                true_count = data["gpu"]["gpu_count"]
-                if true_count == req_count:
-                    new_nodes[node_type] = data
+            if not gpu_exists and not req_gpu:
+                new_nodes[node_type] = data
         return new_nodes
 
-    def _minimum_storage_helper(nodes, req_storage: int):
-        """Find all nodes with a minimum total storage of REQ_STORAGE."""
+    def gpu_count_helper(nodes, req_count):
+        """Find all nodes with exactly REQ_COUNT GPUs."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            total_storage = 0
-            for device in data["storage_devices"]:
-                total_storage += int(device["humanized_size"][:-3])
+            gpu_exists = not ("gpu" not in data or data["gpu"]["gpu"] is False)
+            if gpu_count < 0:
+                raise ValueError(
+                    f"'gpu_count' should be a non-negative integer")
+            else:
+                if gpu_exists:
+                    true_count = data["gpu"]["gpu_count"]
+                    if true_count == req_count:
+                        new_nodes[node_type] = data
+        return new_nodes
+
+    def storage_size_gb_helper(nodes, req_storage: int):
+        """Find all nodes with a minimum total storage of REQ_STORAGE."""
+        new_nodes = {}
+        if req_storage < 0:
+            raise ValueError(
+                f"'storage_size_gb' should be a non-negative integer")
+        for node_type, data in nodes.items():
+            total_storage = sum(int(device["humanized_size"][:-3]) for device
+                                in data["storage_devices"])
             if total_storage >= req_storage:
                 new_nodes[node_type] = data
         return new_nodes
 
-    def _find_architecture_helper(nodes, req_arc):
+    def architecture_helper(nodes, req_arc):
         """Find all nodes with an architecture platform type of REQ_ARC."""
         new_nodes = {}
         for node_type, data in nodes.items():
@@ -217,83 +217,39 @@ def choose_node(gpu: bool = None, gpu_count: int = None,
                 new_nodes[node_type] = data
         return new_nodes
 
-    def _find_ssd_helper(nodes, ssd_req: bool):
+    def ssd_helper(nodes, ssd_req: bool):
         """Find all nodes with or without at least 1 SSD."""
         new_nodes = {}
         for node_type, data in nodes.items():
             for device in data["storage_devices"]:
                 if "media_type" in device:
                     ssd_present = device["media_type"] == "SSD"
-                    if ssd_req and ssd_present:
-                        new_nodes[node_type] = data
-                    if not ssd_req and not ssd_present:
+                    if ssd_req == ssd_present:
                         new_nodes[node_type] = data
                 elif not ssd_req:
                     new_nodes[node_type] = data
         return new_nodes
 
-    if gpu_count is None:
-        pass
-    elif type(gpu_count) is int and gpu_count > 0:
-        if gpu is False:
-            raise IllegalArgumentError(f"input 'gpu' not compatible with "
-                                       f"input 'gpu_count': False and"
-                                       f" {gpu_count} contradict each other")
-
-        avail_nodes = _find_gpu_helper(avail_nodes, gpu_count)
-    elif type(gpu_count) is int and gpu_count == 0:
-        if gpu is True:
-            raise IllegalArgumentError(f"input 'gpu' not compatible with "
-                                       f"input 'gpu_count': True and"
-                                       f" 0 contradict one another")
-        gpu = False
-    else:
-        raise IllegalArgumentError(f"parameter 'gpu_count' expected type 'int'"
-                                   f" > 0, received input '{gpu_count}' of "
-                                   f"type '{type(gpu_count).__name__}'")
-
-    if gpu is None:
-        pass
-    elif gpu is True and gpu_count is None:
-        avail_nodes = _find_gpu_helper(avail_nodes)
-    elif gpu is False:
-        avail_nodes = _find_gpu_helper(avail_nodes, 0)
-    else:
-        raise IllegalArgumentError(f"parameter 'gpu' expected type 'bool'"
-                                   f", received type "
-                                   f"'{type(gpu).__name__}'")
-
-    if storage_size_gb is None:
-        pass
-    elif type(storage_size_gb) is int and storage_size_gb >= 0:
-        avail_nodes = _minimum_storage_helper(avail_nodes, storage_size_gb)
-    else:
-        raise IllegalArgumentError(f"parameter 'storage_size_gb' expected type"
-                                   f" 'int' > 0, received input "
-                                   f"'{storage_size_gb}' of type "
-                                   f"'{type(storage_size_gb).__name__}'")
-
-    if architecture is None:
-        pass
-    elif type(architecture) is str:
-        avail_nodes = _find_architecture_helper(avail_nodes, architecture)
-    else:
-        raise IllegalArgumentError(f"parameter 'architecture' expected type"
-                                   f" 'str', received type"
-                                   f" '{type(architecture).__name__}'")
-
-    if ssd is None:
-        pass
-    elif type(ssd) is bool:
-        avail_nodes = _find_ssd_helper(avail_nodes, ssd)
-    else:
-        raise IllegalArgumentError(f"parameter 'ssd' expected type"
-                                   f" 'bool', received type"
-                                   f" '{type(ssd).__name__}'")
-
+    if has_gpu is not None:
+        avail_nodes = has_gpu_helper(avail_nodes, has_gpu)
+    if gpu_count is not None:
+        if has_gpu is True and gpu_count == 0:
+            raise ValueError("'has_gpu' specified, but requested nodes "
+                             "with 0 GPUs")
+        if has_gpu is False and gpu_count > 0:
+            raise ValueError("'gpu_count' specified, but requested nodes "
+                             "without GPU")
+        avail_nodes = gpu_count_helper(avail_nodes, gpu_count)
+    if storage_size_gb is not None:
+        avail_nodes = storage_size_gb_helper(avail_nodes, storage_size_gb)
+    if architecture is not None:
+        avail_nodes = architecture_helper(avail_nodes, architecture)
+    if ssd is not None:
+        avail_nodes = ssd_helper(avail_nodes, ssd)
     if not avail_nodes.keys():
-        print("All nodes of the given parameters are currently reserved. "
-              "Please try again later.")
+        print("All nodes of the given parameters are currently reserved, "
+              "or no nodes matched the constraints. See "
+              "https://chameleoncloud.org/hardware for all node information.")
         return
 
     node_output = widgets.Output()
@@ -313,18 +269,15 @@ def get_sites():
 
     Returns:
         The list of sites, if found.
-
-    Raises:
-        HTTPError: If request for user's site data failed.
     """
-    api_ret = requests.get(SITES_URL[:-1] + ".json")
+    api_ret = requests.get(SITES_URL_JSON)
     api_ret.raise_for_status()
-    sites_ret = api_ret.json().get("items")
-
-    for i in range(len(sites_ret) - 1):
-        if sites_ret[i]["name"] == "CHI@Edge":
-            del sites_ret[i]
-    return sites_ret
+    api_json = api_ret.json()
+    if "items" not in api_json:
+        raise ValueError("Malformed response from sites endpoint. Is the API "
+                         "working correctly?")
+    return [site for site in api_json.get("items") if site["name"] !=
+            "CHI@Edge"]
 
 
 def get_projects():
