@@ -6,7 +6,6 @@ from requests import HTTPError
 
 import chi
 from chi import widgets
-from chi.context import SITES_URL, SITES_URL_JSON, NODES_SUFFIX
 
 
 @pytest.fixture()
@@ -80,7 +79,7 @@ def resource_request_two(node_names, node_types, node_uids):
 @pytest.fixture()
 def blazar_request(node_uids, node_names, node_types):
     return [{"hypervisor_hostname": node_uids[0], "node_name": node_names[0],
-             "node_type": node_types[0], "reservable": True}]
+             "node_type": node_types[0], "reservable": False}]
 
 
 def test_get_selected_site(site_names):
@@ -96,14 +95,16 @@ def test_get_selected_node_type(node_types):
 def test_get_resource_data(requests_mock, sites_request, site_names,
                            node_names, resource_request_one, node_uids,
                            resource_request_two):
-    requests_mock.get(SITES_URL, text='', status_code=404)
+    sites_url = widgets._build_request(sites=True)
+    requests_mock.get(sites_url, text='', status_code=404)
     with pytest.raises(HTTPError):
         widgets.get_resource_data()
 
-    requests_mock.get(SITES_URL, text=sites_request)
-    assert requests.get(SITES_URL).text == sites_request
+    requests_mock.get(sites_url, text=sites_request)
+    assert requests.get(sites_url).text == sites_request
 
-    node_urls = [SITES_URL + uid + NODES_SUFFIX for uid in node_uids]
+    node_urls = [widgets._build_request(sites=True, uid=uid, nodes=True)
+                 for uid in node_uids]
     requests_mock.get(node_urls[0], text='', status_code=404)
     with pytest.raises(HTTPError):
         widgets.get_resource_data()
@@ -133,9 +134,11 @@ def test_get_nodes(requests_mock, site_names, sites_request, node_uids,
                    node_types, resource_request_one, resource_request_two,
                    mocker, blazar_request):
     # setup
+    sites_url = widgets._build_request(sites=True)
     chi.set("region_name", site_names[0])
-    requests_mock.get(SITES_URL, text=sites_request)
-    node_urls = [SITES_URL + uid + NODES_SUFFIX for uid in node_uids]
+    requests_mock.get(sites_url, text=sites_request)
+    node_urls = [widgets._build_request(sites=True, uid=uid, nodes=True)
+                 for uid in node_uids]
     requests_mock.get(node_urls[0], text=resource_request_one)
     requests_mock.get(node_urls[1], text=resource_request_two)
 
@@ -163,10 +166,11 @@ def test_choose_node_type(requests_mock, site_names, sites_request, node_uids,
                           node_types, resource_request_one, blazar_request,
                           resource_request_two, mocker):
     # setup
+    sites_url = widgets._build_request(sites=True)
     chi.set("region_name", site_names[0])
-    requests_mock.get(SITES_URL, text=sites_request)
-    node_urls = [SITES_URL + uid
-                 + NODES_SUFFIX for uid in node_uids]
+    requests_mock.get(sites_url, text=sites_request)
+    node_urls = [widgets._build_request(sites=True, uid=uid, nodes=True)
+                 for uid in node_uids]
     requests_mock.get(node_urls[0], text=resource_request_one)
     requests_mock.get(node_urls[1], text=resource_request_two)
 
@@ -232,10 +236,12 @@ def test_choose_node_type(requests_mock, site_names, sites_request, node_uids,
 
 
 def test_get_sites(requests_mock, sites_request, site_names):
-    requests_mock.get(SITES_URL_JSON, text='', status_code=404)
+    requests_mock.get(widgets._build_request(sites=True, json=True),
+                      text='', status_code=404)
     with pytest.raises(HTTPError):
         widgets.get_sites()
-    requests_mock.get(SITES_URL_JSON, text=sites_request)
+    requests_mock.get(widgets._build_request(sites=True, json=True),
+                      text=sites_request)
     assert dumps(widgets.get_sites()) == sites_request[10:-1]
 
 
@@ -246,7 +252,8 @@ def test_get_projects(mocker):
 
 
 def test_choose_site(mocker, site_names, requests_mock, sites_request):
-    requests_mock.get(SITES_URL_JSON, text=sites_request)
+    requests_mock.get(widgets._build_request(sites=True, json=True),
+                      text=sites_request)
     mocker.patch("chi.widgets.get_sites", return_value=[
         {"name": site_names[0]}, {"name": site_names[1]}])
     mocker.patch("chi.context.set", return_value=None)

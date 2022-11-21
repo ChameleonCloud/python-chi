@@ -8,7 +8,27 @@ import requests
 from IPython.core.display import display
 
 import chi
-from .context import get, SITES_URL, SITES_URL_JSON, NODES_SUFFIX
+from .context import get, RESOURCE_API_URL
+
+
+def _build_request(sites: bool = False,
+                   nodes: bool = False,
+                   uid: str = "",
+                   json: bool = False):
+    """Construct resource API request URL.
+
+    Returns:
+        Resource API request URL.
+    """
+    url = RESOURCE_API_URL
+    if sites:
+        url += "/sites/"
+    url += uid
+    if nodes:
+        url += "/clusters/chameleon/nodes"
+    if json:
+        url = url[:-1] + ".json"
+    return url
 
 
 def get_selected_site():
@@ -49,7 +69,7 @@ def get_resource_data(site_name: str = None):
     if site_name == "CHI@Edge":
         return None
 
-    r = requests.get(SITES_URL)
+    r = requests.get(_build_request(sites=True))
     r.raise_for_status()
     r_json = r.json()
     node_names_to_uids = {r_json["items"][i]["name"]: r_json["items"][i]["uid"]
@@ -58,8 +78,8 @@ def get_resource_data(site_name: str = None):
     if site_name:
         if site_name not in node_names_to_uids:
             raise ValueError(f"{site_name} is an invalid site name")
-        r = requests.get(SITES_URL + node_names_to_uids[site_name] +
-                         NODES_SUFFIX)
+        r = requests.get(_build_request(sites=True, nodes=True,
+                                        uid=node_names_to_uids[site_name]))
         r.raise_for_status()
         data = r.json()["items"]
         return {data[i]["node_name"]: data[i] for i in range(len(data))}
@@ -69,7 +89,7 @@ def get_resource_data(site_name: str = None):
         name, uid = name_uid
         if uid == "edge":
             continue
-        r = requests.get(SITES_URL + uid + NODES_SUFFIX)
+        r = requests.get(_build_request(sites=True, uid=uid, nodes=True))
         r.raise_for_status()
         data = r.json()['items']
         for i in range(len(data)):
@@ -96,24 +116,22 @@ def get_nodes(display: bool = True):
 
     try:
         client = chi.blazar()
-        hosts = {host["hypervisor_hostname"]: host for host in
-                 client.host.list()}
-    except keystoneauth1.exceptions.http.Unauthorized:
-        raise keystoneauth1.exceptions.http.Unauthorized(
-            f"You lack the required authentication to access "
-            f"{get_selected_site()}. Your user credentials "
-            f"may have expired and need to be refreshed at "
-            f"https://jupyter.chameleoncloud.org/auth/refresh.")
+    except keystoneauth1.exceptions.http.Unauthorized as e:
+        print(f"You lack the required authentication to access "
+              f"{get_selected_site()}. Your user credentials "
+              f"may have expired and need to be refreshed at "
+              f"https://jupyter.chameleoncloud.org/auth/refresh.")
+        raise e
 
-    for uid, blazar_data in hosts.items():
+    for blazar_data in client.host.list():
         node_name = blazar_data["node_name"]
         node_type = resource_data[node_name]["node_type"]
         free = blazar_data["reservable"]
-
         all_nodes.setdefault(node_type, {"avail": 0, "unavail": 0})
-        all_nodes[node_type]["avail"] = all_nodes[node_type]["avail"] + free
-        all_nodes[node_type]["unavail"] = all_nodes[node_type]["unavail"] + (
+        all_nodes[node_type]["avail"] = all_nodes[node_type]["avail"] + (
             not free)
+        all_nodes[node_type]["unavail"] = all_nodes[node_type][
+                                              "unavail"] + free
         node_data = resource_data[node_name]
 
         if all_nodes[node_type]["avail"]:
@@ -174,8 +192,8 @@ def choose_node_type(has_gpu: bool = None, gpu_count: int = None,
         """Find all nodes with or without GPUs."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            gpu_exists = not ("gpu" not in data or data["gpu"]["gpu"] is False)
-            if gpu_exists and req_gpu:
+            gpu_exists = "gpu" in data and data["gpu"]["gpu"]
+            if gpu_exists == req_gpu:
                 new_nodes[node_type] = data
             if not gpu_exists and not req_gpu:
                 new_nodes[node_type] = data
@@ -185,7 +203,7 @@ def choose_node_type(has_gpu: bool = None, gpu_count: int = None,
         """Find all nodes with exactly REQ_COUNT GPUs."""
         new_nodes = {}
         for node_type, data in nodes.items():
-            gpu_exists = not ("gpu" not in data or data["gpu"]["gpu"] is False)
+            gpu_exists = "gpu" in data and data["gpu"]["gpu"]
             if gpu_count < 0:
                 raise ValueError(
                     f"'gpu_count' should be a non-negative integer")
@@ -233,10 +251,10 @@ def choose_node_type(has_gpu: bool = None, gpu_count: int = None,
     if has_gpu is not None:
         avail_nodes = has_gpu_helper(avail_nodes, has_gpu)
     if gpu_count is not None:
-        if has_gpu is True and gpu_count == 0:
+        if has_gpu and gpu_count <= 0:
             raise ValueError("'has_gpu' specified, but requested nodes "
                              "with 0 GPUs")
-        if has_gpu is False and gpu_count > 0:
+        if not has_gpu and gpu_count > 0:
             raise ValueError("'gpu_count' specified, but requested nodes "
                              "without GPU")
         avail_nodes = gpu_count_helper(avail_nodes, gpu_count)
@@ -270,7 +288,7 @@ def get_sites():
     Returns:
         The list of sites, if found.
     """
-    api_ret = requests.get(SITES_URL_JSON)
+    api_ret = requests.get(_build_request(sites=True, json=True))
     api_ret.raise_for_status()
     api_json = api_ret.json()
     if "items" not in api_json:
