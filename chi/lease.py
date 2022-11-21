@@ -823,7 +823,7 @@ def ensure_lease(lease_name: str, **kwargs):
     try:
         current_lease = get_lease(lease_name)
         assert current_lease["status"] not in bad_lease_status
-        print(f"Using existing lease named {current_lease}")
+        print(f"Using existing lease named {lease_name}")
         return current_lease
     except Exception:
         print(f"Could not find lease {lease_name}. Will attempt to create a "

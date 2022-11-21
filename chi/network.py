@@ -173,7 +173,7 @@ def ensure_network(network_name: str, **kwargs):
     """
     try:
         current_network = get_network(network_name)
-        print(f"Using existing network named {current_network}")
+        print(f"Using existing network named {network_name}")
         return current_network
     except NotFound:
         print(f"Could not find network {network_name}. Will attempt to create "
@@ -452,14 +452,14 @@ def ensure_port(port_name: str, **kwargs):
     """
     try:
         current_port = get_port(port_name)
-        print(f"Using existing port named {current_port}")
+        print(f"Using existing port named {port_name}")
         return current_port
     except Exception:
         print(f"Could not find port {port_name}. Will attempt to create a new one")
 
     try:
         new_port = create_port(port_name=port_name, **kwargs)
-        print(f"Using new port named {new_port}")
+        print(f"Using new port named {port_name}")
         return new_port
     except Exception as ex:
         raise RuntimeError(f"Unable to create new port named "
@@ -559,7 +559,7 @@ def ensure_router(router_name: str, **kwargs):
     """
     try:
         current_router = get_router(router_name)
-        print(f"Using existing router named {current_router}")
+        print(f"Using existing router named {router_name}")
         return current_router
     except Exception:
         print(f"Could not find router {router_name}. Will attempt to create a "
@@ -567,7 +567,7 @@ def ensure_router(router_name: str, **kwargs):
 
     try:
         new_router = create_router(router_name=router_name, **kwargs)
-        print(f"Using new router named {new_router}")
+        print(f"Using new router named {router_name}")
         return new_router
     except Exception as ex:
         raise RuntimeError(f"Unable to create new router named "
