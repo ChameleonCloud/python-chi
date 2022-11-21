@@ -18,6 +18,8 @@ import tarfile
 import time
 import typing
 
+from zunclient.common.apiclient.exceptions import NotFound
+
 from .clients import zun
 from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 
@@ -78,6 +80,7 @@ def create_container(
         **kwargs: Additional keyword arguments to send to the Zun client's
             container create call.
     """
+    ensure_container(container_name=name, **kwargs)
     hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
@@ -141,6 +144,33 @@ def get_container(container_ref: "str") -> "Container":
         The container, if found.
     """
     return zun().containers.get(container_ref)
+
+
+def ensure_container(container_name: str, **kwargs) -> "Container":
+    """Get a container with name if it exists, create a new one if not.
+
+    Args:
+        container_name (str): The name or ID of the container.
+        all kwargs of create_container.
+
+    Returns:
+        The existing container if found, a new container if not.
+    """
+    try:
+        current_container = get_container(container_name)
+        print(f"Using existing container named {container_name}")
+        return current_container
+    except NotFound:
+        print(f"Could not find container {container_name}. Will attempt to "
+              f"create a new one")
+
+    try:
+        new_container = create_container(name=container_name, **kwargs)
+        print(f"Using new container named {container_name}")
+        return new_container
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new container named "
+                           f"{container_name}") from ex
 
 
 def snapshot_container(

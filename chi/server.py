@@ -2,11 +2,12 @@ from datetime import datetime
 from operator import attrgetter
 import socket
 import time
+from typing import Union
 
 from novaclient.exceptions import NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
-from novaclient.v2.servers import Server as NovaServer
+from novaclient.v2.servers import Server as NovaServer, Server
 
 from openstack.compute.v2.server import Server as OpenStackServer
 
@@ -597,9 +598,10 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
 ##########
 
 def create_server(server_name, reservation_id=None, key_name=None, network_id=None,
-                  network_name=DEFAULT_NETWORK, nics=[], image_id=None,
+                  network_name=DEFAULT_NETWORK, nics=None, image_id=None,
                   image_name=DEFAULT_IMAGE, flavor_id=None,
-                  flavor_name=None, count=1, hypervisor_hostname=None) -> 'Union[NovaServer,list[NovaServer]]':
+                  flavor_name=None, count=1, hypervisor_hostname=None,
+                  **kwargs) -> "Union[NovaServer,list[NovaServer]]":
     """Launch a new server instance.
 
     Args:
@@ -628,6 +630,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         count (int): The number of instances to launch. When launching bare
             metal server instances, this number must be less than or equal to
             the total number of hosts reserved. (Default 1).
+        all kwargs of ensure_server.
 
     Returns:
         The created server instance. If ``count`` was larger than 1, then a
@@ -636,6 +639,9 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
     Raises:
         ValueError: if an invalid count is provided.
     """
+    if nics is None:
+        nics = []
+    ensure_server(server_name=server_name, **kwargs)
     if count < 1:
         raise ValueError('Must launch at least one server.')
     if not key_name:
@@ -676,3 +682,30 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         return sorted(matching, key=attrgetter('created'), reverse=True)[:count]
     else:
         return server
+
+
+def ensure_server(server_name: 'str', **kwargs) -> "Server":
+    """Get a server with name if it exists, create a new one if not.
+
+    Args:
+        server_name(str): The name or ID of the server.
+        all kwargs of create_server.
+
+    Returns:
+        The existing server if found, a new server if not.
+    """
+    try:
+        current_server = get_server(server_name)
+        print(f"Using existing server named {server_name}")
+        return current_server
+    except NotFound:
+        print(f"Could not find server {server_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_server = create_server(server_name=server_name, **kwargs)
+        print(f"Using new server named {server_name}")
+        return new_server
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new server named "
+                           f"{server_name}") from ex
