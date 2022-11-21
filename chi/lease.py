@@ -1,10 +1,10 @@
-from datetime import timedelta
 import json
 import numbers
 import re
 import sys
 import time
 from typing import TYPE_CHECKING
+from datetime import timedelta
 
 from blazarclient.exception import BlazarClientException
 
@@ -46,6 +46,7 @@ __all__ = [
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 NODE_TYPES = {
+    "compute_haswell",
     "compute_skylake",
     "compute_haswell_ib",
     "compute_cascadelake",
@@ -641,7 +642,7 @@ def add_fip_reservation(reservation_list, count=1):
 
 
 def add_device_reservation(
-    reservation_list, count=1, machine_name=None, device_model=None, device_name=None 
+    reservation_list, count=1, machine_name=None, device_model=None, device_name=None
 ):
     """Add an IoT/edge device reservation to a reservation list.
 
@@ -676,7 +677,7 @@ def add_device_reservation(
             )
         resource_properties.append(["==", "$name", device_name])
     if machine_name:
-        resource_properties.append(["==", "$machine_name", machine_name]) 
+        resource_properties.append(["==", "$machine_name", machine_name])
     if device_model:
         resource_properties.append(["==", "$model", device_model])
 
@@ -759,7 +760,8 @@ def get_lease_id(lease_name) -> str:
     return matching[0]["id"]
 
 
-def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
+def create_lease(lease_name, reservations=None, start_date=None,
+                 end_date=None, **kwargs):
     """Create a new lease with some requested reservations.
 
     Args:
@@ -768,10 +770,12 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
         start_date (datetime): The start date of the lease. (Defaults to now.)
         end_date (datetime): The end date of the lease. (Defaults to 1 day from
             the lease start date.)
+        all kwargs of ensure_lease.
 
     Returns:
         The created lease representation.
     """
+    ensure_lease(lease_name, **kwargs)
     if not (start_date or end_date):
         start_date, end_date = lease_duration(days=1)
     elif not end_date:
@@ -802,6 +806,36 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
             )
         else:
             LOG.error(msg)
+
+
+def ensure_lease(lease_name: str, **kwargs):
+    """Get a lease with name if it is valid, create a new one if not.
+
+    Args:
+        lease_name (str): The name or ID of the lease.
+        all kwargs of create_lease.
+
+    Returns:
+        The existing lease if found, a new lease if not.
+    """
+    bad_lease_status = ["Terminated", "Error"]
+
+    try:
+        current_lease = get_lease(lease_name)
+        assert current_lease["status"] not in bad_lease_status
+        print(f"Using existing lease named {lease_name}")
+        return current_lease
+    except Exception:
+        print(f"Could not find lease {lease_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_lease = create_lease(lease_name=lease_name, **kwargs)
+        print(f"Using new lease named {lease_name}")
+        return new_lease
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new lease named "
+                           f"{lease_name}") from ex
 
 
 def delete_lease(ref):
