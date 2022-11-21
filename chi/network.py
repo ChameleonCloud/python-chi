@@ -173,21 +173,19 @@ def ensure_network(network_name: str, **kwargs):
     """
     try:
         current_network = get_network(network_name)
-    except NotFound:
-        print(f"Unable to get network named {network_name}")
-        try:
-            new_network = create_network(network_name=network_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new network named {network_name}")
-            raise ex
-        else:
-            print(f"Using new network named {network_name}")
-            return new_network
-    else:
-        print(f"Using existing network named {network_name}")
+        print(f"Using existing network named {current_network}")
         return current_network
+    except NotFound:
+        print(f"Could not find network {network_name}. Will attempt to create "
+              f"a new one")
 
-
+    try:
+        new_network = create_network(network_name=network_name, **kwargs)
+        print(f"Using new network named {network_name}")
+        return new_network
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new network named "
+                           f"{network_name}") from ex
 
 
 def delete_network(network_id):
@@ -310,19 +308,19 @@ def ensure_subnet(subnet_name: str, **kwargs):
     """
     try:
         current_subnet = get_subnet(subnet_name)
-    except Exception:
-        print(f"Unable to get subnet named {subnet_name}")
-        try:
-            new_subnet = create_subnet(subnet_name=subnet_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create  new subnet named {subnet_name}")
-            raise ex
-        else:
-            print(f"Using new subnet named {subnet_name}")
-            return new_subnet
-    else:
         print(f"Using existing subnet named {subnet_name}")
         return current_subnet
+    except Exception:
+        print(f"Could not find subnet {subnet_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_subnet = create_subnet(name=subnet_name, **kwargs)
+        print(f"Using new subnet named {subnet_name}")
+        return new_subnet
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new subnet named "
+                           f"{subnet_name}") from ex
 
 
 def delete_subnet(subnet_id):
@@ -454,19 +452,18 @@ def ensure_port(port_name: str, **kwargs):
     """
     try:
         current_port = get_port(port_name)
-    except Exception:
-        print(f"Unable to get port named {port_name}")
-        try:
-            new_port = create_port(port_name=port_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new port named {port_name}")
-            raise ex
-        else:
-            print(f"Using new port named {port_name}")
-            return new_port
-    else:
-        print(f"Using existing port named {port_name}")
+        print(f"Using existing port named {current_port}")
         return current_port
+    except Exception:
+        print(f"Could not find port {port_name}. Will attempt to create a new one")
+
+    try:
+        new_port = create_port(port_name=port_name, **kwargs)
+        print(f"Using new port named {new_port}")
+        return new_port
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new port named "
+                           f"{port_name}") from ex
 
 
 def update_port(port_id, subnet_id=None, ip_address=None):
@@ -562,19 +559,19 @@ def ensure_router(router_name: str, **kwargs):
     """
     try:
         current_router = get_router(router_name)
-    except Exception:
-        print(f"Unable to get router named {router_name}")
-        try:
-            new_router = create_router(router_name=router_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new router named {router_name}")
-            raise ex
-        else:
-            print(f"Using new router named {router_name}")
-            return new_router
-    else:
-        print(f"Using existing router named {router_name}")
+        print(f"Using existing router named {current_router}")
         return current_router
+    except Exception:
+        print(f"Could not find router {router_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_router = create_router(router_name=router_name, **kwargs)
+        print(f"Using new router named {new_router}")
+        return new_router
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new router named "
+                           f"{router_name}") from ex
 
 
 def delete_router(router_id):

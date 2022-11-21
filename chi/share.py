@@ -63,19 +63,19 @@ def ensure_share(share_name: str, **kwargs):
     """
     try:
         current_share = get_share(share_name)
-    except NotFound:
-        print(f"Unable to get share named {share_name}")
-        try:
-            new_share = create_share(name=share_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new share named {share_name}")
-            raise ex
-        else:
-            print(f"Using new share named {share_name}")
-            return new_share
-    else:
         print(f"Using existing share named {share_name}")
         return current_share
+    except NotFound:
+        print(f"Could not find share {share_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_share = create_share(name=share_name, **kwargs)
+        print(f"Using new share named {share_name}")
+        return new_share
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new share named "
+                           f"{share_name}") from ex
 
 
 def delete_share(share):

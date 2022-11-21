@@ -158,19 +158,19 @@ def ensure_container(container_name: str, **kwargs) -> "Container":
     """
     try:
         current_container = get_container(container_name)
-    except NotFound:
-        print(f"Unable to get container named {container_name}")
-        try:
-            new_container = create_container(name=container_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new container named {container_name}")
-            raise ex
-        else:
-            print(f"Using new container named {container_name}")
-            return new_container
-    else:
         print(f"Using existing container named {container_name}")
         return current_container
+    except NotFound:
+        print(f"Could not find container {container_name}. Will attempt to "
+              f"create a new one")
+
+    try:
+        new_container = create_container(name=container_name, **kwargs)
+        print(f"Using new container named {container_name}")
+        return new_container
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new container named "
+                           f"{container_name}") from ex
 
 
 def snapshot_container(

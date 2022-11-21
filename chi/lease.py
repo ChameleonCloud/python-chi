@@ -823,19 +823,19 @@ def ensure_lease(lease_name: str, **kwargs):
     try:
         current_lease = get_lease(lease_name)
         assert current_lease["status"] not in bad_lease_status
-    except Exception:
-        print(f"Unable to get lease named {lease_name}")
-        try:
-            new_lease = create_lease(lease_name=lease_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new lease named {lease_name}")
-            raise ex
-        else:
-            print(f"Using new lease named {lease_name}")
-            return new_lease
-    else:
-        print(f"Using existing lease named {lease_name}")
+        print(f"Using existing lease named {current_lease}")
         return current_lease
+    except Exception:
+        print(f"Could not find lease {lease_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_lease = create_lease(lease_name=lease_name, **kwargs)
+        print(f"Using new lease named {lease_name}")
+        return new_lease
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new lease named "
+                           f"{lease_name}") from ex
 
 
 def delete_lease(ref):

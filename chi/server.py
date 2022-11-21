@@ -696,16 +696,16 @@ def ensure_server(server_name: 'str', **kwargs) -> "Server":
     """
     try:
         current_server = get_server(server_name)
-    except NotFound:
-        print(f"Unable to get server named {server_name}")
-        try:
-            new_server = create_server(server_name=server_name, **kwargs)
-        except Exception as ex:
-            print(f"Unable to create new server named {server_name}")
-            raise ex
-        else:
-            print(f"Using new server named {server_name}")
-            return new_server
-    else:
         print(f"Using existing server named {server_name}")
         return current_server
+    except NotFound:
+        print(f"Could not find server {server_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_server = create_server(server_name=server_name, **kwargs)
+        print(f"Using new server named {server_name}")
+        return new_server
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new server named "
+                           f"{server_name}") from ex
