@@ -25,7 +25,7 @@ def _get_default_share_type_id():
 
 
 def create_share(size, name=None, description=None, metadata=None,
-                 is_public=False):
+                 is_public=False, **kwargs):
     """Create a share.
 
     Args:
@@ -33,10 +33,12 @@ def create_share(size, name=None, description=None, metadata=None,
         name (str): name of new share.
         description (str): description of a share.
         is_public (bool): whether to set share as public or not.
+        all kwargs of ensure_share.
 
     Returns:
         The created share.
     """
+    ensure_share(share_name=name, **kwargs)
     share = manila().shares.create(
         share_proto="NFS",
         size=size,
@@ -47,6 +49,33 @@ def create_share(size, name=None, description=None, metadata=None,
         is_public=is_public
     )
     return share
+
+
+def ensure_share(share_name: str, **kwargs):
+    """Get a share with name if it exists, create a new one if not.
+
+    Args:
+        share_name (str): The name or ID of the share.
+        all kwargs of create_share.
+
+    Returns:
+        The existing share if found, a new share if not.
+    """
+    try:
+        current_share = get_share(share_name)
+        print(f"Using existing share named {share_name}")
+        return current_share
+    except NotFound:
+        print(f"Could not find share {share_name}. Will attempt to create a "
+              f"new one")
+
+    try:
+        new_share = create_share(name=share_name, **kwargs)
+        print(f"Using new share named {share_name}")
+        return new_share
+    except Exception as ex:
+        raise RuntimeError(f"Unable to create new share named "
+                           f"{share_name}") from ex
 
 
 def delete_share(share):
