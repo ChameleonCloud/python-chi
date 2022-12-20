@@ -125,6 +125,9 @@ def get_nodes(display: bool = True):
 
     for blazar_data in client.host.list():
         node_name = blazar_data["node_name"]
+        if node_name not in resource_data.keys():
+            # skip blazar hosts not in resource data
+            continue
         node_type = resource_data[node_name]["node_type"]
         free = blazar_data["reservable"]
         all_nodes.setdefault(node_type, {"avail": 0, "unavail": 0})
