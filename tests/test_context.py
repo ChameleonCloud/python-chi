@@ -16,7 +16,6 @@ def test_get():
     chi.set("keypair_name", value)
     assert chi.get("keypair_name") == value
 
-
 def test_get_invalid_key():
     with pytest.raises(cfg.NoSuchOptError):
         chi.get("some_invalid_key")
@@ -99,6 +98,15 @@ def test_default_from_env():
     assert chi.get("username") == "USERNAME"
     assert chi.get("password") == "PASSWORD"
     assert chi.get("project_id") == "PROJECT_ID"
+
+
+def test_use_node():
+    assert (chi.get("node_type")) is None
+    data = {'node_type': {'architecture': {'foo': 'bar'}}}
+    node_type = list(data.keys())[0]
+    chi.use_node(node_type, data, False)
+    assert (chi.get("node_type")) == "node_type"
+    chi.use_node(node_type, data, False)
 
 
 def test_use_site():

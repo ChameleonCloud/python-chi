@@ -1,18 +1,16 @@
-from itertools import chain
+import logging
 import os
 import sys
 import time
 
-from keystoneauth1.identity.v3 import OidcAccessToken
-from keystoneauth1 import loading
-from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
-from keystoneauth1 import session
-from oslo_config import cfg
 import requests
+from keystoneauth1 import loading
+from keystoneauth1 import session
+from keystoneauth1.identity.v3 import OidcAccessToken
+from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
+from oslo_config import cfg
 
 from . import jupyterhub
-
-import logging
 
 LOG = logging.getLogger(__name__)
 
@@ -43,6 +41,7 @@ extra_opts = [
     cfg.StrOpt("image", help=("Name of disk image to use when launching instances")),
     cfg.StrOpt("keypair-private-key", help="Path to the SSH private key file"),
     cfg.StrOpt("keypair-public-key", help="Path to the SSH public key file"),
+    cfg.StrOpt("node_type", help="Type of currently selected bare metal node")
 ]
 global_options = session_opts + adapter_opts + extra_opts
 global_option_names = [opt.dest for opt in global_options]
@@ -218,7 +217,6 @@ def get(key):
         cfg.NoSuchOptError: if the parameter is not supported.
     """
     global _auth_plugin
-
     if key in global_option_names:
         key = _check_deprecated(key)
         return cfg.CONF[CONF_GROUP][key]
@@ -313,13 +311,24 @@ def use_site(site_name):
     set("auth_url", f'{site["web"]}:5000/v3')
     set("region_name", site["name"])
 
-    output = [
+    output = "\n".join([
         f"Now using {site_name}:",
         f'URL: {site.get("web")}',
         f'Location: {site.get("location")}',
         f'Support contact: {site.get("user_support_contact")}',
-    ]
-    print("\n".join(output))
+    ])
+    print(output)
+
+
+def use_node(node_type, data, verbose):
+    """ Configure the global request context to target a particular CHI node.
+    More accurate description TBD.
+    """
+    set("node_type", node_type)
+    output = f"Now using {node_type}"
+    if verbose:
+        output += f':\n{data}'
+    print(output)
 
 
 def session():
