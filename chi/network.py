@@ -122,7 +122,7 @@ def get_network_id(name) -> str:
 
 def create_network(network_name, of_controller_ip=None, of_controller_port=None,
                    vswitch_name=None, provider='physnet1',
-                   port_security_enabled=True, **kwargs) -> dict:
+                   port_security_enabled=True) -> dict:
     """Create a network.
 
     For an OpenFlow network include the IP and port of an OpenFlow controller
@@ -139,9 +139,7 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
         vswitch_name (str): The virtual switch to use name.
         provider (str): the provider network to use when specifying stitchable
             VLANs (i.e. ExoGENI). Default: 'physnet1'
-        all kwargs of ensure_network.
     """
-    ensure_network(network_name=network_name, **kwargs)
     desc_parts = []
     if of_controller_ip and of_controller_port:
         desc_parts.append(f'OFController={of_controller_ip}:{of_controller_port}')
@@ -159,33 +157,6 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     })
 
     return network['network']
-
-
-def ensure_network(network_name: str, **kwargs):
-    """Get a network with name if it exists, create a new one if not.
-
-    Args:
-        network_name(str): The name or ID of the network.
-        all kwargs of create_network.
-
-    Returns:
-        The existing network if found, a new network if not.
-    """
-    try:
-        current_network = get_network(network_name)
-        print(f"Using existing network named {network_name}")
-        return current_network
-    except NotFound:
-        print(f"Could not find network {network_name}. Will attempt to create "
-              f"a new one")
-
-    try:
-        new_network = create_network(network_name=network_name, **kwargs)
-        print(f"Using new network named {network_name}")
-        return new_network
-    except Exception as ex:
-        raise RuntimeError(f"Unable to create new network named "
-                           f"{network_name}") from ex
 
 
 def delete_network(network_id):
@@ -256,7 +227,7 @@ def create_subnet(subnet_name, network_id,
                   cidr='192.168.1.0/24',
                   allocation_pool_start=None,
                   allocation_pool_end=None,
-                  gateway_ip=None, **kwargs) -> dict:
+                  gateway_ip=None) -> dict:
     """Create a subnet on a network.
 
     Args:
@@ -266,12 +237,10 @@ def create_subnet(subnet_name, network_id,
         gateway_ip (str): The subnet's gateway address. If not defined,
             the first address in the subnet will be automatically chosen as
             the gateway.
-        all kwargs of ensure_subnet.
 
     Returns:
         The new subnet representation.
     """
-    ensure_subnet(subnet_name=subnet_name, **kwargs)
     subnet = {
         'name': subnet_name,
         'cidr': cidr,
@@ -294,33 +263,6 @@ def create_subnet(subnet_name, network_id,
     })
 
     return subnet_rtn['subnets'][0]
-
-
-def ensure_subnet(subnet_name: str, **kwargs):
-    """Get a subnet with name if it exists, create a new one if not.
-
-    Args:
-        subnet_name (str): The name or ID of the subnet.
-        all kwargs of create_subnet.
-
-    Returns:
-        The existing subnet if found, a new subnet if not.
-    """
-    try:
-        current_subnet = get_subnet(subnet_name)
-        print(f"Using existing subnet named {subnet_name}")
-        return current_subnet
-    except Exception:
-        print(f"Could not find subnet {subnet_name}. Will attempt to create a "
-              f"new one")
-
-    try:
-        new_subnet = create_subnet(name=subnet_name, **kwargs)
-        print(f"Using new subnet named {subnet_name}")
-        return new_subnet
-    except Exception as ex:
-        raise RuntimeError(f"Unable to create new subnet named "
-                           f"{subnet_name}") from ex
 
 
 def delete_subnet(subnet_id):
@@ -381,8 +323,8 @@ def get_port_id(name) -> str:
     return _resolve_id('ports', name)
 
 
-def create_port(port_name, network_id, fixed_ips=None, subnet_id=None,
-                ip_address=None, port_security_enabled=True, **kwargs) -> dict:
+def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_address=None,
+               port_security_enabled=True) -> dict:
     """Create a new port on a network.
 
     This function has a short-form and a long-form invocation. In the short form,
@@ -417,12 +359,10 @@ def create_port(port_name, network_id, fixed_ips=None, subnet_id=None,
         port_security_enabled (bool): Whether to enable `port security
             <https://wiki.openstack.org/wiki/Neutron/ML2PortSecurityExtensionDriver>`_.
             In general this should be kept on. (Default True).
-        all kwargs of ensure_port.
 
     Returns:
         The created port representation.
     """
-    ensure_port(port_name=port_name, **kwargs)
     port = {
         'name': port_name,
         'network_id': network_id,
@@ -438,32 +378,6 @@ def create_port(port_name, network_id, fixed_ips=None, subnet_id=None,
     port['fixed_ips'] = fixed_ips
 
     return neutron().create_port(body={'port': port})
-
-
-def ensure_port(port_name: str, **kwargs):
-    """Get a port with name if it exists, create a new one if not.
-
-    Args:
-        port_name (str): The name or ID of the port.
-        all kwargs of create_port.
-
-    Returns:
-        The existing port if found, a new port if not.
-    """
-    try:
-        current_port = get_port(port_name)
-        print(f"Using existing port named {port_name}")
-        return current_port
-    except Exception:
-        print(f"Could not find port {port_name}. Will attempt to create a new one")
-
-    try:
-        new_port = create_port(port_name=port_name, **kwargs)
-        print(f"Using new port named {port_name}")
-        return new_port
-    except Exception as ex:
-        raise RuntimeError(f"Unable to create new port named "
-                           f"{port_name}") from ex
 
 
 def update_port(port_id, subnet_id=None, ip_address=None):
@@ -524,54 +438,23 @@ def get_router_id(name) -> str:
     return _resolve_id('routers', name)
 
 
-def create_router(router_name, gw_network_name=None, **kwargs) -> dict:
+def create_router(router_name, gw_network_name=None) -> dict:
     """Create a router, with or without a public gateway.
 
     Args:
         router_name (str): The new router name.
         gw_network_name (str): The name of the public gateway requested to
             provide subnets connected this router NAT to the Internet.
-        all kwargs of ensure_router.
-
     Returns:
         The created router representation.
     """
-    ensure_router(router_name=router_name, **kwargs)
     router = {"name": router_name, "admin_state_up": True}
 
     if gw_network_name:
-        router["external_gateway_info"] = {"network_id": get_network_id(
-            gw_network_name)}
+        router["external_gateway_info"] = {"network_id": get_network_id(gw_network_name)}
 
     response = neutron().create_router(body={"router": router})
     return response["router"]
-
-
-def ensure_router(router_name: str, **kwargs):
-    """Get a router with name if it exists, create a new one if not.
-
-    Args:
-        router_name (str): The name or ID of the router.
-        all kwargs of create_router.
-
-    Returns:
-        The existing router if found, a new router if not.
-    """
-    try:
-        current_router = get_router(router_name)
-        print(f"Using existing router named {router_name}")
-        return current_router
-    except Exception:
-        print(f"Could not find router {router_name}. Will attempt to create a "
-              f"new one")
-
-    try:
-        new_router = create_router(router_name=router_name, **kwargs)
-        print(f"Using new router named {router_name}")
-        return new_router
-    except Exception as ex:
-        raise RuntimeError(f"Unable to create new router named "
-                           f"{router_name}") from ex
 
 
 def delete_router(router_id):
