@@ -30,9 +30,9 @@ def refresh_access_token():
     Raises:
         AuthenticationError: if the access token cannot be refreshed.
     """
-    res = call_jupyterhub_api(ACCESS_TOKEN_ENDPOINT)
-    access_token = res.get('access_token')
-    expires_at = res.get('expires_at')
+    res = call_jupyterhub_api(f"users/{os.getenv('JUPYTERHUB_USER')}")
+    access_token = res.get("auth_state").get('access_token')
+    expires_at = res.get("auth_state").get('expires_at')
 
     if not access_token:
         raise ValueError(f'Failed to get access token: {res}')
