@@ -459,7 +459,7 @@ def get_node_reservation(
         if res.get("resource_type") != "physical:host":
             return False
         if count is not None and not all(
-            int(res.get(key, -1)) == count for key in ["min_count", "max_count"]
+            int(res.get(key, -1)) == count for key in ["min", "max"]
         ):
             return False
         rp = res.get("resource_properties")
