@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 session_factory = session
 
 NOVA_API_VERSION = "2.10"
-ZUN_API_VERSION = "1"
+ZUN_API_VERSION = "1.41"
 
 
 def connection(session=None) -> "Connection":
