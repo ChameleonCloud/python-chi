@@ -26,6 +26,14 @@ the `documentation on OpenRC scripts
 to learn more about how to download and source your authentication credentials
 for the CLI; the same instructions apply for using the Python interface.
 
+Depending on the contents of your OpenRC script, you might need to include this
+line in your python script:
+
+.. code-block:: python
+
+    chi.set('project_domain_name', 'chameleon')
+
+
 Basic usage
 ===========
 
