@@ -4,6 +4,7 @@ keystoneauth1
 openstacksdk
 paramiko
 python-blazarclient
+python-cinderclient
 python-glanceclient
 python-ironicclient
 python-manilaclient

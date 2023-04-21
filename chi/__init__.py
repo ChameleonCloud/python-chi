@@ -1,6 +1,7 @@
 from .clients import (
     connection,
     blazar,
+    cinder,
     glance,
     gnocchi,
     ironic,
@@ -22,6 +23,7 @@ __all__ = [
     "use_site",
     "connection",
     "blazar",
+    "cinder",
     "glance",
     "gnocchi",
     "ironic",

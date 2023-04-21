@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from openstack.connection import Connection
     from blazarclient.client import Client as BlazarClient
+    from cinderclient.client import Client as CinderClient
     from glanceclient.client import Client as GlanceClient
     from gnocchiclient.v1.client import Client as GnocchiClient
     from manilaclient.client import Client as ManilaClient
@@ -72,6 +73,21 @@ def blazar(session=None) -> "BlazarClient":
     return BlazarClient(
         "1", service_type="reservation", session=(session or session_factory())
     )
+
+
+def cinder(session=None) -> "CinderClient":
+    """Get a preconfigured client for Cinder, the persistent volume service.
+
+    Args:
+        session (Session): An authentication session object. By default a
+            new session is created via :func:`chi.session`.
+
+    Returns:
+        A new Cinder client.
+    """
+    from cinderclient.client import Client as CinderClient
+
+    return CinderClient("3", session=(session or session_factory()))
 
 
 def glance(session=None) -> "GlanceClient":
