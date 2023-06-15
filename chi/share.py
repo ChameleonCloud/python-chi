@@ -111,7 +111,7 @@ def get_share_id(name):
         ValueError: If the share could not be found, or if multiple shares
             matched the name.
     """
-    shares = list(manila().shares.list(filters={'name': name}))
+    shares = list(manila().shares.list(search_opts={'name': name}))
     if not shares:
         raise ValueError(f'No shares found matching name "{name}"')
     elif len(shares) > 1:
