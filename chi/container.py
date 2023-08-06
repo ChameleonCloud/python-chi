@@ -67,6 +67,7 @@ def create_container(
         exposed_ports (list[str]): A list of ports to expose on the container.
             TCP or UDP can be provided with a slash prefix, e.g., "80/tcp" vs.
             "53/udp". If no protocol is provided, TCP is assumed.
+        reservation_id (str): The id of the lease.
         host (str): The Zun host to launch a container on. If not specified,
             the host is chosen by Zun.
         runtime (str): The container runtime to use. This should only be
