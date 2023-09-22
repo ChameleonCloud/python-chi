@@ -5,6 +5,10 @@ from . import context
 
 
 class Remote(Connection):
+    """Wrapper for `Fabric Connection
+    <https://docs.fabfile.org/en/latest/api/connection.html#fabric.connection.Connection>`__
+
+    """
     def __init__(self, ip=None, server=None, user="cc", **kwargs):
         if ip is None:
             if server is None:
