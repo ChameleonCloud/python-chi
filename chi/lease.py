@@ -45,22 +45,6 @@ __all__ = [
 ]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
-NODE_TYPES = {
-    "compute_skylake",
-    "compute_haswell_ib",
-    "compute_cascadelake",
-    "compute_cascadelake_r",
-    "storage",
-    "storage_hierarchy",
-    "gpu_p100",
-    "gpu_p100_nvlink",
-    "gpu_k80",
-    "gpu_m40",
-    "fpga",
-    "lowpower_xeon",
-    "atom",
-    "arm64",
-}
 DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_LEASE_LENGTH = timedelta(days=1)
 DEFAULT_NETWORK_RESOURCE_PROPERTIES = ["==", "$physical_network", "physnet1"]
@@ -167,9 +151,6 @@ def lease_create_nodetype(*args, **kwargs):
         node_type = kwargs.pop("node_type")
     except KeyError:
         raise ValueError("no node_type specified")
-    if node_type not in NODE_TYPES:
-        print('warning: unknown node_type ("{}")'.format(node_type), file=sys.stderr)
-        # raise ValueError('unknown node_type ("{}")'.format(node_type))
     kwargs["node_resource_properties"] = ["==", "$node_type", node_type]
     return lease_create_args(*args, **kwargs)
 
