@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+import os
 import logging
 import tarfile
 import time
@@ -202,6 +203,9 @@ def execute(container_ref: "str", command: "str") -> "dict":
 def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
     """Upload a file or directory to a running container.
 
+    This method requires your running container to include
+    the GNU tar utility.
+
     Args:
         container_ref (str): The name or ID of the container.
         source (str): The (local) path to the file or directory to upload.
@@ -209,7 +213,7 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
     """
     fd = io.BytesIO()
     with tarfile.open(fileobj=fd, mode="w") as tar:
-        tar.add(source, arcname=".")
+        tar.add(source, arcname=os.path.basename(source))
     fd.seek(0)
     data = fd.read()
     fd.close()
@@ -218,6 +222,9 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
 
 def download(container_ref: "str", source: "str", dest: "str"):
     """Download a file or directory from a running container.
+
+       This method requires your running container to include
+       both the POSIX sh and GNU tar utilities.
 
     Args:
         container_ref (str): The name or ID of the container.
