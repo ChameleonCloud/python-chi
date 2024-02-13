@@ -223,8 +223,8 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
 def download(container_ref: "str", source: "str", dest: "str"):
     """Download a file or directory from a running container.
 
-       This method requires your running container to include
-       both the POSIX sh and GNU tar utilities.
+    This method requires your running container to include
+    both the POSIX sh and GNU tar utilities.
 
     Args:
         container_ref (str): The name or ID of the container.
