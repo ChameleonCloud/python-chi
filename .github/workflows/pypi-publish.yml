@@ -30,6 +30,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install wheel
+        pip install setuptools
     - name: update release version in setup
       run: >-
         sed -i "s/{{VERSION_PLACEHOLDER}}/${{ github.event.release.tag_name }}/g" setup.py
