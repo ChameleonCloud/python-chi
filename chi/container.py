@@ -38,7 +38,9 @@ __all__ = [
     "get_logs",
     "execute",
     "upload",
+    "download",
     "wait_for_active",
+    "associate_floating_ip",
 ]
 
 
