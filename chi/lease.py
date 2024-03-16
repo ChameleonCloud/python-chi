@@ -776,11 +776,8 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
         msg = msg.lower()
 
         match = ErrorParsers.NOT_ENOUGH_RESOURCES.match(msg)
-        if match:
-            LOG.error(
-                f"There were not enough unreserved {match.group('resource_type')} "
-                "to satisfy your request."
-            )
+        if 'not enough resources' in ex.args[0].lower():
+            raise ResourceExhaustionError(f"Lease creation failed: Insufficient resources") from ex
         else:
             LOG.error(msg)
 
