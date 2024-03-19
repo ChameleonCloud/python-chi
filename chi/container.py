@@ -98,7 +98,7 @@ def create_container(
         kwargs["exposed_ports"] = exposed_ports
 
     # Note: most documented args are not on the function signature because there is some special
-    # handling of it in the Zun client; it is not sent if it is not on kwargs.
+    # handling of it in the Zu      n client; it is not sent if it is not on kwargs.
     # If it is on kwargs it is expected to be non-None.
     container = zun().containers.create(
         name=name,
@@ -236,7 +236,7 @@ def download(container_ref: "str", source: "str", dest: "str"):
     res = zun().containers.get_archive(container_ref, source)
     fd = io.BytesIO(res["data"])
     with tarfile.open(fileobj=fd, mode="r") as tar:
-        tar.extractall(dest)
+        tar.extractall(dest, filter="fully_trusted")
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
