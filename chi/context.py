@@ -1,13 +1,18 @@
-from itertools import chain
 import os
 import sys
 import time
+import openstack
 
+from typing import List, Optional
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1 import loading
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
 from keystoneauth1 import session
+from keystoneclient.v3.client import Client as KeystoneClient
 from oslo_config import cfg
+from IPython.display import display
+
+import ipywidgets as widgets
 import requests
 
 from . import jupyterhub
@@ -16,10 +21,12 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_SITE = "CHI@UC"
+DEFAULT_IMAGE_NAME = "CC-Ubuntu22.04"
+DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_AUTH_TYPE = "v3token"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
-
 
 def default_key_name():
     username = os.getenv("USER")
@@ -170,6 +177,15 @@ def _check_deprecated(key):
     )
     return deprecated_extra_opts[key]
 
+def _is_ipynb() -> bool:
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:
+            return False
+    except ImportError:
+        return False
+    return True
+
 
 def set(key, value):
     """Set a context parameter by name.
@@ -225,7 +241,6 @@ def get(key):
     else:
         return cfg.CONF[_auth_section(_auth_plugin)][key]
 
-
 def params():
     """List all parameters currently set on the context.
 
@@ -237,8 +252,44 @@ def params():
     keys.extend(list(cfg.CONF[_auth_section(_auth_plugin)].keys()))
     return keys
 
+def list_sites(show: Optional[str] = None) -> List[str]:
+    """
+    Retrieve a list of Chameleon sites.
 
-def use_site(site_name):
+    Args:
+        show (str, optional): Determines how the list of sites is displayed.
+            Possible values are "widget" and "text". Defaults to None.
+
+    Returns:
+        List[str]: A list of site names.
+
+    Raises:
+        ValueError: If no sites are returned.
+
+    """
+    global _sites
+    if not _sites:
+        res = requests.get(f"{RESOURCE_API_URL}/sites.json")
+        try:
+            res.raise_for_status()
+            items = res.json().get("items", [])
+            _sites = {s["name"]: s for s in items}
+            if not _sites:
+                raise ValueError("No sites returned.")
+        except Exception:
+            print("Failed to fetch list of available Chameleon sites.", file=sys.stderr)
+            return []
+
+    site_names = list(_sites.keys())
+
+    if show == "widget" and _is_ipynb():
+        display(widgets.Select(options=site_names, description="Sites"))
+    elif show == "text":
+        print("\n".join(site_names))
+
+    return site_names
+
+def use_site(site_name: str) -> None:
     """Configure the global request context to target a particular CHI site.
 
     Targeting a site will mean that leases, instance launch requests, and any
@@ -321,6 +372,56 @@ def use_site(site_name):
     ]
     print("\n".join(output))
 
+def choose_site() -> None:
+    """
+    Displays a dropdown menu to select a chameleon site.
+
+    Only works if running in a Ipynb notebook environment.
+    """
+    if _is_ipynb():
+        site_dropdown = widgets.Dropdown(options=list_sites(), description="Select Site")
+        display(site_dropdown)
+        site_dropdown.observe(lambda change: use_site(change['new']), names='value')
+    else:
+                print("Choose site feature is only available in Jupyter notebook environment.")
+
+def _get_project_names():
+    set_log_level(debug=True)
+    keystone_session = session()
+    keystone_client = KeystoneClient(
+        session=keystone_session,
+        interface=getattr(keystone_session, "interface", None),
+        region_name=getattr(keystone_session, "region_name", None),
+    )
+
+    projects = keystone_client.projects.list(user=keystone_session.get_user_id())
+
+    return [project.name for project in projects]
+
+def choose_project() -> None:
+    """
+    Displays a dropdown menu to select a project.
+
+    Only works if running in a Ipynb notebook environment.
+    """
+    if _is_ipynb():
+        project_dropdown = widgets.Dropdown(options=_get_project_names(), description="Select Project")
+        display(project_dropdown)
+        project_dropdown.observe(lambda change: set('project_name', change['new']), names='value')
+    else:
+        print("Choose project feature is only available in Jupyter notebook environment.")
+
+def check_credentials() -> None:
+    """
+    Prints authentication metadata (e.g. username, site) and if credentials are currently valid and user is authenticated.
+    """
+    try:
+        print(f"Username: {os.getenv("USER")}")
+        print(f"Site: {get('region_name')}")
+        print("Projects:\n ", _get_project_names())
+        print("Authentication is valid.")
+    except Exception as e:
+        print("Authentication failed: ", str(e))
 
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
@@ -337,6 +438,15 @@ def session():
         )
     return _session
 
+def set_log_level(debug: bool = False) -> None:
+    """Configures logger for python-chi. By default, only errors are shown.
+    Set to debug to True, which will show calls to external APIs.
+
+    Args:
+        debug (bool, optional): shows calls to external openstack APIs if
+        set to True. Defaults to False.
+    """
+    openstack.enable_logging(debug=debug, http_debug=debug)
 
 def reset():
     """Reset the context, removing all overrides and defaults.
