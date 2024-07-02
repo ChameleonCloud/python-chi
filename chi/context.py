@@ -8,6 +8,9 @@ from keystoneauth1 import loading
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
 from keystoneauth1 import session
 from oslo_config import cfg
+from IPython.display import display
+
+import ipywidgets as widgets
 import requests
 
 from . import jupyterhub
@@ -16,10 +19,12 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_SITE = "default-site"
+DEFAULT_IMAGE_NAME = "default-image"
+DEFAULT_NODE_TYPE = "default-type"
 DEFAULT_AUTH_TYPE = "v3token"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
-
 
 def default_key_name():
     username = os.getenv("USER")
@@ -225,7 +230,6 @@ def get(key):
     else:
         return cfg.CONF[_auth_section(_auth_plugin)][key]
 
-
 def params():
     """List all parameters currently set on the context.
 
@@ -237,8 +241,30 @@ def params():
     keys.extend(list(cfg.CONF[_auth_section(_auth_plugin)].keys()))
     return keys
 
+def list_sites(show: Optional[str] = None) -> List[str]:
+    global _sites
+    if not _sites:
+        res = requests.get(f"{RESOURCE_API_URL}/sites.json")
+        try:
+            res.raise_for_status()
+            items = res.json().get("items", [])
+            _sites = {s["name"]: s for s in items}
+            if not _sites:
+                raise ValueError("No sites returned.")
+        except Exception:
+            print("Failed to fetch list of available Chameleon sites.", file=sys.stderr)
+            return []
 
-def use_site(site_name):
+    site_names = list(_sites.keys())
+
+    if show == "widget" and is_jupyter_notebook():
+        display(widgets.Select(options=site_names, description="Sites"))
+    elif show == "text":
+        print("\n".join(site_names))
+
+    return site_names
+
+def use_site(site_name: str) -> None:
     """Configure the global request context to target a particular CHI site.
 
     Targeting a site will mean that leases, instance launch requests, and any
@@ -321,6 +347,41 @@ def use_site(site_name):
     ]
     print("\n".join(output))
 
+def choose_site() -> None:
+    if is_jupyter_notebook():
+        site_dropdown = widgets.Dropdown(options=list_sites(), description="Select Site")
+        display(site_dropdown)
+        site_dropdown.observe(lambda change: use_site(change['new']), names='value')
+    else:
+        print("Choose site feature is only available in Jupyter notebook environment.")
+
+def choose_project() -> None:
+    if is_jupyter_notebook():
+        project_dropdown = widgets.Dropdown(options=["project1", "project2"], description="Select Project")
+        display(project_dropdown)
+        project_dropdown.observe(lambda change: set('project', change['new']), names='value')
+    else:
+        print("Choose project feature is only available in Jupyter notebook environment.")
+
+def check_credentials() -> None:
+    try:
+        keystone_session = get()
+        projects = keystone_session.get('/projects').json()
+        print("Authentication is valid.")
+        print(f"Username: {get('username')}")
+        print(f"Site: {get('region_name')}")
+        print("Projects: ", [project['name'] for project in projects['projects']])
+    except Exception as e:
+        print("Authentication failed: ", str(e))
+
+def is_jupyter_notebook() -> bool:
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:
+            return False
+    except ImportError:
+        return False
+    return True
 
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
