@@ -33,3 +33,5 @@ __all__ = [
     "nova",
     "zun",
 ]
+
+context.use_site(context.DEFAULT_SITE)
