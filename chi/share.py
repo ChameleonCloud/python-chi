@@ -1,4 +1,5 @@
 from .clients import manila
+from .exception import CHIValueError, ResourceError
 
 from manilaclient.exceptions import NotFound
 
@@ -18,9 +19,9 @@ def _get_default_share_type_id():
     # we only support one share type - cephfsnfstype
     share_types = manila().share_types.list()
     if not share_types:
-        raise ValueError("No share types found")
+        raise CHIValueError("No share types found")
     elif len(share_types) > 1:
-        raise ValueError("Multiple share types found")
+        raise ResourceError("Multiple share types found")
     return share_types[0].id
 
 
@@ -113,9 +114,9 @@ def get_share_id(name):
     """
     shares = list(manila().shares.list(search_opts={'name': name}))
     if not shares:
-        raise ValueError(f'No shares found matching name "{name}"')
+        raise CHIValueError(f'No shares found matching name "{name}"')
     elif len(shares) > 1:
-        raise ValueError(f'Multiple shares found matching name "{name}"')
+        raise ResourceError(f'Multiple shares found matching name "{name}"')
     return shares[0].id
 
 

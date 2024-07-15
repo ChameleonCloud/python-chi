@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import openstack
 
 from typing import List, Optional
 from keystoneauth1.identity.v3 import OidcAccessToken
@@ -12,11 +11,12 @@ from keystoneclient.v3.client import Client as KeystoneClient
 from oslo_config import cfg
 from IPython.display import display
 
+from . import jupyterhub
+from .exception import CHIValueError, ServiceError
+
+import openstack
 import ipywidgets as widgets
 import requests
-
-from . import jupyterhub
-
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -275,7 +275,7 @@ def list_sites(show: Optional[str] = None) -> List[str]:
             items = res.json().get("items", [])
             _sites = {s["name"]: s for s in items}
             if not _sites:
-                raise ValueError("No sites returned.")
+                raise ServiceError("No sites returned.")
         except Exception:
             print("Failed to fetch list of available Chameleon sites.", file=sys.stderr)
             return []
@@ -353,7 +353,7 @@ def use_site(site_name: str) -> None:
                 "user_support_contact": "help@chameleoncloud.org",
             }
         else:
-            raise ValueError(
+            raise CHIValueError(
                 (
                     f'No site named "{site_name}" exists! Possible values: '
                     ", ".join(_sites.keys())
