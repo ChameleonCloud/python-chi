@@ -1,7 +1,9 @@
 import os
 import sys
 import time
+import openstack
 
+from enum import Enum
 from typing import List, Optional
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1 import loading
@@ -10,6 +12,9 @@ from keystoneauth1 import session
 from keystoneclient.v3.client import Client as KeystoneClient
 from oslo_config import cfg
 from IPython.display import display
+
+import ipywidgets as widgets
+import requests
 
 from . import jupyterhub
 from .exception import CHIValueError, ServiceError
@@ -252,42 +257,79 @@ def params():
     keys.extend(list(cfg.CONF[_auth_section(_auth_plugin)].keys()))
     return keys
 
+
 def list_sites(show: Optional[str] = None) -> List[str]:
     """
-    Retrieve a list of Chameleon sites.
+    Retrieves a list of Chameleon sites.
 
     Args:
-        show (str, optional): Determines how the list of sites is displayed.
-            Possible values are "widget" and "text". Defaults to None.
+        show (str, optional): Determines how the site names should be displayed.
+        Possible values are "widget" to display as a table widget, "text" to print
+        as plain text,or None (default) to return the List[str] of site names.
 
     Returns:
-        List[str]: A list of site names.
+        If `show` is set to "widget", it displays the site names as a text widget.
+        If `show` is set to "text", it prints the site names as plain text.
+        If `show` is set to None, it returns a list of site names.
 
     Raises:
-        ValueError: If no sites are returned.
-
+        ValueError: If no sites are returned or if an invalid value is provided for the `show` parameter.
     """
     global _sites
+
     if not _sites:
         res = requests.get(f"{RESOURCE_API_URL}/sites.json")
-        try:
-            res.raise_for_status()
-            items = res.json().get("items", [])
-            _sites = {s["name"]: s for s in items}
-            if not _sites:
-                raise ServiceError("No sites returned.")
-        except Exception:
-            print("Failed to fetch list of available Chameleon sites.", file=sys.stderr)
-            return []
+        res.raise_for_status()
+        items = res.json().get("items", [])
+        _sites = {s["name"]: s for s in items}
+        _sites = dict(sorted(_sites.items(),
+                             key=lambda x: (x[1]['site_class'], x[0] not in ["CHI@TACC", "CHI@UC"])))
+        _sites["KVM@TACC"] = {
+        "name": "KVM@TACC",
+        "web": "https://kvm.tacc.chameleoncloud.org",
+        "location": "Austin, Texas, USA",
+        "user_support_contact": "help@chameleoncloud.org",
+        }
+        if not _sites:
+            raise ValueError("No sites returned.")
 
-    site_names = list(_sites.keys())
+    if show == None:
+        return _sites
+    elif show == "widget" and _is_ipynb():
+        # Constructing the table HTML
+        table_html = """
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Location</th>
+                <th>User Support Contact</th>
+            </tr>
+        """
 
-    if show == "widget" and _is_ipynb():
-        display(widgets.Select(options=site_names, description="Sites"))
+        for site_name in _sites.keys():
+            table_html += f"""
+            <tr>
+                <td>{site_name}</td>
+                <td>{_sites[site_name]["web"]}</td>
+                <td>{_sites[site_name]["location"]}</td>
+                <td>{_sites[site_name]["user_support_contact"]}</td>
+            </tr>
+            """
+
+        table_html += "</table>"
+        display(widgets.HTML(value=table_html))
     elif show == "text":
-        print("\n".join(site_names))
+        print("Chameleon Sites:")
+        for site_name in _sites.keys():
+            site = _sites[site_name]
+            print(f"- Name: {site_name}")
+            print(f"  URL: {site['web']}")
+            print(f"  Location: {site['location']}")
+            print(f"  User Support Contact: {site['user_support_contact']}")
+    else:
+        raise CHIValueError("Invalid value for 'show' parameter.")
 
-    return site_names
 
 def use_site(site_name: str) -> None:
     """Configure the global request context to target a particular CHI site.
@@ -315,13 +357,8 @@ def use_site(site_name: str) -> None:
     """
     global _sites
     if not _sites:
-        res = requests.get(f"{RESOURCE_API_URL}/sites.json")
         try:
-            res.raise_for_status()
-            items = res.json().get("items", [])
-            _sites = {s["name"]: s for s in items}
-            if not _sites:
-                raise ValueError("No sites returned.")
+            _sites = list_sites()
         except Exception:
             printerr(
                 """Failed to fetch list of available Chameleon sites.
@@ -336,31 +373,13 @@ def use_site(site_name: str) -> None:
 
     site = _sites.get(site_name)
     if not site:
-        # TODO(jason): Remove this fallback when CHI@Edge is enrolled into
-        # the resource discovery API and the resource catalogue has support for it.
-        if site_name == "CHI@Edge":
-            site = {
-                "name": "CHI@Edge",
-                "web": "https://chi.edge.chameleoncloud.org",
-                "location": "Distributed",
-                "user_support_contact": "https://groups.google.com/g/chameleon-edge-users",
-            }
-        elif site_name == "KVM@TACC":
-            site = {
-                "name": "KVM@TACC",
-                "web": "https://kvm.tacc.chameleoncloud.org",
-                "location": "Austin, Texas, USA",
-                "user_support_contact": "help@chameleoncloud.org",
-            }
-        else:
-            raise CHIValueError(
-                (
-                    f'No site named "{site_name}" exists! Possible values: '
-                    ", ".join(_sites.keys())
-                )
+        raise CHIValueError(
+            (
+                f'No site named "{site_name}" exists! Possible values: '
+                ", ".join(_sites.keys())
             )
+        )
 
-    # Set important parameters
     set("auth_url", f'{site["web"]}:5000/v3')
     set("region_name", site["name"])
 
@@ -379,14 +398,36 @@ def choose_site() -> None:
     Only works if running in a Ipynb notebook environment.
     """
     if _is_ipynb():
-        site_dropdown = widgets.Dropdown(options=list_sites(), description="Select Site")
+        global _sites
+        if not _sites:
+            _sites = list_sites()
+        use_site(list(_sites.keys())[0])
+        print("Please choose a site in the dropdown below")
+        site_dropdown = widgets.Dropdown(options=_sites.keys(), description="Select Site")
         display(site_dropdown)
-        use_site(list_sites()[0])
         site_dropdown.observe(lambda change: use_site(change['new']), names='value')
     else:
-                print("Choose site feature is only available in Jupyter notebook environment.")
+        print("Choose site feature is only available in an ipynb environment.")
 
-def _get_project_names():
+
+def list_projects(show: str = None) -> List[str]:
+    """
+    Retrieves a list of projects associated with the current user.
+
+    Args:
+        show (str, optional): Determines how the project names should be displayed.
+        Possible values are "widget" to display as a table widget, "text" to print
+        as plain text, or None (default) to return the list of project names.
+
+    Returns:
+        If `show` is set to "widget", it displays the project names as a text widget.
+        If `show` is set to "text", it prints the project names as plain text.
+        If `show` is set to None, it returns a list of project names.
+
+    Raises:
+        ValueError: If no projects are returned or an invalid value is provided for the `show` parameter.
+
+    """
     keystone_session = session()
     keystone_client = KeystoneClient(
         session=keystone_session,
@@ -395,8 +436,34 @@ def _get_project_names():
     )
 
     projects = keystone_client.projects.list(user=keystone_session.get_user_id())
+    project_names = [project.name for project in projects]
 
-    return [project.name for project in projects]
+    if show == "widget":
+        table_html = "<table>"
+        for project in project_names:
+            table_html += f"<tr><td>{project}</td></tr>"
+        table_html += "</table>"
+
+        display(widgets.HTML(table_html))
+    elif show == "text":
+        print("\n".join(project_names))
+    elif show == None:
+        return list(project_names)
+    else:
+        raise CHIValueError("Invalid value for 'show' parameter.")
+
+def use_project(project: str) -> None:
+    """
+    Sets the current project name.
+
+    Args:
+        project (str): The name of the project to use.
+
+    Returns:
+        None
+    """
+    set('project_name', project)
+    print(f"Now using project: {project}")
 
 def choose_project() -> None:
     """
@@ -405,12 +472,10 @@ def choose_project() -> None:
     Only works if running in a Ipynb notebook environment.
     """
     if _is_ipynb():
-        project_dropdown = widgets.Dropdown(options=_get_project_names(), description="Select Project")
+        project_dropdown = widgets.Dropdown(options=list_projects(), description="Select Project")
         display(project_dropdown)
-        _handle_project_change = lambda change: (set('project_name', change['new']),
-                                                 print(f"Now using project: {change['new']}"))
-        _handle_project_change({'new': _get_project_names()[0]})
-        project_dropdown.observe(_handle_project_change, names='value')
+        use_project(list_projects()[0])
+        project_dropdown.observe(lambda change: (use_project(change['new'])), names='value')
     else:
         print("Choose project feature is only available in Jupyter notebook environment.")
 
@@ -420,23 +485,34 @@ def check_credentials() -> None:
     """
     try:
         print(f"Username: {os.getenv('USER')}")
-        print(f"Site: {get('region_name')}" )
+        print(f"Currently site: {get('region_name')}" )
+        print(f"Currently project: {get('project_name')}" )
         print("Projects:")
-        for project in _get_project_names():
+        for project in list_projects():
             print(project)
         print("Authentication is valid.")
     except Exception as e:
         print("Authentication failed: ", str(e))
 
-def set_log_level(debug: bool = False) -> None:
+class LogLevel(Enum):
+    ERROR = "ERROR"
+    DEBUG = "DEBUG"
+
+def set_log_level(level: str = "ERROR") -> None:
     """Configures logger for python-chi. By default, only errors are shown.
-    Set to debug to True, which will show calls to external APIs.
+    Set to "DEBUG" to see debug level logging, which will show calls to external APIs.
 
     Args:
-        debug (bool, optional): shows calls to external openstack APIs if
-        set to True. Defaults to False.
+        level (str, optional): The log level. Defaults to "ERROR".
     """
-    openstack.enable_logging(debug=debug, http_debug=debug)
+    if level == "DEBUG":
+        openstack.enable_logging(debug=True, http_debug=True)
+        LOG.setLevel(logging.DEBUG)
+    elif level == "ERROR":
+        openstack.enable_logging(debug=False, http_debug=False)
+        LOG.setLevel(logging.ERROR)
+    else:
+        raise CHIValueError("Invalid log level value, please choose between 'ERROR' and 'DEBUG'")
 
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
