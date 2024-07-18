@@ -17,7 +17,7 @@ import ipywidgets as widgets
 import requests
 
 from . import jupyterhub
-from .exception import CHIValueError, ServiceError
+from .exception import CHIValueError, ResourceError
 
 import openstack
 import ipywidgets as widgets
@@ -291,7 +291,7 @@ def list_sites(show: Optional[str] = None) -> List[str]:
         "user_support_contact": "help@chameleoncloud.org",
         }
         if not _sites:
-            raise ValueError("No sites returned.")
+            raise ResourceError("No sites returned.")
 
     if show == None:
         return _sites
