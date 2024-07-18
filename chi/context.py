@@ -3,7 +3,6 @@ import sys
 import time
 import openstack
 
-from enum import Enum
 from typing import List, Optional
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1 import loading
@@ -191,6 +190,15 @@ def _is_ipynb() -> bool:
         return False
     return True
 
+def _is_ipynb() -> bool:
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:
+            return False
+    except ImportError:
+        return False
+    return True
+
 
 def set(key, value):
     """Set a context parameter by name.
@@ -359,6 +367,8 @@ def use_site(site_name: str) -> None:
     if not _sites:
         try:
             _sites = list_sites()
+        try:
+            _sites = list_sites()
         except Exception:
             printerr(
                 """Failed to fetch list of available Chameleon sites.
@@ -493,10 +503,6 @@ def check_credentials() -> None:
         print("Authentication is valid.")
     except Exception as e:
         print("Authentication failed: ", str(e))
-
-class LogLevel(Enum):
-    ERROR = "ERROR"
-    DEBUG = "DEBUG"
 
 def set_log_level(level: str = "ERROR") -> None:
     """Configures logger for python-chi. By default, only errors are shown.
