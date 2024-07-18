@@ -367,8 +367,6 @@ def use_site(site_name: str) -> None:
     if not _sites:
         try:
             _sites = list_sites()
-        try:
-            _sites = list_sites()
         except Exception:
             printerr(
                 """Failed to fetch list of available Chameleon sites.
