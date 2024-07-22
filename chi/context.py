@@ -16,7 +16,11 @@ import ipywidgets as widgets
 import requests
 
 from . import jupyterhub
+from .exception import CHIValueError, ResourceError
 
+import openstack
+import ipywidgets as widgets
+import requests
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -286,7 +290,7 @@ def list_sites(show: Optional[str] = None) -> List[str]:
         "user_support_contact": "help@chameleoncloud.org",
         }
         if not _sites:
-            raise ValueError("No sites returned.")
+            raise ResourceError("No sites returned.")
 
     if show == None:
         return _sites
@@ -323,7 +327,7 @@ def list_sites(show: Optional[str] = None) -> List[str]:
             print(f"  Location: {site['location']}")
             print(f"  User Support Contact: {site['user_support_contact']}")
     else:
-        raise ValueError("Invalid value for 'show' parameter.")
+        raise CHIValueError("Invalid value for 'show' parameter.")
 
 
 def use_site(site_name: str) -> None:
@@ -368,7 +372,7 @@ def use_site(site_name: str) -> None:
 
     site = _sites.get(site_name)
     if not site:
-        raise ValueError(
+        raise CHIValueError(
             (
                 f'No site named "{site_name}" exists! Possible values: '
                 ", ".join(_sites.keys())
@@ -445,7 +449,7 @@ def list_projects(show: str = None) -> List[str]:
     elif show == None:
         return list(project_names)
     else:
-        raise ValueError("Invalid value for 'show' parameter.")
+        raise CHIValueError("Invalid value for 'show' parameter.")
 
 def use_project(project: str) -> None:
     """
@@ -503,7 +507,7 @@ def set_log_level(level: str = "ERROR") -> None:
         openstack.enable_logging(debug=False, http_debug=False)
         LOG.setLevel(logging.ERROR)
     else:
-        raise ValueError("Invalid log level value, please choose between 'ERROR' and 'DEBUG'")
+        raise CHIValueError("Invalid log level value, please choose between 'ERROR' and 'DEBUG'")
 
 def session():
     """Get a Keystone Session object suitable for authenticating a client.

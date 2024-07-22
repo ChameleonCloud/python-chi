@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from blazarclient.exception import BlazarClientException
 
 from .clients import blazar, neutron
+from .exception import CHIValueError, ResourceError, ServiceError
 from .context import get as get_from_context, session
 from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
 from .server import Server, ServerError
@@ -85,7 +86,7 @@ def lease_create_args(
     if length is None and end is None:
         length = DEFAULT_LEASE_LENGTH
     elif length is not None and end is not None:
-        raise ValueError("provide either 'length' or 'end', not both")
+        raise CHIValueError("provide either 'length' or 'end', not both")
 
     if end is None:
         if isinstance(length, numbers.Number):
@@ -150,7 +151,7 @@ def lease_create_nodetype(*args, **kwargs):
     try:
         node_type = kwargs.pop("node_type")
     except KeyError:
-        raise ValueError("no node_type specified")
+        raise CHIValueError("no node_type specified")
     kwargs["node_resource_properties"] = ["==", "$node_type", node_type]
     return lease_create_args(*args, **kwargs)
 
@@ -234,7 +235,7 @@ class Lease(object):
     def __enter__(self):
         if self.lease is None:
             # don't support reuse in multiple with's.
-            raise RuntimeError("Lease context manager not reentrant")
+            raise ResourceError("Lease context manager not reentrant")
         self.wait()
         return self
 
@@ -323,7 +324,7 @@ class Lease(object):
             if self.ready:
                 break
         else:
-            raise RuntimeError("timeout, lease failed to start")
+            raise ServiceError("timeout, lease failed to start")
 
     def delete(self):
         """Deletes the lease"""
@@ -538,13 +539,13 @@ def _reservation_matching(lease_ref, match_fn, multiple=False):
     matches = [r for r in reservations if match_fn(r)]
 
     if not matches:
-        raise ValueError("No matching reservation found")
+        raise ResourceError("No matching reservation found")
 
     if multiple:
         return matches
     else:
         if len(matches) > 1:
-            raise ValueError("Multiple matching reservations found")
+            raise ResourceError("Multiple matching reservations found")
         return matches[0]
 
 
@@ -622,7 +623,7 @@ def add_fip_reservation(reservation_list, count=1):
 
 
 def add_device_reservation(
-    reservation_list, count=1, machine_name=None, device_model=None, device_name=None 
+    reservation_list, count=1, machine_name=None, device_model=None, device_name=None
 ):
     """Add an IoT/edge device reservation to a reservation list.
 
@@ -652,12 +653,12 @@ def add_device_reservation(
     resource_properties = []
     if device_name:
         if count > 1:
-            raise ValueError(
+            raise ResourceError(
                 "Cannot reserve multiple devices if device_name is a constraint."
             )
         resource_properties.append(["==", "$name", device_name])
     if machine_name:
-        resource_properties.append(["==", "$machine_name", machine_name]) 
+        resource_properties.append(["==", "$machine_name", machine_name])
     if device_model:
         resource_properties.append(["==", "$model", device_model])
 
@@ -734,9 +735,9 @@ def get_lease_id(lease_name) -> str:
     """
     matching = [l for l in blazar().lease.list() if l["name"] == lease_name]
     if not matching:
-        raise ValueError(f"No leases found for name {lease_name}")
+        raise CHIValueError(f"No leases found for name {lease_name}")
     elif len(matching) > 1:
-        raise ValueError(f"Multiple leases found for name {lease_name}")
+        raise ResourceError(f"Multiple leases found for name {lease_name}")
     return matching[0]["id"]
 
 
@@ -761,7 +762,7 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
         start_date = utcnow()
 
     if not reservations:
-        raise ValueError("No reservations provided.")
+        raise CHIValueError("No reservations provided.")
 
     try:
         return blazar().lease.create(
@@ -818,6 +819,6 @@ def wait_for_active(ref):
         if status == "ACTIVE":
             return lease
         elif status == "ERROR":
-            raise RuntimeError("Lease went into ERROR state")
+            raise ServiceError("Lease went into ERROR state")
         time.sleep(10)
-    raise TimeoutError("Lease failed to start")
+    raise ServiceError("Lease failed to start")

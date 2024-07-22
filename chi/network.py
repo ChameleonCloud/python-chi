@@ -1,4 +1,5 @@
 from .clients import neutron
+from .exception import CHIValueError, ResourceError
 
 from neutronclient.common.exceptions import NotFound
 
@@ -59,22 +60,22 @@ PUBLIC_NETWORK = 'public'
 def _resolve_id(resource, name) -> str:
     list_fn = getattr(neutron(), f'list_{resource}', None)
     if not callable(list_fn):
-        raise ValueError(f'Invalid resource type "{resource}"')
+        raise CHIValueError(f'Invalid resource type "{resource}"')
     resources = [
         x for x in list_fn()[resource]
         if x['name'] == name
     ]
     if not resources:
-        raise RuntimeError(f'No {resource} found with name {name}')
+        raise CHIValueError(f'No {resource} found with name {name}')
     elif len(resources) > 1:
-        raise RuntimeError(f'Found multiple {resource} with name {name}')
+        raise ResourceError(f'Found multiple {resource} with name {name}')
     return resources[0]['id']
 
 
 def _resolve_resource(resource, name_or_id) -> dict:
     get_fn = getattr(neutron(), f'show_{resource}', None)
     if not callable(get_fn):
-        raise ValueError(f'Invalid resource type "{resource}"')
+        raise CHIValueError(f'Invalid resource type "{resource}"')
     try:
         res = get_fn(name_or_id)
     except NotFound:
@@ -651,7 +652,7 @@ def get_free_floating_ip(allocate=True) -> dict:
         return fip
     except StopIteration:
         if not allocate:
-            raise RuntimeError(
+            raise ResourceError(
                 "No free floating IPs in project and not allocating a new one")
         return _neutron.create_floatingip({
             "floatingip": {
@@ -701,7 +702,7 @@ def get_floating_ip(ip_address) -> dict:
     for fip in ips:
         if fip['floating_ip_address'] == ip_address:
             return fip
-    raise Exception(f"Floating IP {ip_address} not found")
+    raise CHIValueError(f"Floating IP {ip_address} not found")
 
 
 def list_floating_ips() -> 'list[dict]':

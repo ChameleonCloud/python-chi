@@ -11,6 +11,7 @@ from novaclient.v2.servers import Server as NovaServer
 from openstack.compute.v2.server import Server as OpenStackServer
 
 from .clients import connection, glance, nova, neutron
+from .exception import CHIValueError, ResourceError, ServiceError
 from .context import get as get_from_context, session
 from .image import get_image, get_image_id
 from .keypair import Keypair
@@ -185,7 +186,7 @@ class Server(object):
             )
             self.server = self.conn.compute.create_server(**server_kwargs)
         else:
-            raise ValueError(
+            raise CHIValueError(
                 "Missing required argument: 'id' or 'lease' required.")
 
         self.id = self.server.id
@@ -321,7 +322,7 @@ def get_flavor_id(name) -> str:
     """
     flavor = next((f for f in nova().flavors.list() if f.name == name), None)
     if not flavor:
-        raise NotFound(f'No flavors found matching name {name}')
+        raise CHIValueError(f'No flavors found matching name {name}')
     return flavor
 
 
@@ -398,9 +399,9 @@ def get_server_id(name) -> str:
     """
     servers = [s for s in nova().servers.list() if s.name == name]
     if not servers:
-        raise ValueError(f'No matching servers found for name "{name}"')
+        raise CHIValueError(f'No matching servers found for name "{name}"')
     elif len(servers) > 1:
-        raise ValueError(f'Multiple matching servers found for name "{name}"')
+        raise ResourceError(f'Multiple matching servers found for name "{name}"')
     return servers[0].id
 
 
@@ -542,7 +543,7 @@ def wait_for_tcp(host, port, timeout=(60 * 20), sleep_time=5):
         except OSError as ex:
             time.sleep(sleep_time)
             if time.perf_counter() - start_time >= timeout:
-                raise TimeoutError((
+                raise ServiceError((
                     f'Waited too long for the port {port} on host {host} to '
                     'start accepting connections.')) from ex
 
@@ -637,7 +638,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         ValueError: if an invalid count is provided.
     """
     if count < 1:
-        raise ValueError('Must launch at least one server.')
+        raise CHIValueError('Must launch at least one server.')
     if not key_name:
         key_name = update_keypair().id
     if not network_id:
@@ -652,7 +653,7 @@ def create_server(server_name, reservation_id=None, key_name=None, network_id=No
         else:
             flavor_id = next((f.id for f in list_flavors()), None)
             if not flavor_id:
-                raise NotFound('Could not auto-select flavor to use')
+                raise ResourceError('Could not auto-select flavor to use')
 
     scheduler_hints = {}
     if reservation_id:

@@ -1,4 +1,5 @@
 from .clients import glance
+from .exception import CHIValueError, ResourceError
 
 from glanceclient.exc import NotFound
 
@@ -42,9 +43,9 @@ def get_image_id(name):
     """
     images = list(glance().images.list(filters={'name': name}))
     if not images:
-        raise ValueError(f'No images found matching name "{name}"')
+        raise CHIValueError(f'No images found matching name "{name}"')
     elif len(images) > 1:
-        raise ValueError(f'Multiple images found matching name "{name}"')
+        raise ResourceError(f'Multiple images found matching name "{name}"')
     return images[0].id
 
 
