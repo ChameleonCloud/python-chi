@@ -198,17 +198,7 @@ class Lease:
     Properties:
         events: List of events associated with the lease.
         status: The status of the lease.
-
     """
-
-    def __init__(self, name: str,
-                 start_date: datetime = None,
-                 end_date: datetime = None,
-                 duration: timedelta = None,
-                 lease_json: dict = None):
-        # Implementation details...
-class Lease:
-
     def __init__(self, name: str,
                  start_date: datetime = None,
                  end_date: datetime = None,
