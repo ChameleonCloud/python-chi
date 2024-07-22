@@ -161,6 +161,54 @@ def lease_create_nodetype(*args, **kwargs):
     return lease_create_args(*args, **kwargs)
 
 class Lease:
+    """
+    Represents a lease in the CHI system.
+
+    Args:
+        name (str): The name of the lease.
+        start_date (datetime, optional): The start date of the lease. Defaults to None.
+        end_date (datetime, optional): The end date of the lease. Defaults to None.
+        duration (timedelta, optional): The duration of the lease. Defaults to None.
+        lease_json (dict, optional): JSON representation of the lease. Defaults to None.
+
+    Attributes:
+        name (str): The name of the lease.
+        start_date (str): The start date of the lease in the format specified by BLAZAR_TIME_FORMAT.
+        end_date (str): The end date of the lease in the format specified by BLAZAR_TIME_FORMAT.
+        id (str): The ID of the lease.
+        status (str): The status of the lease.
+        user_id (str): The ID of the user associated with the lease.
+        project_id (str): The ID of the project associated with the lease.
+        created_at (datetime): The creation date of the lease.
+        node_reservations (list): List of node reservations associated with the lease.
+        fip_reservations (list): List of floating IP reservations associated with the lease.
+        network_reservations (list): List of network reservations associated with the lease.
+        _events (list): List of events associated with the lease.
+
+    Methods:
+        add_node_reservation: Adds a node reservation to the lease.
+        add_fip_reservation: Adds a floating IP reservation to the lease.
+        add_network_reservation: Adds a network reservation to the lease.
+        submit: Submits the lease for creation.
+        wait: Waits for the lease to reach a specific status.
+        refresh: Refreshes the lease data from the Blazar API.
+        delete: Deletes the lease.
+        show: Displays the lease details.
+
+    Properties:
+        events: List of events associated with the lease.
+        status: The status of the lease.
+
+    """
+
+    def __init__(self, name: str,
+                 start_date: datetime = None,
+                 end_date: datetime = None,
+                 duration: timedelta = None,
+                 lease_json: dict = None):
+        # Implementation details...
+class Lease:
+
     def __init__(self, name: str,
                  start_date: datetime = None,
                  end_date: datetime = None,
@@ -289,19 +337,25 @@ class Lease:
         while time.time() - start_time < timeout:
             self.refresh()
             if self.status.lower() == status.lower():
+                print(f"Lease {self.name} has reached status {self.status.lower()}")
                 return
             time.sleep(15)
-        raise TimeoutError(f"Lease did not reach '{status}' status within {timeout} seconds")
+        raise ServiceError(f"Lease did not reach '{status}' status within {timeout} seconds")
 
     def refresh(self):
-        lease_data = blazar().lease.get(self.id)
-        self._populate_from_json(lease_data)
+        if self.id:
+            lease_data = blazar().lease.get(self.id)
+            self._populate_from_json(lease_data)
+        else:
+            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
 
     def delete(self):
         if self.id:
             blazar().lease.delete(self.id)
             self.id = None
             self.status = "DELETED"
+        else:
+            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
 
     def show(self, type=["text", "widget"], wait_for_active=False):
         if wait_for_active:
