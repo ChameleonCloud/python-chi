@@ -30,52 +30,43 @@ class Node:
     uid: str
     version: str
 
-    def next_free_timeslot(self) -> datetime:
+    def next_free_timeslot(self) -> Tuple[datetime, Optional[datetime]]:
         """
-        (Not implemented yet) Finds the next available timeslot for the hardware.
+        Finds the next available timeslot for the hardware using the Blazar client.
 
         Returns:
             A tuple containing the start and end datetime of the next available timeslot.
-            If no timeslot is available, returns the end datetime of the last lease.
-
+            If no timeslot is available, returns (end_datetime_of_last_allocation, None).
         """
-        raise NotImplementedError()
-
+        raise NotImplementedError
         blazarclient = blazar()
 
-        # Get all leases
-        leases = blazarclient.lease.list()
+        # Get allocations for this specific host
+        allocations = blazarclient.allocation.get(resource_id=self.uid)
 
-        # Filter leases for this node
-        node_leases = [
-            lease for lease in leases
-            if any(r['resource_id'] == self.uid for r in lease.get('reservations', [])
-                   if r['resource_type'] == 'physical:host')
-        ]
-
-        # Sort leases by start time
-        node_leases.sort(key=lambda x: x['start_date'])
+        # Sort allocations by start time
+        allocations.sort(key=lambda x: x['start_date'])
 
         now = datetime.now(timezone.utc)
 
-        print(node_leases)
+        if not allocations:
+            return (now, None)
 
         # Check if there's a free slot now
-        if not node_leases or node_leases[0]['start_date'] > now:
-            return (now, node_leases[0]['start_date'] if node_leases else None)
+        if datetime.fromisoformat(allocations[0]['start_date']) > now:
+            return (now, datetime.fromisoformat(allocations[0]['start_date']))
 
         # Find the next free slot
-        for i in range(len(node_leases) - 1):
-            current_end = datetime.strptime(node_leases[i]['end_date'], "%Y-%m-%d %H:%M:%S")
-            next_start = datetime.strptime(node_leases[i+1]['start_date'], "%Y-%m-%d %H:%M:%S")
+        for i in range(len(allocations) - 1):
+            current_end = datetime.fromisoformat(allocations[i]['end_date'])
+            next_start = datetime.fromisoformat(allocations[i+1]['start_date'])
 
             if current_end < next_start:
                 return (current_end, next_start)
 
-        # If no free slot found, return the end of the last lease
-        last_end = datetime.strptime(node_leases[-1]['end_date'], "%Y-%m-%d %H:%M:%S")
-
-        return last_end
+        # If no free slot found, return the end of the last allocation
+        last_end = datetime.fromisoformat(allocations[-1]['end_date'])
+        return (last_end, None)
 
 def _call_api(endpoint):
     url = "{0}/{1}.{2}".format(RESOURCE_API_URL, endpoint, "json")
