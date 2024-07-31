@@ -1,9 +1,12 @@
 from datetime import datetime
 from operator import attrgetter
+from typing import Dict, List, Optional
+from IPython.display import display, HTML
 import socket
 import time
+import os
 
-from novaclient.exceptions import NotFound
+from novaclient.exceptions import NotFound, Conflict
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
@@ -12,10 +15,10 @@ from openstack.compute.v2.server import Server as OpenStackServer
 
 from .clients import connection, glance, nova, neutron
 from .exception import CHIValueError, ResourceError, ServiceError
-from .context import get as get_from_context, session
+from .context import get as get_from_context, session, DEFAULT_IMAGE_NAME, _is_ipynb
 from .image import get_image, get_image_id
 from .keypair import Keypair
-from .network import (get_network_id, get_or_create_floating_ip,
+from .network import (get_network, get_network_id, get_or_create_floating_ip,
                       get_floating_ip, get_free_floating_ip)
 from .util import random_base32, sshkey_fingerprint
 
@@ -43,9 +46,12 @@ __all__ = [
     'wait_for_tcp',
 
     'update_keypair',
+
+    'get_keypair',
+    'list_keypair',
 ]
 
-DEFAULT_IMAGE = 'CC-Ubuntu20.04'
+DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
 DEFAULT_NETWORK = 'sharednet1'
 BAREMETAL_FLAVOR = 'baremetal'
 
@@ -70,10 +76,11 @@ def instance_create_args(
 
     server_args = {
         "name": name,
-        "flavor": flavor,
-        "image": image,
+        "flavorRef": get_flavor_id(flavor),
+        "imageRef": get_image_id(image),
         "scheduler_hints": {"reservation": reservation, },
         "key_name": key,
+        "networks":net_ids,
     }
 
     if net_ids is None:
@@ -85,210 +92,406 @@ def instance_create_args(
         # https://github.com/ChameleonCloud/horizon/blob/stable/liberty/openstack_dashboard/dashboards/project/instances/workflows/create_instance.py#L943
         # appears to POST a JSON akin to
         # {"server": {..., "networks": [{"uuid": "e8c33574-5423-436c-a45b-5bab78071b8a"}] ...}, "os:scheduler_hints": ...},
-        server_args["nics"] = [
-            {"net-id": netid, "v4-fixed-ip": ""} for netid in net_ids
+        server_args["networks"] = [
+            {"uuid": netid} for netid in net_ids
         ]
 
     server_args.update(kwargs)
     return server_args
 
+class Server:
+    """
+    Represents an instance.
 
-class Server(object):
-    """A wrapper object referring to a server instance.
-
-    This class is helpful if you want to use a more object-oriented programming
-    approach when building your infrastrucutre. With the Server abstraction,
-    you can for example do the following:
-
-    .. code-block:: python
-
-        with Server(lease=my_lease, image=my_image) as server:
-            # When entering this block, the server is guaranteed to be
-            # in the "ACTIVE" state if it launched successfully.
-            server.associate_floating_ip()
-            # Interact with the server (via, e.g., SSH), then...
-        # When the block exits, the server will be terminated and deleted
-
-    The above example uses a context manager. The class can also be used
-    without a context manager:
-
-    .. code-block:: python
-
-        # Triggers the launch of the server instance
-        server = Server(lease=my_lease, image=my_image)
-        # Wait for server to be active
-        server.wait()
-        server.associate_floating_ip()
-        # Interact with the server, then...
-        server.delete()
+    Args:
+        name (str): The name of the server.
+        reservation_id (Optional[str]): The reservation ID associated with the server. Defaults to None.
+        image_name (str): The name of the image to use for the server. Defaults to DEFAULT_IMAGE_NAME.
+        image (Optional[str]): The image ID or name to use for the server. Defaults to None.
+        flavor_name (str): The name of the flavor to use for the server. Defaults to BAREMETAL_FLAVOR.
+        key_name (str): The name of the keypair to use for the server. Defaults to None.
+        keypair (Optional[Keypair]): The keypair object to use for the server. Defaults to None.
+        network_name (str): The name of the network to use for the server. Defaults to DEFAULT_NETWORK.
 
     Attributes:
-        id (str): The ID of an existing server instance. Use this if you have
-            already launched the instance and just want a convenient wrapper
-            object for it.
-        lease (Lease): The Lease the instance will be launched under.
-        key (str): The name of the key pair to associate with the image. This
-            is only applicable if launching the image; key pairs cannot be
-            added to a server that has already been launched and wrapped via
-            the ``id`` attribute.
-        image (str): The name or ID of the disk iage to use.
-        name (str): A name to give the new instance. (Defaults to an
-            auto-generated name.)
-        net_ids (list[str]): A list of network IDs to associate the instance
-            with. The instance will obtain an IP address on each network
-            during boot.
-
-            .. note::
-               For bare metal instances, the number of network IDs cannot
-               exceed the number of enabled NICs on the bare metal node.
-
-        kwargs: Additional keyword arguments to pass to Nova's server
-            :meth:`~novaclient.v2.servers.ServerManager.create` function.
+        name (str): The name of the server.
+        reservation_id (Optional[str]): The reservation ID associated with the server.
+        image_name (str): The name of the image used for the server.
+        flavor_name (str): The name of the flavor used for the server.
+        keypair (Optional[Keypair]): The keypair object used for the server.
+        network_name (str): The name of the network used for the server.
+        id (Optional[str]): The ID of the server.
+        _addresses (Dict[str, List[str]]): The IP addresses associated with the server.
+        created_at (Optional[datetime]): The timestamp when the server was created.
+        host_id (Optional[str]): The ID of the host where the server is running.
+        host_status (Optional[str]): The status of the host where the server is running.
+        hypervisor_hostname (Optional[str]): The hostname of the hypervisor where the server is running.
+        is_locked (bool): Indicates whether the server is locked.
+        _status (Optional[str]): The status of the server.
+        fault (Optional[dict]): The fault information of the server.
     """
 
-    def __init__(self, id=None, lease=None, key=None, image=DEFAULT_IMAGE,
-                 **kwargs):
-        kwargs.setdefault("session", session())
-        self.session = kwargs.pop("session")
-        self.conn = connection(session=self.session)
-        self.neutron = neutron(session=self.session)
-        self.nova = nova(session=self.session)
-        self.glance = glance(session=self.session)
-        self.image = get_image(image)
-        self.flavor = show_flavor_by_name(BAREMETAL_FLAVOR)
+    def __init__(self, name: str, reservation_id: Optional[str] = None, image_name: str = DEFAULT_IMAGE_NAME,
+                 image: Optional[str] = None, flavor_name: str = BAREMETAL_FLAVOR,
+                 key_name: str = None, keypair: Optional[Keypair] = None,
+                 network_name: str = DEFAULT_NETWORK):
+        self.name = name
+        self.reservation_id = reservation_id or None
+        # Add this once chi.image is implemented
+        # self.image = image or get_image(image_name)
+        self.image_name = image_name
+        self.flavor_name = flavor_name
 
-        self.ip = None
-        self._fip = None
-        self._fip_created = False
-        self._preexisting = False
-
-        kwargs.setdefault("_no_clean", False)
-        self._noclean = kwargs.pop("_no_clean")
-
-        net_ids = kwargs.pop("net_ids", None)
-        net_name = kwargs.pop("net_name", DEFAULT_NETWORK)
-        if net_ids is None and net_name is not None:
-            net_ids = [get_network_id(net_name)]
-
-        if id is not None:
-            self._preexisting = True
-            self.server = self.conn.compute.get_server(id)
-        elif lease is not None:
-            if key is None:
-                key = Keypair().key_name
-            server_kwargs = instance_create_args(
-                lease.node_reservation,
-                image=self.image,
-                flavor=self.flavor,
-                key=key,
-                net_ids=net_ids,
-                **kwargs
-            )
-            self.server = self.conn.compute.create_server(**server_kwargs)
+        if keypair:
+            self.keypair = keypair
         else:
-            raise CHIValueError(
-                "Missing required argument: 'id' or 'lease' required.")
+            update_keypair()
+            self.keypair = get_keypair(key_name or get_from_context("keypair_name"))
 
-        self.id = self.server.id
-        self.name = self.server.name
+        self.network_name = network_name
 
-    def __repr__(self):
-        return "<{} '{}' ({})>".format(self.__class__.__name__, self.name, self.id)
+        self.conn = connection(session=session())
 
-    def __enter__(self):
-        self.wait()
-        return self
+        self.id: Optional[str] = None
+        self._addresses: Dict[str, List[str]] = {}
+        self.created_at: Optional[datetime] = None
+        self.host_id: Optional[str] = None
+        self.host_status: Optional[str] = None
+        self.hypervisor_hostname: Optional[str] = None
+        self.is_locked: bool = False
+        self._status: Optional[str] = None
+        self.fault: Optional[dict] = None
 
-    def __exit__(self, exc_type, exc, exc_tb):
-        if exc is not None and self._noclean:
-            print("Instance existing uncleanly (noclean = True).")
-            return
+    @property
+    def addresses(self) -> Dict[str, List[str]]:
+        if self.id:
+            self.refresh()
+        return self._addresses
 
-        self.disassociate_floating_ip()
-        if not self._preexisting:
-            self.delete()
+    @property
+    def status(self) -> Optional[str]:
+        if self.id:
+            self.refresh()
+        return self._status
+
+    def submit(self, wait_for_active: bool = True, show: str = "widget",
+               idempotent: bool = False) -> 'Server':
+        """
+        Submits a server creation request to the Nova API.
+
+        Args:
+            wait_for_active (bool, optional): Whether to wait for the server to become active before returning. Defaults to True.
+            show (str, optional): The type of server information to display after creation. Defaults to "widget".
+            idempotent (bool, optional): Whether to create the server only if it doesn't already exist. Defaults to False.
+
+        Returns:
+            Server: The created server object.
+
+        Raises:
+            Conflict: If the server creation fails due to a conflict and idempotent mode is not enabled.
+        """
+        nova_client = nova()
+
+        if idempotent:
+            existing_server = nova_client.servers.get(get_server_id(self.name))
+            if existing_server:
+                server = Server._from_nova_server(existing_server)
+                if wait_for_active:
+                    self.wait()
+                if show:
+                    server.show(type=show)
+                return server
+
+        server_args = instance_create_args(reservation=self.reservation_id,
+                                        name=self.name,
+                                        image=self.image_name,
+                                        flavor=self.flavor_name,
+                                        key=self.keypair.name,
+                                        net_ids=[get_network_id(DEFAULT_NETWORK)])
+        try:
+            nova_server = self.conn.compute.create_server(**server_args)
+        except Conflict as e:
+            if idempotent:
+                # If creation failed due to conflict and we're in idempotent mode,
+                # try to fetch the existing server
+                existing_server = nova_client.servers.get(get_server_id(self.name))
+                if existing_server:
+                    server = Server._from_nova_server(existing_server)
+                    return server
+            raise e  # Re-raise the exception if not handled
+
+        server = Server._from_nova_server(nova_server)
+
+        if wait_for_active:
+            self.wait()
+
+        if show:
+            server.show(type=show)
+
+        return server
+
+    @classmethod
+    def _from_nova_server(cls, nova_server):
+        try:
+            image_id = nova_server.image['id']
+        except Exception:
+            image_id = nova_server.image_id
+
+        try:
+            flavor_id = nova_server.flavor['id']
+        except Exception:
+            flavor_id = nova_server.flavor_id
+
+        try:
+            network_id = list(nova_server.networks.keys())[0] if len(nova_server.networks) > 0 else None
+        except Exception:
+            network_id = nova_server.networks[0]['uuid'] if len(nova_server.networks) > 0 else None
+
+        server = cls(name=nova_server.name,
+                     reservation_id=None,
+                     image_name=get_image(image_id).name,
+                     flavor_name=get_flavor(flavor_id).name,
+                     key_name=nova_server.key_name,
+                     network_name=get_network(network_id)['name'] if network_id is not None else None )
+
+        try:
+            created_at = nova_server.created
+        except Exception:
+            created_at = nova_server.created_at
+
+        try:
+            host_id = nova_server.hostId
+        except Exception:
+            host_id = nova_server.host_id
+
+        try:
+            host_status = nova_server.host_status
+        except Exception:
+            host_status = None
+
+        try:
+            hypervisor_hostname = nova_server.hypervisor_hostname
+        except Exception:
+            hypervisor_hostname = None
+
+        try:
+            is_locked = nova_server.is_locked
+        except Exception:
+            is_locked = None
+
+        server.id = nova_server.id
+        server._status = nova_server.status
+        server._addresses = nova_server.addresses
+        server.created_at = created_at
+        server.host_id = host_id
+        server.host_status = host_status
+        server.hypervisor_hostname = hypervisor_hostname
+        server.is_locked = is_locked
+        server.fault = connection(session()).compute.get_server(get_server_id(server.name)).fault
+
+        return server
+
+    def delete(self) -> None:
+        delete_server(self.id)
 
     def refresh(self):
-        """Poll the latest state of the server instance."""
-        now = datetime.now()
+        """
+        Refreshes the server's information by retrieving the latest details from the server provider.
+
+        Raises:
+            ResourceError: If the server refresh fails.
+        """
         try:
-            lr = self._last_refresh
-        except AttributeError:
-            pass  # expected failure on first pass
-        else:
-            # limit refreshes to once/sec.
-            if (now - lr).total_seconds() < 1:
+            nova_server = nova().servers.get(get_server_id(self.name))
+            conn_server = self.conn.compute.get_server(get_server_id(self.name))
+
+
+            self.id = nova_server.id
+            self._status = nova_server.status
+            self._addresses = nova_server.addresses
+            self.created_at = nova_server.created
+            self.host_id = nova_server.hostId
+            self.host_status = conn_server.host_status
+            self.hypervisor_hostname = conn_server.hypervisor_hostname
+            self.is_locked = conn_server.is_locked
+            self.fault = conn_server.fault
+        except Exception as e:
+            raise ResourceError(f"Could not refresh server: {e}")
+
+    def wait(self, status: str = "ACTIVE") -> None:
+        """
+        Waits for the server's status to reach the specified status.
+
+        Args:
+            status (str): The status to wait for. Defaults to "ACTIVE".
+
+        Raises:
+            ServiceError: If the server does not reach the specified status within the timeout period.
+
+        Returns:
+            None
+        """
+        print(f"Waiting for server {self.name}'s status to turn to {status}. This can take up to 18 minutes")
+        timeout = 1800  # 12 minutes
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            self.refresh()
+            if self.status == status.upper() or self.status == "ERROR":
+                print(f"Server has moved to status {self.status}")
                 return
+            time.sleep(5)  # Wait for 5 seconds before checking again
+        raise ServiceError(f"Timeout waiting for server to reach {status} status")
 
-        self.server = self.conn.compute.get_server(self.server)
-        self._last_refresh = now
-
-    @property
-    def status(self) -> str:
-        """Get the instance status."""
-        self.refresh()
-        return self.server.status
-
-    @property
-    def ready(self) -> bool:
-        """Check if the instance is marked as active."""
-        return self.status == "ACTIVE"
-
-    @property
-    def error(self) -> bool:
-        """Check if the instance is in an error state."""
-        return self.status == "ERROR"
-
-    def wait(self):
-        """Wait for the server instance to finish launching.
-
-        If the server goes into an error state, this function will return early.
+    def show(self, type: str = "text", wait_for_active: bool = False) -> None:
         """
-        self.conn.compute.wait_for_server(self.server, wait=(60 * 20))
+        Display the content of the server.
 
-    def associate_floating_ip(self):
-        """Attach a floating IP to this server instance."""
-        if self.ip is not None:
-            return self.ip
+        Args:
+            type (str, optional): The type of content to display. options are ["text","widget"]. Defaults to "text".
+            wait_for_active (bool, optional): Whether to wait for the server to be active before displaying the content. Defaults to False.
 
-        self._fip, self._fip_created = get_or_create_floating_ip()
-        self.ip = self._fip["floating_ip_address"]
-        self.conn.compute.add_floating_ip_to_server(self.server.id, self.ip)
-        return self.ip
+        Raises:
+            CHIValueError: If an invalid show type is provided.
 
-    def disassociate_floating_ip(self):
-        """Detach the floating IP attached to this server instance, if any."""
-        if self.ip is None:
-            return
-
-        self.conn.compute.remove_floating_ip_from_server(
-            self.server.id, self.ip)
-        if self._fip_created:
-            self.neutron.delete_floatingip(self._fip["id"])
-
-        self.ip = None
-        self._fip = None
-        self._fip_created = False
-
-    def delete(self):
-        """Delete this server instance."""
-        self.conn.compute.delete_server(self.server)
-        self.conn.compute.wait_for_delete(self.server)
-
-    def rebuild(self, image_ref):
-        """Rebuild this server instance.
-
-        .. note::
-           For bare metal instances, this effectively redeploys to the host and
-           overwrites the local disk.
+        Returns:
+            None
         """
-        self.image = get_image(image_ref)
-        self.conn.compute.rebuild_server(self.server, image=self.image.id)
+        if wait_for_active:
+            self.wait("ACTIVE")
 
+        if type == "text":
+            self._show_text(self)
+        elif type == "widget" and _is_ipynb():
+            self._show_widget(self)
+        else:
+            raise CHIValueError("Invalid show type. Use 'text' or 'widget'.")
+
+    def _show_text(self, server):
+        print(f"Server: {server.name}")
+        print(f"  ID: {server.id}")
+        print(f"  Status: {server.status}")
+        print(f"  Image Name: {server.image_name}")
+        print(f"  Flavor Name: {server.flavor_name}")
+        print(f"  Network Name: {server.network_name}")
+        print(f"  Addresses: {server.addresses}")
+        print(f"  Created at: {server.created_at}")
+        print(f"  Keypair: {server.keypair.name if server.keypair else 'N/A'}")
+        print(f"  Host ID: {server.host_id}")
+        print(f"  Reservation ID: {server.reservation_id}")
+        print(f"  Host Status: {server.host_status}")
+        print(f"  Hypervisor Hostname: {server.hypervisor_hostname}")
+        print(f"  Is Locked: {server.is_locked}")
+        print(f"  Fault: {server.fault}")
+
+    def _show_widget(self, server):
+        html = "<table style='border-collapse: collapse; width: 100%;'>"
+        html += "<tr style='background-color: #f2f2f2;'>"
+        html += "<th style='border: 1px solid #ddd; padding: 8px;'>Attribute</th>"
+        html += f"<th style='border: 1px solid #ddd; padding: 8px;'>{server.name}</th>"
+        html += "</tr>"
+
+        attributes = [
+            'id', 'status', 'image_name', 'flavor_name', 'addresses', 'network_name',
+            'created_at', 'keypair', 'reservation_id', 'host_id', 'host_status',
+            'hypervisor_hostname', 'is_locked', 'fault'
+        ]
+
+        for attr in attributes:
+            html += "<tr>"
+            html += f"<td style='border: 1px solid #ddd; padding: 8px;'>{attr.replace('_', ' ').title()}</td>"
+            value = getattr(server, attr)
+            if attr == 'addresses':
+                value = self._format_addresses(value)
+            elif attr == 'keypair':
+                value = value.name if value else 'N/A'
+            html += f"<td style='border: 1px solid #ddd; padding: 8px;'>{value}</td>"
+            html += "</tr>"
+
+        html += "</table>"
+        display(HTML(html))
+
+    def _format_addresses(self, addresses):
+        formatted = ""
+        for network, address_list in addresses.items():
+            formatted += f"<strong>{network}:</strong><br>"
+            for address in address_list:
+                formatted += (f"&nbsp;&nbsp;IP: {address['addr']} (v{address['version']})<br>"
+                              f"&nbsp;&nbsp;Type: {address['OS-EXT-IPS:type']}<br>"
+                              f"&nbsp;&nbsp;MAC: {address['OS-EXT-IPS-MAC:mac_addr']}<br>")
+        return formatted
+
+    def associate_floating_ip(self, fip: Optional[str] = None) -> None:
+        """
+        Associates a floating IP with the server.
+
+        Args:
+            fip (str, optional): The floating IP to associate with the server. If not provided, a new floating IP will be allocated.
+
+        Returns:
+            None
+        """
+        associate_floating_ip(self.id, fip)
+
+    def detach_floating_ip(self, fip: str) -> None:
+        """
+        Detaches a floating IP from the server.
+
+        Args:
+            fip (str): The floating IP to detach.
+
+        Returns:
+            None
+        """
+        detach_floating_ip(self.id, fip)
+
+    def check_connectivity(self, wait: bool = True, port: int = 22, timeout: int = 500,
+                           type: Optional[str] = "widget") -> bool:
+        # Implementation for checking server connectivity
+        pass
+
+    def upload(self, file: str, remote_path: str = "") -> None:
+        # Implementation for uploading files to the server
+        pass
+
+    def execute(self, command: str):
+        # Implementation for executing commands on the server
+        pass
 
 ##########
 # Flavors
 ##########
+
+class Flavor:
+    """
+    Represents a flavor in the system.
+
+    Attributes:
+        name (str): The name of the flavor.
+        disk (int): The disk size in GB.
+        ram (int): The RAM size in MB.
+        vcpus (int): The number of virtual CPUs.
+    """
+
+    def __init__(self, name: str, disk: int, ram: int, vcpus: int):
+        self.name = name
+        self.disk = disk
+        self.ram = ram
+        self.vcpus = vcpus
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} '{self.name}' (disk={self.disk}) (ram={self.ram}) (vcpus={self.vcpus})>"
+
+
+def list_flavors() -> List[Flavor]:
+    """Get a list of all available flavors.
+
+    Returns:
+        A list of all flavors.
+    """
+    nova_client = nova()
+    flavors = nova_client.flavors.list()
+    return [Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors]
+
 
 def get_flavor(ref) -> NovaFlavor:
     """Get a flavor by its ID or name.
@@ -323,7 +526,7 @@ def get_flavor_id(name) -> str:
     flavor = next((f for f in nova().flavors.list() if f.name == name), None)
     if not flavor:
         raise CHIValueError(f'No flavors found matching name {name}')
-    return flavor
+    return flavor.id
 
 
 def show_flavor(flavor_id) -> NovaFlavor:
@@ -354,35 +557,38 @@ def show_flavor_by_name(name) -> NovaFlavor:
     return show_flavor(flavor_id)
 
 
-def list_flavors() -> 'list[NovaFlavor]':
-    """Get a list of all available flavors.
-
-    Returns:
-        A list of all flavors.
-    """
-    return nova().flavors.list()
-
-
 ##########
 # Servers
 ##########
 
-def get_server(ref) -> NovaServer:
-    """Get a server by its ID.
+from typing import List
+
+def list_servers() -> List[Server]:
+    """
+    Returns a list of all servers in the current project.
+
+    :return: A list of Server objects representing the servers.
+    """
+    nova_servers = nova().servers.list()
+    servers = [Server._from_nova_server(server) for server in nova_servers]
+    return servers
+
+def get_server(name: str) -> Server:
+    """
+    Retrieves a server object by its name.
 
     Args:
-        ref (str): The ID or name of the server.
+        name (str): The name of the server to retrieve.
 
     Returns:
-        The server matching the ID.
+        Server: The server object corresponding to the given name.
 
     Raises:
-        NotFound: If the server could not be found.
+        Exception: If the server with the given name does not exist.
+
     """
-    try:
-        return show_server(ref)
-    except NotFound:
-        return show_server(get_server_id(ref))
+    nova_server = nova().servers.get(get_server_id(name))
+    return Server._from_nova_server(nova_server)
 
 
 def get_server_id(name) -> str:
@@ -551,6 +757,48 @@ def wait_for_tcp(host, port, timeout=(60 * 20), sleep_time=5):
 # Key pairs
 ############
 
+class Keypair:
+    """
+    Represents a keypair object.
+
+    Attributes:
+        name (str): The name of the keypair.
+        public_key (str): The public key associated with the keypair.
+    """
+    def __init__(self, name: str, public_key: str):
+        self.name = name
+        self.public_key = public_key
+    def __repr__(self):
+        return f"<{self.__class__.__name__} '{self.name}' ({self.public_key})>"
+
+def get_keypair(name=None) -> Keypair:
+    """
+    Retrieves a keypair by name.
+
+    Args:
+        name (str, optional): The name of the keypair to retrieve. If not provided,
+            it will use the JupyterHub keypair for the current user.
+
+    Returns:
+        Keypair: An instance of the Keypair class representing the retrieved keypair.
+    """
+    if name is None:
+        name = get_from_context("keypair_name")
+
+    nova_client = nova()
+    keypair = nova_client.keypairs.get(name)
+    return Keypair(name=keypair.name, public_key=keypair.public_key)
+
+def list_keypair() -> List[Keypair]:
+    """
+    Retrieve a list of keypairs from the Nova client.
+
+    Returns:
+        A list of Keypair objects, containing the name and public key of each keypair.
+    """
+    nova_client = nova()
+    keypairs = nova_client.keypairs.list()
+    return [Keypair(name=kp.name, public_key=kp.public_key) for kp in keypairs]
 
 def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
     """Update a key pair's public key.
@@ -591,7 +839,6 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
     except NotFound:
         return _nova.keypairs.create(
             key_name, public_key=public_key, key_type="ssh")
-
 
 ##########
 # Wizards

@@ -269,7 +269,19 @@ class Lease:
                              node_type: str = None,
                              node_name: str = None,
                              nodes: List[Node] = None):
+        """
+        Add a node reservation to the lease.
 
+        Parameters:
+        - amount (int): The number of nodes to reserve.
+        - node_type (str): The type of nodes to reserve.
+        - node_name (str): The name of the node to reserve.
+        - nodes (List[Node]): A list of Node objects to reserve.
+
+        Raises:
+        - CHIValueError: If nodes are specified, no other arguments should be included.
+
+        """
         if nodes:
             if any([amount, node_type, node_name]):
                 raise CHIValueError("When specifying nodes, no other arguments should be included")
@@ -283,6 +295,15 @@ class Lease:
                                  node_name=node_name)
 
     def add_fip_reservation(self, amount: int):
+        """
+        Add a reservation for a floating IP address to the list of FIP reservations.
+
+        Args:
+            amount (int): The number of reservations to add.
+
+        Returns:
+            None
+        """
         add_fip_reservation(reservation_list=self.fip_reservations,
                             count=amount)
 
@@ -290,6 +311,14 @@ class Lease:
                                 network_name: str,
                                 usage_type: str = None,
                                 stitch_provider: str = None):
+        """
+        Add a network reservation to the list of network reservations.
+
+        Args:
+            network_name (str): The name of the network to be reserved.
+            usage_type (str, optional): The type of usage for the network reservation. Defaults to None.
+            stitch_provider (str, optional): The stitch provider for the network reservation. Defaults to None.
+        """
         add_network_reservation(reservation_list=self.network_reservations,
                                 network_name=network_name,
                                 usage_type=usage_type,
@@ -300,6 +329,21 @@ class Lease:
                wait_timeout: int = 300,
                show: List[str] = ["widget", "text"],
                idempotent: bool = False):
+        """
+        Submits the lease for creation.
+
+        Args:
+            wait_for_active (bool, optional): Whether to wait for the lease to become active. Defaults to True.
+            wait_timeout (int, optional): The maximum time to wait for the lease to become active, in seconds. Defaults to 300.
+            show (List[str], optional): The types of lease information to display. Defaults to ["widget", "text"].
+            idempotent (bool, optional): Whether to create the lease only if it doesn't already exist. Defaults to False.
+
+        Raises:
+            ResourceError: If unable to create the lease.
+
+        Returns:
+            None
+        """
         if idempotent:
             existing_lease = self._get_existing_lease()
             if existing_lease:
