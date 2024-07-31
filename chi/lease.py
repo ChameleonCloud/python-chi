@@ -5,7 +5,7 @@ import re
 import sys
 import time
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional, Union
 from ipywidgets import HTML
 from IPython.display import display
 from blazarclient.exception import BlazarClientException
@@ -199,26 +199,12 @@ class Lease:
         events: List of events associated with the lease.
         status: The status of the lease.
     """
-    def __init__(self, name: str,
-                 start_date: datetime = None,
-                 end_date: datetime = None,
-                 duration: timedelta = None,
-                 lease_json: dict = None):
-        self.name = name
-        if start_date:
-            self.start_date = start_date.strftime(BLAZAR_TIME_FORMAT)
-        else:
-            self.start_date = (utcnow() + timedelta(minutes=1)).strftime(BLAZAR_TIME_FORMAT)
-
-        if end_date and duration:
-            raise CHIValueError("Specify either end_date or duration, not both")
-        elif end_date:
-            self.end_date = end_date.strftime(BLAZAR_TIME_FORMAT)
-        elif duration:
-            self.start_date, self.end_date = lease_duration(days=duration.days)
-        else:
-            raise CHIValueError("Either end_date or duration must be specified")
-
+    def __init__(self,
+                    name: Optional[str] = None,
+                    start_date: Optional[datetime] = None,
+                    end_date: Optional[datetime] = None,
+                    duration: Optional[timedelta] = None,
+                    lease_json: Optional[dict] = None):
         self.id = None
         self.status = None
         self.user_id = None
@@ -232,8 +218,27 @@ class Lease:
 
         if lease_json:
             self._populate_from_json(lease_json)
+        else:
+            if name is None:
+                raise CHIValueError("Name must be specified when lease_json is not provided")
+
+            self.name = name
+            if start_date:
+                self.start_date = start_date.strftime(BLAZAR_TIME_FORMAT)
+            else:
+                self.start_date = 'now'
+
+            if end_date and duration:
+                raise CHIValueError("Specify either end_date or duration, not both")
+            elif end_date:
+                self.end_date = end_date.strftime(BLAZAR_TIME_FORMAT)
+            elif duration:
+                self.start_date, self.end_date = lease_duration(days=duration.days)
+            else:
+                raise CHIValueError("Either end_date or duration must be specified")
 
     def _populate_from_json(self, lease_json):
+        self.name = lease_json.get('name')
         self.id = lease_json.get('id')
         self.status = lease_json.get('status')
         self.user_id = lease_json.get('user_id')
@@ -308,7 +313,10 @@ class Lease:
                                 start_date=self.start_date,
                                 end_date=self.end_date)
 
-        self._populate_from_json(response)
+        if response:
+            self._populate_from_json(response)
+        else:
+            raise ResourceError("Unable to make lease")
 
         if wait_for_active:
             self.wait(status="active", timeout=wait_timeout)
@@ -815,34 +823,51 @@ def lease_duration(days=1, hours=0):
 # Leases
 #########
 
-def list_leases() -> List[dict]:
-    """Return a list of user leases.
+def list_leases() -> List[Lease]:
+    """
+    Return a list of user leases.
 
     Returns:
-        A list of user leases.
+        A list of Lease objects representing user leases.
     """
-    leases = blazar().lease.list()
-    pprint.pprint(leases)
+    blazar_client = blazar()
+    lease_dicts = blazar_client.lease.list()
+
+    leases = []
+    for lease_dict in lease_dicts:
+        lease = Lease(lease_json=lease_dict)
+        leases.append(lease)
+
     return leases
 
-def get_lease(ref) -> dict:
-    """Get a lease by its ID or name.
+def get_lease(ref: str) -> Union[Lease, None]:
+    """
+    Get a lease by its ID or name.
 
     Args:
         ref (str): The ID or name of the lease.
 
     Returns:
-        The lease matching the ID or name.
+        A Lease object matching the ID or name, or None if not found.
     """
+    blazar_client = blazar()
+
     try:
-        return blazar().lease.get(ref)
+        lease_dict = blazar_client.lease.get(ref)
+        return Lease(lease_json=lease_dict)
     except BlazarClientException as err:
         # Blazar's exception class is a bit odd and stores the actual code
         # in 'kwargs'. The 'code' attribute on the exception is just the default
         # code. Prefer to use .kwargs['code'] if present, fall back to .code
         code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
         if code == 404:
-            return blazar().lease.get(get_lease_id(ref))
+            try:
+                lease_id = get_lease_id(ref)
+                lease_dict = blazar_client.lease.get(lease_id)
+                return Lease(lease_json=lease_dict)
+            except BlazarClientException:
+                # If we still can't find the lease, return None
+                return None
         else:
             raise
 
