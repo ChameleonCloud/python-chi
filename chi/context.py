@@ -181,6 +181,7 @@ def _check_deprecated(key):
     )
     return deprecated_extra_opts[key]
 
+
 def _is_ipynb() -> bool:
     try:
         from IPython import get_ipython
