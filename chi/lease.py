@@ -398,8 +398,10 @@ class Lease:
         </ul>
         """
 
+
         widget = HTML(html_content)
         display(widget)
+
 
     def _show_text(self):
         print(f"Lease Details:")

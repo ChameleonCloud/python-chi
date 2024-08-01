@@ -200,6 +200,16 @@ def _is_ipynb() -> bool:
     return True
 
 
+def _is_ipynb() -> bool:
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' not in get_ipython().config:
+            return False
+    except ImportError:
+        return False
+    return True
+
+
 def set(key, value):
     """Set a context parameter by name.
 
