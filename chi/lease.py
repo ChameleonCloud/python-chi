@@ -1,16 +1,19 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import numbers
 import re
 import sys
 import time
-from typing import TYPE_CHECKING
 
+from typing import TYPE_CHECKING, List, Optional, Union
+from ipywidgets import HTML
+from IPython.display import display
 from blazarclient.exception import BlazarClientException
 
 from .clients import blazar, neutron
 from .exception import CHIValueError, ResourceError, ServiceError
-from .context import get as get_from_context, session
+from .context import get as get_from_context, session, _is_ipynb
+from .hardware import Node
 from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
 from .server import Server, ServerError
 from .util import random_base32, utcnow
@@ -19,6 +22,7 @@ import logging
 
 if TYPE_CHECKING:
     from typing import Pattern
+import pprint
 
 LOG = logging.getLogger(__name__)
 
@@ -38,6 +42,7 @@ __all__ = [
     "get_device_reservation",
     "get_reserved_floating_ips",
     "lease_duration",
+    "list_leases",
     "get_lease",
     "get_lease_id",
     "create_lease",
@@ -155,192 +160,292 @@ def lease_create_nodetype(*args, **kwargs):
     kwargs["node_resource_properties"] = ["==", "$node_type", node_type]
     return lease_create_args(*args, **kwargs)
 
-
-class Lease(object):
+class Lease:
     """
-    Creates and manages a lease, optionally with a context manager (``with``).
+    Represents a lease in the CHI system.
 
-    .. code-block:: python
+    Args:
+        name (str): The name of the lease.
+        start_date (datetime, optional): The start date of the lease. Defaults to None.
+        end_date (datetime, optional): The end date of the lease. Defaults to None.
+        duration (timedelta, optional): The duration of the lease. Defaults to None.
+        lease_json (dict, optional): JSON representation of the lease. Defaults to None.
 
-        with Lease(session, node_type='compute_skylake') as lease:
-            instance = lease.create_server()
-            ...
+    Attributes:
+        name (str): The name of the lease.
+        start_date (str): The start date of the lease in the format specified by BLAZAR_TIME_FORMAT.
+        end_date (str): The end date of the lease in the format specified by BLAZAR_TIME_FORMAT.
+        id (str): The ID of the lease.
+        status (str): The status of the lease.
+        user_id (str): The ID of the user associated with the lease.
+        project_id (str): The ID of the project associated with the lease.
+        created_at (datetime): The creation date of the lease.
+        node_reservations (list): List of node reservations associated with the lease.
+        fip_reservations (list): List of floating IP reservations associated with the lease.
+        network_reservations (list): List of network reservations associated with the lease.
+        _events (list): List of events associated with the lease.
 
-    When using the context manager, on entering it will wait for the lease
-    to launch, then on exiting it will delete the lease, which in-turn
-    also deletes the instances launched with it.
+    Methods:
+        add_node_reservation: Adds a node reservation to the lease.
+        add_fip_reservation: Adds a floating IP reservation to the lease.
+        add_network_reservation: Adds a network reservation to the lease.
+        submit: Submits the lease for creation.
+        wait: Waits for the lease to reach a specific status.
+        refresh: Refreshes the lease data from the Blazar API.
+        delete: Deletes the lease.
+        show: Displays the lease details.
 
-    :param keystone_session: session object
-    :param bool sequester: If the context manager catches that an instance
-        failed to start, it will not delete the lease, but rather extend it
-        and rename it with the ID of the instance that failed.
-    :param bool _no_clean: Don't delete the lease at the end of a context
-        manager
-    :param kwargs: Parameters passed through to
-        :py:func:`lease_create_nodetype` and in turn
-        :py:func:`lease_create_args`
+    Properties:
+        events: List of events associated with the lease.
+        status: The status of the lease.
     """
+    def __init__(self,
+                    name: Optional[str] = None,
+                    start_date: Optional[datetime] = None,
+                    end_date: Optional[datetime] = None,
+                    duration: Optional[timedelta] = None,
+                    lease_json: Optional[dict] = None):
+        self.id = None
+        self.status = None
+        self.user_id = None
+        self.project_id = None
+        self.created_at = None
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault("session", session())
+        self.node_reservations = []
+        self.fip_reservations = []
+        self.network_reservations = []
+        self._events = []
 
-        self.session = kwargs.pop("session")
-        self.blazar = blazar(session=self.session)
-        self.neutron = neutron(session=self.session)
-
-        self.lease = None
-
-        self._servers = {}
-
-        self._sequester = kwargs.pop("sequester", False)
-
-        kwargs.setdefault("_preexisting", False)
-        self._preexisting = kwargs.pop("_preexisting")
-
-        kwargs.setdefault("_no_clean", False)
-        self._noclean = kwargs.pop("_no_clean")
-
-        prefix = kwargs.pop("prefix", "")
-        rand = random_base32(6)
-        self.prefix = f"{prefix}-{rand}" if prefix else rand
-
-        kwargs.setdefault("name", self.prefix)
-
-        if self._preexisting:
-            self.id = kwargs["_id"]
-            self.refresh()
+        if lease_json:
+            self._populate_from_json(lease_json)
         else:
-            kwargs.setdefault("node_type", DEFAULT_NODE_TYPE)
-            self._lease_kwargs = lease_create_nodetype(self.neutron, **kwargs)
-            self.lease = self.blazar.lease.create(**self._lease_kwargs)
-            self.id = self.lease["id"]
+            if name is None:
+                raise CHIValueError("Name must be specified when lease_json is not provided")
 
-        self.name = self.lease["name"]
-        self.reservations = self.lease["reservations"]
+            self.name = name
+            if start_date:
+                self.start_date = start_date.strftime(BLAZAR_TIME_FORMAT)
+            else:
+                self.start_date = 'now'
 
-    @classmethod
-    def from_existing(cls, id):
-        """
-        Attach to an existing lease by ID. When using in conjunction with the
-        context manager, it will *not* delete the lease at the end.
-        """
-        return cls(_preexisting=True, _id=id)
+            if end_date and duration:
+                raise CHIValueError("Specify either end_date or duration, not both")
+            elif end_date:
+                self.end_date = end_date.strftime(BLAZAR_TIME_FORMAT)
+            elif duration:
+                self.start_date, self.end_date = lease_duration(days=duration.days)
+            else:
+                raise CHIValueError("Either end_date or duration must be specified")
 
-    def __repr__(self):
-        region = self.session.region_name
-        return "<{} '{}' on {} ({})>".format(
-            self.__class__.__name__, self.name, region, self.id
-        )
+    def _populate_from_json(self, lease_json):
+        self.name = lease_json.get('name')
+        self.id = lease_json.get('id')
+        self.status = lease_json.get('status')
+        self.user_id = lease_json.get('user_id')
+        self.project_id = lease_json.get('project_id')
 
-    def __enter__(self):
-        if self.lease is None:
-            # don't support reuse in multiple with's.
-            raise ResourceError("Lease context manager not reentrant")
-        self.wait()
-        return self
+        self.created_at = datetime.fromisoformat(lease_json.get('created_at'))
+        self.start_date = datetime.strptime(lease_json.get('start_date'), "%Y-%m-%dT%H:%M:%S.%f")
+        self.end_date = datetime.strptime(lease_json.get('end_date'), "%Y-%m-%dT%H:%M:%S.%f")
+        self.created_at = datetime.strptime(lease_json.get('created_at'), "%Y-%m-%d %H:%M:%S")
 
-    def __exit__(self, exc_type, exc, exc_tb):
-        if exc is not None and self._noclean:
-            print("Lease existing uncleanly (noclean = True).")
-            return
+        self.node_reservations.clear()
+        self.fip_reservations.clear()
+        self.network_reservations.clear()
 
-        if isinstance(exc, ServerError) and self._sequester:
-            print("Instance failed to start, sequestering lease")
-            self.blazar.lease.update(
-                lease_id=self.id,
-                name="sequester-error-instance-{}".format(exc.server.id),
-                prolong_for="6d",
-            )
-            return
+        for reservation in lease_json.get('reservations', []):
+            resource_type = reservation.get('resource_type')
+            if resource_type == 'physical:host':
+                self.node_reservations.append(reservation)
+            elif resource_type == 'virtual:floatingip':
+                self.fip_reservations.append(reservation)
+            elif resource_type == 'network':
+                self.network_reservations.append(reservation)
 
-        # if lease exists, delete instances
-        current_lease = self.blazar.lease.get(self.id)
-        if current_lease:
-            for server in self.servers:
-                server.delete()
+        # self.events = lease_json.get('events', [])
 
-        if not self._preexisting:
-            # don't auto-delete pre-existing leases
-            self.delete()
+    def add_node_reservation(self,
+                             amount: int = None,
+                             node_type: str = None,
+                             node_name: str = None,
+                             nodes: List[Node] = None):
+
+        if nodes:
+            if any([amount, node_type, node_name]):
+                raise CHIValueError("When specifying nodes, no other arguments should be included")
+            for node in nodes:
+                add_node_reservation(reservation_list=self.node_reservations,
+                                     node_name=node.name)
+        else:
+            add_node_reservation(reservation_list=self.node_reservations,
+                                 count=amount,
+                                 node_type=node_type,
+                                 node_name=node_name)
+
+    def add_fip_reservation(self, amount: int):
+        add_fip_reservation(reservation_list=self.fip_reservations,
+                            count=amount)
+
+    def add_network_reservation(self,
+                                network_name: str,
+                                usage_type: str = None,
+                                stitch_provider: str = None):
+        add_network_reservation(reservation_list=self.network_reservations,
+                                network_name=network_name,
+                                usage_type=usage_type,
+                                stitch_provider=stitch_provider)
+
+    def submit(self,
+               wait_for_active: bool = True,
+               wait_timeout: int = 300,
+               show: List[str] = ["widget", "text"],
+               idempotent: bool = False):
+        if idempotent:
+            existing_lease = self._get_existing_lease()
+            if existing_lease:
+                self._populate_from_json(existing_lease)
+                return
+
+        reservations = self.node_reservations + self.fip_reservations + self.network_reservations
+
+        response = create_lease(lease_name=self.name,
+                                reservations=reservations,
+                                start_date=self.start_date,
+                                end_date=self.end_date)
+
+        if response:
+            self._populate_from_json(response)
+        else:
+            raise ResourceError("Unable to make lease")
+
+        if wait_for_active:
+            self.wait(status="active", timeout=wait_timeout)
+
+        if "widget" in show:
+            self.show(type="widget", wait_for_active=wait_for_active)
+        if "text" in show:
+            self.show(type="text", wait_for_active=wait_for_active)
+
+    def _get_existing_lease(self):
+        return get_lease(self.name);
+
+    def wait(self, status="active", timeout=300):
+        print("Waiting for lease to start... This can take up to 60 seconds")
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            self.refresh()
+            if self.status.lower() == status.lower():
+                print(f"Lease {self.name} has reached status {self.status.lower()}")
+                return
+            time.sleep(15)
+        raise ServiceError(f"Lease did not reach '{status}' status within {timeout} seconds")
 
     def refresh(self):
-        """Updates the lease data"""
-        self.lease = self.blazar.lease.get(self.id)
+        if self.id:
+            lease_data = blazar().lease.get(self.id)
+            self._populate_from_json(lease_data)
+        else:
+            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
+
+    def delete(self):
+        if self.id:
+            blazar().lease.delete(self.id)
+            self.id = None
+            self.status = "DELETED"
+        else:
+            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
+
+    def show(self, type=["text", "widget"], wait_for_active=False):
+        if wait_for_active:
+            self.wait(status="active")
+
+        if "widget" in type and _is_ipynb():
+            self._show_widget()
+        if "text" in type:
+            self._show_text()
+
+    def _show_widget(self):
+        html_content = f"""
+        <h2>Lease Details</h2>
+        <table>
+            <tr><th>Name</th><td>{self.name}</td></tr>
+            <tr><th>ID</th><td>{self.id or 'N/A'}</td></tr>
+            <tr><th>Status</th><td>{self.status or 'N/A'}</td></tr>
+            <tr><th>Start Date</th><td>{self.start_date or 'N/A'}</td></tr>
+            <tr><th>End Date</th><td>{self.end_date or 'N/A'}</td></tr>
+            <tr><th>User ID</th><td>{self.user_id or 'N/A'}</td></tr>
+            <tr><th>Project ID</th><td>{self.project_id or 'N/A'}</td></tr>
+        </table>
+
+        <h3>Node Reservations</h3>
+        <ul>
+        {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Min: {r.get('min', 'N/A')}, Max: {r.get('max', 'N/A')}</li>" for r in self.node_reservations)}
+        </ul>
+
+        <h3>Floating IP Reservations</h3>
+        <ul>
+        {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Amount: {r.get('amount', 'N/A')}</li>" for r in self.fip_reservations)}
+        </ul>
+
+        <h3>Network Reservations</h3>
+        <ul>
+        {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}</li>" for r in self.network_reservations)}
+        </ul>
+
+        <h3>Events</h3>
+        <ul>
+        {"".join(f"<li>Type: {e.get('event_type', 'N/A')}, Time: {e.get('time', 'N/A')}, Status: {e.get('status', 'N/A')}</li>" for e in self.events)}
+        </ul>
+        """
+
+
+        widget = HTML(html_content)
+        display(widget)
+
+
+    def _show_text(self):
+        print(f"Lease Details:")
+        print(f"Name: {self.name}")
+        print(f"ID: {self.id or 'N/A'}")
+        print(f"Status: {self.status or 'N/A'}")
+        print(f"Start Date: {self.start_date or 'N/A'}")
+        print(f"End Date: {self.end_date or 'N/A'}")
+        print(f"User ID: {self.user_id or 'N/A'}")
+        print(f"Project ID: {self.project_id or 'N/A'}")
+
+        print("\nNode Reservations:")
+        for r in self.node_reservations:
+            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Min: {r.get('min', 'N/A')}, Max: {r.get('max', 'N/A')}")
+
+        print("\nFloating IP Reservations:")
+        for r in self.fip_reservations:
+            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Amount: {r.get('amount', 'N/A')}")
+
+        print("\nNetwork Reservations:")
+        for r in self.network_reservations:
+            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}")
+
+        print("\nEvents:")
+        for e in self.events:
+            print(f"Type: {e.get('event_type', 'N/A')}, Time: {e.get('time', 'N/A')}, Status: {e.get('status', 'N/A')}")
+
 
     @property
-    def node_reservation(self):
-        return next(
-            iter(
-                [
-                    r["id"]
-                    for r in (self.reservations or [])
-                    if r["resource_type"] == "physical:host"
-                ]
-            ),
-            None,
-        )
+    def events(self):
+        if self.id:
+            # Fetch latest events from Blazar API
+            pass
+        return self._events
 
     @property
     def status(self):
-        """Refreshes and returns the status of the lease."""
-        self.refresh()
-        # NOTE(priteau): Temporary compatibility with old and new lease status
-        if self.lease.get("action") is not None:
-            return self.lease["action"], self.lease["status"]
-        else:
-            return self.lease["status"]
+        if self.id:
+            self.refresh()
+        return self._status
 
-    @property
-    def ready(self):
-        """Returns True if the lease has started."""
-        # NOTE(priteau): Temporary compatibility with old and new lease status
-        if self.lease.get("action") is not None:
-            return self.status == ("START", "COMPLETE")
-        else:
-            return self.status == "ACTIVE"
-
-    @property
-    def servers(self):
-        return self._servers.values()
-
-    @property
-    def binding(self):
-        return {
-            key: {
-                "address": value.ip,
-                "auth": {
-                    "user": "cc",
-                    "private_key": get_from_context("keypair_private_key"),
-                },
-            }
-            for key, value in self._servers.items()
-        }
-
-    def wait(self):
-        """Blocks for up to 150 seconds, waiting for the lease to be ready.
-        Raises a RuntimeError if it times out."""
-        for _ in range(15):
-            time.sleep(10)
-            if self.ready:
-                break
-        else:
-            raise ServiceError("timeout, lease failed to start")
-
-    def delete(self):
-        """Deletes the lease"""
-        self.blazar.lease.delete(self.id)
-        self.lease = None
-
-    def create_server(self, *server_args, **server_kwargs):
-        """Generates instances using the resource of the lease. Arguments
-        are passed to :py:class:`ccmanage.server.Server` and returns same
-        object."""
-        server_kwargs.setdefault("lease", self)
-        server_name = server_kwargs.pop("name", len(self.servers))
-        server_kwargs.setdefault("name", f"{self.prefix}-{server_name}")
-        server = Server(*server_args, **server_kwargs)
-        self._servers[server_name] = server
-        return server
+    @status.setter
+    def status(self, value):
+        self._status = value
 
 
 def _format_resource_properties(user_constraints, extra_constraints):
@@ -365,6 +470,7 @@ def add_node_reservation(
     count=1,
     resource_properties=None,
     node_type=None,
+    node_name=None,
     architecture=None,
 ):
     """Add a node reservation to a reservation list.
@@ -381,7 +487,8 @@ def add_node_reservation(
                 nodes with a `node_type` matching "some-node-type".
               [">", "$architecture.smt_size", 40]: filter to nodes having more than 40
                 (hyperthread) cores.
-
+        node_name (str): The specific node name to request. If None, the reservation will
+        target any node of the node_type.
         node_type (str): The node type to request. If None, the reservation will not
             target any particular node type. If `resource_properties` is defined, the
             node type constraint is added to the existing property constraints.
@@ -395,6 +502,10 @@ def add_node_reservation(
         extra_constraints.append(["==", "$node_type", node_type])
     if architecture:
         extra_constraints.append(["==", "$architecture.platform_type", architecture])
+    if node_name:
+        if count != 1 or node_type != None or resource_properties != None or architecture != None:
+            raise CHIValueError("If node name is specified, no other resource constraint can be specified")
+        extra_constraints.append(["==", "$node_name", node_name])
 
     resource_properties = _format_resource_properties(
         user_constraints, extra_constraints
@@ -552,9 +663,11 @@ def _reservation_matching(lease_ref, match_fn, multiple=False):
 def add_network_reservation(
     reservation_list,
     network_name,
+    usage_type=None,
     of_controller_ip=None,
     of_controller_port=None,
     vswitch_name=None,
+    stitch_provider=None,
     resource_properties=None,
     physical_network="physnet1",
 ):
@@ -572,6 +685,7 @@ def add_network_reservation(
             this network. See `the virtual forwarding context documentation
             <https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_sdn.html#corsa-dp2000-virtual-forwarding-contexts-network-layout-and-advanced-features>`_
             for more details.
+        stich_provider (str): specify a stitching provider such as fabric. '
         resource_properties (list): A list of resource property constraints. These take
             the form [<operation>, <search_key>, <search_value>]
         physical_network (str): The physical provider network to reserve from.
@@ -585,10 +699,24 @@ def add_network_reservation(
     if vswitch_name:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
+
+
     user_constraints = (resource_properties or []).copy()
     extra_constraints = []
+
+
+
     if physical_network:
         extra_constraints.append(["==", "$physical_network", physical_network])
+    if stitch_provider and stitch_provider != 'fabric':
+        extra_constraints.append(["==", "$stitch_provider", stitch_provider])
+    else:
+        raise CHIValueError("stitch_provider must be 'fabric' or None")
+    if usage_type and usage_type != 'storage':
+        extra_constraints.append(["==", "$usage_type", usage_type])
+    else:
+        raise CHIValueError("usage_type must be 'storage' or None")
+
 
     resource_properties = _format_resource_properties(
         user_constraints, extra_constraints
@@ -697,25 +825,51 @@ def lease_duration(days=1, hours=0):
 # Leases
 #########
 
+def list_leases() -> List[Lease]:
+    """
+    Return a list of user leases.
 
-def get_lease(ref) -> dict:
-    """Get a lease by its ID or name.
+    Returns:
+        A list of Lease objects representing user leases.
+    """
+    blazar_client = blazar()
+    lease_dicts = blazar_client.lease.list()
+
+    leases = []
+    for lease_dict in lease_dicts:
+        lease = Lease(lease_json=lease_dict)
+        leases.append(lease)
+
+    return leases
+
+def get_lease(ref: str) -> Union[Lease, None]:
+    """
+    Get a lease by its ID or name.
 
     Args:
         ref (str): The ID or name of the lease.
 
     Returns:
-        The lease matching the ID or name.
+        A Lease object matching the ID or name, or None if not found.
     """
+    blazar_client = blazar()
+
     try:
-        return blazar().lease.get(ref)
+        lease_dict = blazar_client.lease.get(ref)
+        return Lease(lease_json=lease_dict)
     except BlazarClientException as err:
         # Blazar's exception class is a bit odd and stores the actual code
         # in 'kwargs'. The 'code' attribute on the exception is just the default
         # code. Prefer to use .kwargs['code'] if present, fall back to .code
         code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
         if code == 404:
-            return blazar().lease.get(get_lease_id(ref))
+            try:
+                lease_id = get_lease_id(ref)
+                lease_dict = blazar_client.lease.get(lease_id)
+                return Lease(lease_json=lease_dict)
+            except BlazarClientException:
+                # If we still can't find the lease, return None
+                return None
         else:
             raise
 
