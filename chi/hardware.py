@@ -30,7 +30,6 @@ class Node:
     uid: str
     version: str
 
-
     def next_free_timeslot(self) -> Tuple[datetime, Optional[datetime]]:
         """
         Finds the next available timeslot for the hardware using the Blazar client.
@@ -63,12 +62,14 @@ class Node:
             next_start = datetime.fromisoformat(allocations[i+1]['start_date'])
 
 
+
             if current_end < next_start:
                 return (current_end, next_start)
 
         # If no free slot found, return the end of the last allocation
         last_end = datetime.fromisoformat(allocations[-1]['end_date'])
         return (last_end, None)
+
 
 def _call_api(endpoint):
     url = "{0}/{1}.{2}".format(RESOURCE_API_URL, endpoint, "json")
