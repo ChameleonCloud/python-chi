@@ -199,7 +199,6 @@ def _is_ipynb() -> bool:
         return False
     return True
 
-
 def set(key, value):
     """Set a context parameter by name.
 
