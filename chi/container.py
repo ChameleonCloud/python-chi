@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import io
 import os
 import logging
@@ -19,7 +20,11 @@ import tarfile
 import time
 import typing
 
+from typing import List, Tuple, Optional
+from IPython.display import display, HTML
+
 from .clients import zun
+from .exception import ResourceError
 from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 
 if typing.TYPE_CHECKING:
@@ -42,6 +47,258 @@ __all__ = [
     "wait_for_active",
     "associate_floating_ip",
 ]
+
+
+
+class Container:
+    """
+    Represents a container in the system.
+
+    Args:
+        name (str): The name of the container.
+        image_ref (str): The reference to the container image.
+        exposed_ports (List[str]): A list of ports exposed by the container.
+        reservation_id (str, optional): The reservation ID associated with the container. Defaults to None.
+        start (bool, optional): Indicates whether to start the container. Defaults to True.
+        start_timeout (int, optional): The timeout value for starting the container. Defaults to None.
+        runtime (str, optional): The runtime environment for the container. Defaults to None.
+
+    Attributes:
+        name (str): The name of the container.
+        image_ref (str): The reference to the container image.
+        exposed_ports (List[str]): A list of ports exposed by the container.
+        reservation_id (str): The reservation ID associated with the container.
+        start (bool): Indicates whether to start the container.
+        start_timeout (int): The timeout value for starting the container.
+        runtime (str): The runtime environment for the container.
+        id (str): The ID of the container.
+        created_at (str): The timestamp when the container was created.
+        _status (str): The current status of the container.
+    """
+    def __init__(self,
+                 name: str,
+                 image_ref: str,
+                 exposed_ports: List[str],
+                 reservation_id: str = None,
+                 start: bool = True,
+                 start_timeout: int = None,
+                 runtime: str = None):
+        self.name = name
+        self.image_ref = image_ref
+        self.exposed_ports = exposed_ports
+        self.reservation_id = reservation_id
+        self.start = start
+        self.start_timeout = start_timeout
+        self.runtime = runtime
+        self.id = None
+        self.created_at = None
+        self._status = None
+
+    @classmethod
+    def from_zun_container(cls, zun_container):
+        container = cls(
+            name=zun_container.name,
+            image_ref=zun_container.image,
+            exposed_ports=zun_container.ports if zun_container.ports else [],
+            start=True,  # Assuming the container is already created
+        )
+        container.id = zun_container.uuid
+        container._status = zun_container.status
+        return container
+
+    @property
+    def status(self):
+        if self.id:
+            container = zun().containers.get(self.id)
+            self._status = container.status
+        return self._status
+
+    def submit(self, wait_for_active: bool = True, wait_timeout: int = None,
+               show: str = "widget", idempotent: bool = False):
+        """
+        Submits the container for creation and performs additional actions based on the provided parameters.
+
+        Args:
+            wait_for_active (bool, optional): Whether to wait for the container to become active. Defaults to True.
+            wait_timeout (int, optional): The maximum time (in seconds) to wait for the container to become active. Defaults to None.
+            show (str, optional): The type of output to display. Defaults to "widget".
+            idempotent (bool, optional): Whether to update the existing container if it already exists. Defaults to False.
+
+        Raises:
+            ResourceError: If the container creation fails.
+
+        Returns:
+            None
+        """
+        if idempotent:
+            existing = get_container(self.name)
+            if existing:
+                self.__dict__.update(existing.__dict__)
+                return
+
+        container = create_container(
+            name=self.name,
+            image=self.image_ref,
+            exposed_ports=self.exposed_ports,
+            reservation_id=self.reservation_id,
+            start=self.start,
+            start_timeout=self.start_timeout,
+            runtime=self.runtime
+        )
+
+        if container:
+            self.id = zun().containers.get(self.name).uuid
+            self._status = zun().containers.get(self.name).status
+        else:
+            raise ResourceError("could not create container")
+
+        if wait_for_active:
+            self.wait(status="Running", timeout=wait_timeout)
+
+        if show:
+            self.show(type=show, wait_for_active=wait_for_active)
+
+    def delete(self):
+        """
+        Deletes the container.
+
+        If the container has an ID, it calls the `destroy_container` function to delete the container.
+        After deletion, it sets the ID and status of the container to None.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        if self.id:
+            destroy_container(self.id)
+            self.id = None
+            self._status = None
+
+    def wait(self, status: str = "Running", timeout: int = None):
+            """
+            Waits for the container to reach the specified status.
+
+            Args:
+                status (str, optional): The status to wait for. Defaults to "Running".
+                timeout (int, optional): The maximum time to wait in seconds. Defaults to None.
+
+            Returns:
+                None
+            """
+            wait_for_active(self.id, timeout=timeout)
+            self._status = status
+
+    def show(self, type: str = "text", wait_for_active: bool = False):
+        """
+        Display information about the container.
+
+        Args:
+            type (str, optional): The type of display. Can be "text" or "widget". Defaults to "text".
+            wait_for_active (bool, optional): Whether to wait for the container to be in the "Running" state before displaying information. Defaults to False.
+        """
+        if wait_for_active:
+            self.wait(status="Running")
+
+        zun_container = get_container(self.id)
+
+        if type == "text":
+            print(f"Container: {self.name}")
+            print(f"ID: {self.id}")
+            print(f"Status: {zun_container.status}")
+            print(f"Image: {self.image_ref}")
+            print(f"Created at: {self.created_at}")
+        elif type == "widget":
+            self._show_html_table(zun_container)
+
+    def _show_html_table(self, zun_container):
+        container_details = {
+            "Name": self.name,
+            "ID": self.id,
+            "Status": zun_container.status,
+            "Image": self.image_ref,
+            "Created at": str(self.created_at),
+            "Exposed Ports": self.exposed_ports if self.exposed_ports else "None",
+            "Reservation ID": self.reservation_id if self.reservation_id else "None",
+            "Runtime": self.runtime if self.runtime else "Default"
+        }
+
+        html_table = """
+        <table style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2;">Property</th>
+                <th style="border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2;">Value</th>
+            </tr>
+            {rows}
+        </table>
+        """
+
+        rows = ""
+        for key, value in container_details.items():
+            rows += f"""
+            <tr>
+                <td style="border: 1px solid black; padding: 8px;">{key}</td>
+                <td style="border: 1px solid black; padding: 8px;">{value}</td>
+            </tr>
+            """
+
+        html_table = html_table.format(rows=rows)
+        display(HTML(html_table))
+
+    def execute(self, command: str) -> Tuple[str, str]:
+            """
+            Executes a command inside the container and returns the output and exit code.
+
+            Args:
+                command (str): The command to be executed inside the container.
+
+            Returns:
+                Tuple[str, str]: A tuple containing the output of the command and the exit code.
+            """
+            result = execute(self.id, command)
+            return result.get('output', ''), str(result.get('exit_code', ''))
+
+    def upload(self, source: str, remote_dest: str) -> None:
+            """
+            Uploads a file from the local machine to the remote destination in the container.
+
+            Args:
+                source (str): The path of the file on the local machine.
+                remote_dest (str): The destination path in the container where the file will be uploaded.
+
+            Returns:
+                None
+            """
+            upload(self.id, source, remote_dest)
+
+    def download(self, remote_source: str, dest: str) -> None:
+            """
+            Downloads a file from a remote source to the specified destination.
+
+            Args:
+                remote_source (str): The URL or path of the remote file to download.
+                dest (str): The destination path where the file will be saved.
+
+            Returns:
+                None
+            """
+            download(self.id, remote_source, dest)
+
+    def associate_floating_ip(self, fip: str = None):
+        """
+        Associates a floating IP with the container.
+
+        Args:
+            fip (str, optional): The floating IP to associate with the container. Defaults to None.
+
+        Returns:
+            The result of the association operation.
+        """
+        return associate_floating_ip(self.id, fip)
+
+    def detach_floating_ip(self, fip: str):
+        raise NotImplementedError()
 
 
 def create_container(
@@ -123,27 +380,31 @@ def create_container(
     return container
 
 
-def list_containers() -> "list[Container]":
-    """List all containers owned by this project.
+from typing import List
+
+def list_containers() -> List[Container]:
+    """
+    Retrieve a list of containers.
 
     Returns:
-        A list of containers.
+        A list of Container objects representing the containers.
     """
-    return zun().containers.list()
+    zun_containers = zun().containers.list()
+    return [Container.from_zun_container(c) for c in zun_containers]
 
 
-def get_container(container_ref: "str") -> "Container":
-    """Get a container's information.
+def get_container(name: str) -> Optional[Container]:
+    """
+    Retrieve a container by name.
 
     Args:
-        container_ref (str): The name or ID of the container.
-        tag (str): An optional version to tag the container image with. If not
-            defined, defaults to "latest".
+        name (str): The name of the container to retrieve.
 
     Returns:
-        The container, if found.
+        Optional[Container]: The retrieved container object, or None if the container does not exist.
     """
-    return zun().containers.get(container_ref)
+    zun_container = zun().containers.get(name)
+    return Container.from_zun_container(zun_container)
 
 
 def snapshot_container(
