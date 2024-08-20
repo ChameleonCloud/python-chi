@@ -522,7 +522,7 @@ def _wait_for_status(
     start_time = time.perf_counter()
 
     while True:
-        container = get_container(container_ref)
+        container = zun().containers.get(container_ref)
         if container.status == "Error":
             raise RuntimeError("Container went in to error state")
         elif container.status == status:
