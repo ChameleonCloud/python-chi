@@ -187,6 +187,7 @@ class Container:
             Returns:
                 None
             """
+            print(f"Waiting for container {self.name}'s status to turn to {status}. This can take a while depending on the image")
             wait_for_active(self.id, timeout=timeout)
             self._status = status
 

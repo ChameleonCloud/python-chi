@@ -370,7 +370,7 @@ class Lease:
             None
         """
         if idempotent:
-            existing_lease = self._get_existing_lease()
+            existing_lease = _get_lease_from_blazar(self.name)
             if existing_lease:
                 self._populate_from_json(existing_lease)
                 return
@@ -394,9 +394,6 @@ class Lease:
             self.show(type="widget", wait_for_active=wait_for_active)
         if "text" in show:
             self.show(type="text", wait_for_active=wait_for_active)
-
-    def _get_existing_lease(self):
-        return get_lease(self.name);
 
     def wait(self, status="active", timeout=300):
         print("Waiting for lease to start... This can take up to 60 seconds")
@@ -915,6 +912,29 @@ def list_leases() -> List[Lease]:
 
     return leases
 
+def _get_lease_from_blazar(ref: str):
+    blazar_client = blazar()
+
+    try:
+        lease_dict = blazar_client.lease.get(ref)
+        return lease_dict
+    except BlazarClientException as err:
+        # Blazar's exception class is a bit odd and stores the actual code
+        # in 'kwargs'. The 'code' attribute on the exception is just the default
+        # code. Prefer to use .kwargs['code'] if present, fall back to .code
+        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
+        if code == 404:
+            try:
+                lease_id = get_lease_id(ref)
+                lease_dict = blazar_client.lease.get(lease_id)
+                return lease_dict
+            except BlazarClientException:
+                # If we still can't find the lease, return None
+                return None
+        else:
+            raise
+
+
 def get_lease(ref: str) -> Union[Lease, None]:
     """
     Get a lease by its ID or name.
@@ -925,26 +945,7 @@ def get_lease(ref: str) -> Union[Lease, None]:
     Returns:
         A Lease object matching the ID or name, or None if not found.
     """
-    blazar_client = blazar()
-
-    try:
-        lease_dict = blazar_client.lease.get(ref)
-        return Lease(lease_json=lease_dict)
-    except BlazarClientException as err:
-        # Blazar's exception class is a bit odd and stores the actual code
-        # in 'kwargs'. The 'code' attribute on the exception is just the default
-        # code. Prefer to use .kwargs['code'] if present, fall back to .code
-        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
-        if code == 404:
-            try:
-                lease_id = get_lease_id(ref)
-                lease_dict = blazar_client.lease.get(lease_id)
-                return Lease(lease_json=lease_dict)
-            except BlazarClientException:
-                # If we still can't find the lease, return None
-                return None
-        else:
-            raise
+    return Lease(lease_json=_get_lease_from_blazar(ref))
 
 
 def get_lease_id(lease_name) -> str:

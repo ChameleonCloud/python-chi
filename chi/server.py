@@ -430,7 +430,7 @@ class Server:
         Returns:
             None
         """
-        associate_floating_ip(self.id, fip)
+        associate_floating_ip(self.name, fip)
 
     def detach_floating_ip(self, fip: str) -> None:
         """
@@ -442,7 +442,7 @@ class Server:
         Returns:
             None
         """
-        detach_floating_ip(self.id, fip)
+        detach_floating_ip(self.name, fip)
 
     def check_connectivity(self, wait: bool = True, port: int = 22, timeout: int = 500,
                            type: Optional[str] = "widget") -> bool:
