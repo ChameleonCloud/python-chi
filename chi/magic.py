@@ -42,10 +42,8 @@ def visualize_resources(leases: List[Lease]):
     network_count = 0
     fip_count = 0
     device_count = 0
-    idle_count = 0
 
     for lease in leases:
-        # Add nodes
         for node_res in lease.node_reservations:
             node_name = f"Node_{node_count}"
             G.add_node(node_name)
@@ -54,7 +52,6 @@ def visualize_resources(leases: List[Lease]):
             node_labels[node_name] = f"Node\n{node_res.get('min', 'N/A')}-{node_res.get('max', 'N/A')}"
             node_count += 1
 
-        # Add networks
         for net_res in lease.network_reservations:
             net_name = f"Net_{network_count}"
             G.add_node(net_name)
@@ -63,7 +60,6 @@ def visualize_resources(leases: List[Lease]):
             node_labels[net_name] = f"Network\n{net_res.get('network_name', 'N/A')}"
             network_count += 1
 
-        # Add floating IPs
         for fip_res in lease.fip_reservations:
             fip_name = f"FIP_{fip_count}"
             G.add_node(fip_name)
@@ -72,7 +68,6 @@ def visualize_resources(leases: List[Lease]):
             node_labels[fip_name] = f"FIP\n{fip_res.get('amount', 'N/A')}"
             fip_count += 1
 
-        # Add devices
         for device_res in lease.device_reservations:
             device_name = f"Device_{device_count}"
             G.add_node(device_name)
@@ -81,7 +76,6 @@ def visualize_resources(leases: List[Lease]):
             node_labels[device_name] = f"Device\n{device_res.get('min', 'N/A')}-{device_res.get('max', 'N/A')}"
             device_count += 1
 
-    # Add idle resources pool
     idle_resources = max(node_count, network_count, fip_count, device_count)
     for i in range(idle_resources):
         idle_name = f"Idle_{i}"
@@ -90,12 +84,10 @@ def visualize_resources(leases: List[Lease]):
         node_colors.append(colors['idle'])
         node_labels[idle_name] = "Idle"
 
-    # Create the plot
     plt.figure(figsize=(12, 8))
     nx.draw(G, pos=node_positions, node_color=node_colors, node_size=3000, alpha=0.8)
     nx.draw_networkx_labels(G, pos=node_positions, labels=node_labels, font_size=8)
 
-    # Add a legend
     legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'{key.capitalize()}',
                                   markerfacecolor=value, markersize=10)
                        for key, value in colors.items()]
