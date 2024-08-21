@@ -4,8 +4,118 @@ from IPython.display import display
 
 from .server import Server
 from .container import Container
-from .lease import Lease
+from .lease import Lease, delete_lease
 from .context import DEFAULT_NODE_TYPE, DEFAULT_IMAGE_NAME, DEFAULT_SITE
+
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
+def visualize_resources(leases: List[Lease]):
+    """
+    Displays a visualization of the resources associated with the leases in a graph.
+
+    Parameters:
+    leases (List[Lease]): A list of Lease objects.
+
+    Returns:
+    None
+    """
+
+    G = nx.Graph()
+
+    # Colors for different resource types
+    colors = {
+        'node': '#ADD8E6',  # Light Blue
+        'network': '#90EE90',  # Light Green
+        'fip': '#FFB6C1',  # Light Pink
+        'device': '#FAFAD2',  # Light Goldenrod
+        'idle': '#D3D3D3'  # Light Gray
+    }
+
+    node_positions = {}
+    node_colors = []
+    node_labels = {}
+
+    # Counter for positioning
+    node_count = 0
+    network_count = 0
+    fip_count = 0
+    device_count = 0
+    idle_count = 0
+
+    for lease in leases:
+        # Add nodes
+        for node_res in lease.node_reservations:
+            node_name = f"Node_{node_count}"
+            G.add_node(node_name)
+            node_positions[node_name] = (node_count, 0)
+            node_colors.append(colors['node'])
+            node_labels[node_name] = f"Node\n{node_res.get('min', 'N/A')}-{node_res.get('max', 'N/A')}"
+            node_count += 1
+
+        # Add networks
+        for net_res in lease.network_reservations:
+            net_name = f"Net_{network_count}"
+            G.add_node(net_name)
+            node_positions[net_name] = (network_count, 1)
+            node_colors.append(colors['network'])
+            node_labels[net_name] = f"Network\n{net_res.get('network_name', 'N/A')}"
+            network_count += 1
+
+        # Add floating IPs
+        for fip_res in lease.fip_reservations:
+            fip_name = f"FIP_{fip_count}"
+            G.add_node(fip_name)
+            node_positions[fip_name] = (fip_count, 2)
+            node_colors.append(colors['fip'])
+            node_labels[fip_name] = f"FIP\n{fip_res.get('amount', 'N/A')}"
+            fip_count += 1
+
+        # Add devices
+        for device_res in lease.device_reservations:
+            device_name = f"Device_{device_count}"
+            G.add_node(device_name)
+            node_positions[device_name] = (device_count, 3)
+            node_colors.append(colors['device'])
+            node_labels[device_name] = f"Device\n{device_res.get('min', 'N/A')}-{device_res.get('max', 'N/A')}"
+            device_count += 1
+
+    # Add idle resources pool
+    idle_resources = max(node_count, network_count, fip_count, device_count)
+    for i in range(idle_resources):
+        idle_name = f"Idle_{i}"
+        G.add_node(idle_name)
+        node_positions[idle_name] = (i, 4)
+        node_colors.append(colors['idle'])
+        node_labels[idle_name] = "Idle"
+
+    # Create the plot
+    plt.figure(figsize=(12, 8))
+    nx.draw(G, pos=node_positions, node_color=node_colors, node_size=3000, alpha=0.8)
+    nx.draw_networkx_labels(G, pos=node_positions, labels=node_labels, font_size=8)
+
+    # Add a legend
+    legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'{key.capitalize()}',
+                                  markerfacecolor=value, markersize=10)
+                       for key, value in colors.items()]
+    plt.legend(handles=legend_elements, loc='upper right')
+
+    plt.title("Resource Visualization")
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
+def cleanup_resources(lease_name: str):
+    """
+    Cleans up resources associated with the given lease name.
+
+    Args:
+        laese_name (str): The name of the lease to be cleaned up.
+    """
+    delete_lease(lease_name)
+
 
 def create_container(
     container_name: str,
@@ -66,6 +176,7 @@ def create_container(
 
     return container
 
+
 def create_server(
     server_name: str,
     node_type: Optional[str] = None,
@@ -90,13 +201,13 @@ def create_server(
 
     """
     if node_type is None:
-        node_type = get_user_input(
+        node_type = _get_user_input(
             options=["compute_skylake", "storage_nvme"],
             description="Node Type"
         )
 
     if image_name is None:
-        image_name = get_user_input(
+        image_name = _get_user_input(
             options=["CC-Ubuntu22.04", "CC-Ubuntu22.04-CUDA"],
             description="Image"
         )
@@ -126,7 +237,8 @@ def create_server(
 
     return server
 
-def get_user_input(options: List[str], description: str) -> str:
+
+def _get_user_input(options: List[str], description: str) -> str:
     print(f"Available {description}s:")
     for option in options:
         print(f"- {option}")

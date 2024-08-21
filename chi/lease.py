@@ -928,7 +928,7 @@ def _get_lease_from_blazar(ref: str):
                 lease_id = get_lease_id(ref)
                 lease_dict = blazar_client.lease.get(lease_id)
                 return lease_dict
-            except BlazarClientException:
+            except Exception:
                 # If we still can't find the lease, return None
                 return None
         else:
@@ -1021,9 +1021,8 @@ def delete_lease(ref):
         ref (str): The name or ID of the lease.
     """
     lease = get_lease(ref)
-    lease_id = lease["id"]
-    blazar().lease.delete(lease_id)
-    print(f"Deleted lease with id {lease_id}")
+    lease.delete()
+    print(f"Deleted lease {ref}")
 
 
 def wait_for_active(ref):
