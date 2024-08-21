@@ -38,36 +38,41 @@ class Node:
             A tuple containing the start and end datetime of the next available timeslot.
             If no timeslot is available, returns (end_datetime_of_last_allocation, None).
         """
-        raise NotImplementedError
+        def get_host_id(items, target_uid):
+            for item in items:
+                if item.get('uid') == target_uid:
+                    return item['id']
+            return None
+
         blazarclient = blazar()
 
-        # Get allocations for this specific host
-        allocations = blazarclient.allocation.get(resource_id=self.uid)
+        # Get allocation for this specific host
+        host_id = get_host_id(blazarclient.host.list(), self.uid)
 
-        # Sort allocations by start time
-        allocations.sort(key=lambda x: x['start_date'])
+        allocation = blazarclient.host.get_allocation(host_id)
 
         now = datetime.now(timezone.utc)
 
-        if not allocations:
+        if not allocation:
             return (now, None)
 
-        # Check if there's a free slot now
-        if datetime.fromisoformat(allocations[0]['start_date']) > now:
-            return (now, datetime.fromisoformat(allocations[0]['start_date']))
+        reservations = sorted(allocation['reservations'], key=lambda x: x['start_date'])
 
-        # Find the next free slot
-        for i in range(len(allocations) - 1):
-            current_end = datetime.fromisoformat(allocations[i]['end_date'])
-            next_start = datetime.fromisoformat(allocations[i+1]['start_date'])
+        def parse_datetime(dt_str: str) -> datetime:
+            dt = datetime.fromisoformat(dt_str)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
+        if parse_datetime(reservations[0]['start_date']) > now:
+            return (now, parse_datetime(reservations[0]['start_date']))
 
+        for i in range(len(reservations) - 1):
+            current_end = parse_datetime(reservations[i]['end_date'])
+            next_start = parse_datetime(reservations[i+1]['start_date'])
 
             if current_end < next_start:
                 return (current_end, next_start)
 
-        # If no free slot found, return the end of the last allocation
-        last_end = datetime.fromisoformat(allocations[-1]['end_date'])
+        last_end = parse_datetime(reservations[-1]['end_date'])
         return (last_end, None)
 
 
