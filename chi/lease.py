@@ -180,6 +180,7 @@ class Lease:
         user_id (str): The ID of the user associated with the lease.
         project_id (str): The ID of the project associated with the lease.
         created_at (datetime): The creation date of the lease.
+        device_reservations (list): List of device reservations associated with the lease.
         node_reservations (list): List of node reservations associated with the lease.
         fip_reservations (list): List of floating IP reservations associated with the lease.
         network_reservations (list): List of network reservations associated with the lease.
@@ -211,6 +212,7 @@ class Lease:
         self.project_id = None
         self.created_at = None
 
+        self.device_reservations = []
         self.node_reservations = []
         self.fip_reservations = []
         self.network_reservations = []
@@ -249,12 +251,15 @@ class Lease:
         self.end_date = datetime.strptime(lease_json.get('end_date'), "%Y-%m-%dT%H:%M:%S.%f")
         self.created_at = datetime.strptime(lease_json.get('created_at'), "%Y-%m-%d %H:%M:%S")
 
+        self.device_reservations.clear()
         self.node_reservations.clear()
         self.fip_reservations.clear()
         self.network_reservations.clear()
 
         for reservation in lease_json.get('reservations', []):
             resource_type = reservation.get('resource_type')
+            if resource_type == 'device':
+                self.device_reservations.append(reservation)
             if resource_type == 'physical:host':
                 self.node_reservations.append(reservation)
             elif resource_type == 'virtual:floatingip':
@@ -263,6 +268,26 @@ class Lease:
                 self.network_reservations.append(reservation)
 
         # self.events = lease_json.get('events', [])
+
+    def add_device_reservation(self,
+                               amount: int = None,
+                               machine_type: str = None,
+                               device_model: str = None,
+                               device_name: str = None):
+        """
+        Add a IoT device reservation to the list of device reservations.
+
+        Args:
+            amount (int, optional): The number of devices to reserve. Defaults to None.
+            machine_type (str, optional): The type of machine to reserve. Defaults to None.
+            device_model (str, optional): The model of the device to reserve. Defaults to None.
+            device_name (str, optional): The name of the device to reserve. Defaults to None.
+        """
+        add_device_reservation(reservation_list=self.device_reservations,
+                               count=amount,
+                               machine_name=machine_type,
+                               device_model=device_model,
+                               device_name=device_name)
 
     def add_node_reservation(self,
                              amount: int = None,
@@ -350,7 +375,7 @@ class Lease:
                 self._populate_from_json(existing_lease)
                 return
 
-        reservations = self.node_reservations + self.fip_reservations + self.network_reservations
+        reservations = self.device_reservations + self.node_reservations + self.fip_reservations + self.network_reservations
 
         response = create_lease(lease_name=self.name,
                                 reservations=reservations,
@@ -420,6 +445,12 @@ class Lease:
             <tr><th>User ID</th><td>{self.user_id or 'N/A'}</td></tr>
             <tr><th>Project ID</th><td>{self.project_id or 'N/A'}</td></tr>
         </table>
+
+
+        <h3>Device Reservations</h3>
+        <ul>
+        {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Min: {r.get('min', 'N/A')}, Max: {r.get('max', 'N/A')}</li>" for r in self.device_reservations)}
+        </ul>
 
         <h3>Node Reservations</h3>
         <ul>
