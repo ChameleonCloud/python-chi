@@ -352,7 +352,7 @@ class Lease:
     def submit(self,
                wait_for_active: bool = True,
                wait_timeout: int = 300,
-               show: List[str] = ["widget", "text"],
+               show: Optional[str] = None,
                idempotent: bool = False):
         """
         Submits the lease for creation.
@@ -360,7 +360,7 @@ class Lease:
         Args:
             wait_for_active (bool, optional): Whether to wait for the lease to become active. Defaults to True.
             wait_timeout (int, optional): The maximum time to wait for the lease to become active, in seconds. Defaults to 300.
-            show (List[str], optional): The types of lease information to display. Defaults to ["widget", "text"].
+            show (Optional[str], optional): The types of lease information to display. Defaults to None, options are "widget", "text".
             idempotent (bool, optional): Whether to create the lease only if it doesn't already exist. Defaults to False.
 
         Raises:
@@ -373,6 +373,10 @@ class Lease:
             existing_lease = _get_lease_from_blazar(self.name)
             if existing_lease:
                 self._populate_from_json(existing_lease)
+                if wait_for_active:
+                    self.wait(status="active", timeout=wait_timeout)
+                if show:
+                    self.show(type=show, wait_for_active=wait_for_active)
                 return
 
         reservations = self.device_reservations + self.node_reservations + self.fip_reservations + self.network_reservations
@@ -390,10 +394,8 @@ class Lease:
         if wait_for_active:
             self.wait(status="active", timeout=wait_timeout)
 
-        if "widget" in show:
-            self.show(type="widget", wait_for_active=wait_for_active)
-        if "text" in show:
-            self.show(type="text", wait_for_active=wait_for_active)
+        if show:
+            self.show(type=show, wait_for_active=wait_for_active)
 
     def wait(self, status="active", timeout=300):
         print("Waiting for lease to start... This can take up to 60 seconds")

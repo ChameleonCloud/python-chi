@@ -409,11 +409,27 @@ def choose_site() -> None:
         global _sites
         if not _sites:
             _sites = list_sites()
+
         use_site(list(_sites.keys())[0])
+
         print("Please choose a site in the dropdown below")
-        site_dropdown = widgets.Dropdown(options=_sites.keys(), description="Select Site")
-        display(site_dropdown)
-        site_dropdown.observe(lambda change: use_site(change['new']), names='value')
+
+        site_dropdown = widgets.Dropdown(
+            options=_sites.keys(),
+            description="Select Site"
+        )
+
+        output = widgets.Output()
+
+        def on_change(change):
+            with output:
+                output.clear_output()
+                print(f"Selected site: {change['new']}")
+                use_site(change['new'])
+
+        site_dropdown.observe(on_change, names='value')
+
+        display(widgets.VBox([site_dropdown, output]))
     else:
         print("Choose site feature is only available in an ipynb environment.")
 
@@ -480,10 +496,31 @@ def choose_project() -> None:
     Only works if running in a Ipynb notebook environment.
     """
     if _is_ipynb():
-        project_dropdown = widgets.Dropdown(options=list_projects(), description="Select Project")
-        display(project_dropdown)
-        use_project(list_projects()[0])
-        project_dropdown.observe(lambda change: (use_project(change['new'])), names='value')
+        projects = list_projects()
+
+        project_dropdown = widgets.Dropdown(
+            options=projects,
+            description="Select Project"
+        )
+
+        output = widgets.Output()
+
+        def on_change(change):
+            with output:
+                output.clear_output()
+                print(f"Selected project: {change['new']}")
+                use_project(change['new'])
+
+        project_dropdown.observe(on_change, names='value')
+
+        # Use the first project as the default
+        use_project(projects[0])
+
+        # Display the initial selection
+        with output:
+            print(f"Initial project: {projects[0]}")
+
+        display(widgets.VBox([project_dropdown, output]))
     else:
         print("Choose project feature is only available in Jupyter notebook environment.")
 

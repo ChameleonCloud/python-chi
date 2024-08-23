@@ -193,7 +193,8 @@ class Server:
         nova_client = nova()
 
         if idempotent:
-            existing_server = nova_client.servers.get(get_server_id(self.name))
+            server_id = get_server_id(self.name)
+            existing_server = nova_client.servers.get(server_id) if server_id else None
             if existing_server:
                 server = Server._from_nova_server(existing_server)
                 if wait_for_active:
@@ -211,14 +212,7 @@ class Server:
         try:
             nova_server = self.conn.compute.create_server(**server_args)
         except Conflict as e:
-            if idempotent:
-                # If creation failed due to conflict and we're in idempotent mode,
-                # try to fetch the existing server
-                existing_server = nova_client.servers.get(get_server_id(self.name))
-                if existing_server:
-                    server = Server._from_nova_server(existing_server)
-                    return server
-            raise e  # Re-raise the exception if not handled
+            raise ResourceError(e.message)  # Re-raise the exception if not handled
 
         server = Server._from_nova_server(nova_server)
 
@@ -607,7 +601,7 @@ def get_server_id(name) -> str:
     """
     servers = [s for s in nova().servers.list() if s.name == name]
     if not servers:
-        raise CHIValueError(f'No matching servers found for name "{name}"')
+        return None
     elif len(servers) > 1:
         raise ResourceError(f'Multiple matching servers found for name "{name}"')
     return servers[0].id

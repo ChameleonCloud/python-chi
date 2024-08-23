@@ -125,6 +125,4 @@ def get_image_id(name):
     images = list(glance().images.list(filters={'name': name}))
     if not images:
         raise CHIValueError(f'No images found matching name "{name}"')
-    elif len(images) > 1:
-        raise ResourceError(f'Multiple images found matching name "{name}"')
     return images[0].id
