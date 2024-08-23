@@ -16,7 +16,7 @@ from openstack.compute.v2.server import Server as OpenStackServer
 from .clients import connection, glance, nova, neutron
 from .exception import CHIValueError, ResourceError, ServiceError
 from .context import get as get_from_context, session, DEFAULT_IMAGE_NAME, _is_ipynb
-from .image import get_image, get_image_id
+from .image import get_image_id, get_image_name
 from .keypair import Keypair
 from .network import (get_network, get_network_id, get_or_create_floating_ip,
                       get_floating_ip, get_free_floating_ip)
@@ -249,7 +249,7 @@ class Server:
 
         server = cls(name=nova_server.name,
                      reservation_id=None,
-                     image_name=get_image(image_id).name,
+                     image_name=get_image_name(image_id),
                      flavor_name=get_flavor(flavor_id).name,
                      key_name=nova_server.key_name,
                      network_name=get_network(network_id)['name'] if network_id is not None else None )
@@ -422,7 +422,7 @@ class Server:
 
     def associate_floating_ip(self, fip: Optional[str] = None) -> None:
         """
-        Associates a floating IP with the server.
+        Associates a floating IP with the server. (BROKEN)
 
         Args:
             fip (str, optional): The floating IP to associate with the server. If not provided, a new floating IP will be allocated.
@@ -430,11 +430,12 @@ class Server:
         Returns:
             None
         """
-        associate_floating_ip(self.name, fip)
+        raise  NotImplementedError("Floating IP association not working yet")
+        associate_floating_ip(self.id, fip)
 
     def detach_floating_ip(self, fip: str) -> None:
         """
-        Detaches a floating IP from the server.
+        Detaches a floating IP from the server. (BROKEN)
 
         Args:
             fip (str): The floating IP to detach.
@@ -442,6 +443,7 @@ class Server:
         Returns:
             None
         """
+        raise  NotImplementedError("Floating IP dissociation not working yet")
         detach_floating_ip(self.name, fip)
 
     def check_connectivity(self, wait: bool = True, port: int = 22, timeout: int = 500,

@@ -23,8 +23,10 @@ import typing
 from typing import List, Tuple, Optional
 from IPython.display import display, HTML
 
+from zunclient.exceptions import NotFound
+
 from .clients import zun
-from .exception import ResourceError
+from .exception import CHIValueError, ResourceError
 from .network import bind_floating_ip, get_free_floating_ip, get_network_id
 
 if typing.TYPE_CHECKING:
@@ -81,7 +83,7 @@ class Container:
                  exposed_ports: List[str],
                  reservation_id: str = None,
                  start: bool = True,
-                 start_timeout: int = None,
+                 start_timeout: int = 0,
                  runtime: str = None):
         self.name = name
         self.image_ref = image_ref
@@ -133,8 +135,11 @@ class Container:
         if idempotent:
             existing = get_container(self.name)
             if existing:
-                self.__dict__.update(existing.__dict__)
-                return
+                if wait_for_active:
+                    existing.wait(status="Running", timeout=wait_timeout)
+                if show:
+                    existing.show(type=show, wait_for_active=wait_for_active)
+                return existing
 
         container = create_container(
             name=self.name,
@@ -152,7 +157,7 @@ class Container:
         else:
             raise ResourceError("could not create container")
 
-        if wait_for_active:
+        if wait_for_active and self.status != "Running":
             self.wait(status="Running", timeout=wait_timeout)
 
         if show:
@@ -187,7 +192,6 @@ class Container:
             Returns:
                 None
             """
-            print(f"Waiting for container {self.name}'s status to turn to {status}. This can take a while depending on the image")
             wait_for_active(self.id, timeout=timeout)
             self._status = status
 
@@ -199,7 +203,7 @@ class Container:
             type (str, optional): The type of display. Can be "text" or "widget". Defaults to "text".
             wait_for_active (bool, optional): Whether to wait for the container to be in the "Running" state before displaying information. Defaults to False.
         """
-        if wait_for_active:
+        if wait_for_active and self.status != "Running":
             self.wait(status="Running")
 
         zun_container = get_container(self.id)
@@ -404,7 +408,10 @@ def get_container(name: str) -> Optional[Container]:
     Returns:
         Optional[Container]: The retrieved container object, or None if the container does not exist.
     """
-    zun_container = zun().containers.get(name)
+    try:
+        zun_container = zun().containers.get(name)
+    except NotFound:
+        return None
     return Container.from_zun_container(zun_container)
 
 
@@ -520,6 +527,7 @@ def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container
 def _wait_for_status(
     container_ref: "str", status: "str", timeout: int = (60 * 2)
 ) -> "Container":
+    print(f"Waiting for container {container_ref} status to turn to Running. This can take a while depending on the image")
     start_time = time.perf_counter()
 
     while True:

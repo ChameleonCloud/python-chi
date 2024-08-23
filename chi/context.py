@@ -29,6 +29,7 @@ DEFAULT_SITE = "CHI@UC"
 DEFAULT_IMAGE_NAME = "CC-Ubuntu22.04"
 DEFAULT_NODE_TYPE = "compute_skylake"
 DEFAULT_AUTH_TYPE = "v3token"
+DEFAULT_NETWORK = "sharednet1"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
 

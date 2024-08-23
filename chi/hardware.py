@@ -10,6 +10,8 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+node_types = []
+
 @dataclass
 class Node:
     """
@@ -140,6 +142,8 @@ def get_nodes(
                 uid=node_data.get("uid"),
                 version=node_data.get("version"),
             )
+            if node.type not in node_types:
+                node_types.append(node.type)
 
             if isinstance(node.gpu, list):
                 gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu[0]['gpu']))
@@ -152,3 +156,14 @@ def get_nodes(
                 nodes.append(node)
 
     return nodes
+
+def get_node_types() -> List[str]:
+    """
+    Retrieve a list of unique node types.
+
+    Returns:
+        List[str]: A list of unique node types.
+    """
+    if len(node_types) < 1:
+        get_nodes()
+    return list(set(node_types))

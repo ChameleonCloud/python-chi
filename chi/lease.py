@@ -945,7 +945,10 @@ def get_lease(ref: str) -> Union[Lease, None]:
     Returns:
         A Lease object matching the ID or name, or None if not found.
     """
-    return Lease(lease_json=_get_lease_from_blazar(ref))
+    blazar_lease = _get_lease_from_blazar(ref)
+    if blazar_lease == None:
+        raise CHIValueError(f"Lease not found maching {ref}")
+    return Lease(lease_json=blazar_lease)
 
 
 def get_lease_id(lease_name) -> str:

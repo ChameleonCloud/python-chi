@@ -91,6 +91,23 @@ def get_image(name: str) -> Image:
 
     return Image.from_glance_image(glance_images[0])
 
+def get_image_name(id: str) -> str:
+    """Look up an image's name from its ID.
+
+    Args:
+        id (str): The ID of the image.
+
+    Returns:
+        str: The name of the found image.
+
+    Raises:
+        CHIValueError: If the image could not be found.
+    """
+    try:
+        image = glance().images.get(id)
+        return image.name
+    except NotFound:
+        raise CHIValueError(f'No image found with ID "{id}"')
 
 def get_image_id(name):
     """Look up an image's ID from its name.

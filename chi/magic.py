@@ -4,8 +4,11 @@ from IPython.display import display
 
 from .server import Server
 from .container import Container
+from .exception import ResourceError
 from .lease import Lease, delete_lease
-from .context import DEFAULT_NODE_TYPE, DEFAULT_IMAGE_NAME, DEFAULT_SITE
+from .image import list_images
+from .hardware import get_node_types
+from .context import DEFAULT_NODE_TYPE, DEFAULT_IMAGE_NAME, DEFAULT_SITE, DEFAULT_NETWORK, get
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -136,6 +139,8 @@ def create_container(
     Returns:
         Container: The created container object.
     """
+    if get("region_name") != "CHI@Edge":
+        raise ResourceError("Launching containers is only supported on CHI@Edge, please launch servers or change site")
 
     lease = Lease(
         name=f"lease-{container_name}",
@@ -161,7 +166,7 @@ def create_container(
         runtime=runtime
     )
 
-    container.submit(wait_for_active=True, show=show)
+    container = container.submit(wait_for_active=True, show=show, idempotent=True)
 
     if reserve_fip:
         container.associate_floating_ip()
@@ -171,6 +176,7 @@ def create_container(
 
 def create_server(
     server_name: str,
+    network_name: Optional[str] = DEFAULT_NETWORK,
     node_type: Optional[str] = None,
     image_name: Optional[str] = None,
     reserve_fip: bool = True,
@@ -192,15 +198,18 @@ def create_server(
         Server: The created server object.
 
     """
+    if get("region_name") == "CHI@Edge":
+        raise ResourceError("Launching servers is not supported on CHI@Edge, please launch containers or change site")
+
     if node_type is None:
         node_type = _get_user_input(
-            options=["compute_skylake", "storage_nvme"],
+            options=get_node_types(),
             description="Node Type"
         )
 
     if image_name is None:
         image_name = _get_user_input(
-            options=["CC-Ubuntu22.04", "CC-Ubuntu22.04-CUDA"],
+            options=[image.name for image in list_images()],
             description="Image"
         )
 
@@ -219,10 +228,10 @@ def create_server(
         name=server_name,
         reservation_id=lease.node_reservations[0]['id'],
         image_name=image_name,
-        network_name="sharednet1"  # Change this to a DEFAULT var ASAP
+        network_name=network_name  # Change this to a DEFAULT var ASAP
     )
 
-    server = server.submit(wait_for_active=True, show=show)
+    server = server.submit(wait_for_active=True, show=show, idempotent=True)
 
     if reserve_fip:
         server.associate_floating_ip()
