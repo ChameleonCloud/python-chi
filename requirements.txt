@@ -13,3 +13,5 @@ python-novaclient
 python-zunclient
 ipython
 ipywidgets
+networkx
+matplotlib
