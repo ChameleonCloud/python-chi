@@ -352,7 +352,7 @@ class Lease:
     def submit(self,
                wait_for_active: bool = True,
                wait_timeout: int = 300,
-               show: List[str] = ["widget", "text"],
+               show: Optional[str] = None,
                idempotent: bool = False):
         """
         Submits the lease for creation.
@@ -360,7 +360,7 @@ class Lease:
         Args:
             wait_for_active (bool, optional): Whether to wait for the lease to become active. Defaults to True.
             wait_timeout (int, optional): The maximum time to wait for the lease to become active, in seconds. Defaults to 300.
-            show (List[str], optional): The types of lease information to display. Defaults to ["widget", "text"].
+            show (Optional[str], optional): The types of lease information to display. Defaults to None, options are "widget", "text".
             idempotent (bool, optional): Whether to create the lease only if it doesn't already exist. Defaults to False.
 
         Raises:
@@ -370,9 +370,13 @@ class Lease:
             None
         """
         if idempotent:
-            existing_lease = self._get_existing_lease()
+            existing_lease = _get_lease_from_blazar(self.name)
             if existing_lease:
                 self._populate_from_json(existing_lease)
+                if wait_for_active:
+                    self.wait(status="active", timeout=wait_timeout)
+                if show:
+                    self.show(type=show, wait_for_active=wait_for_active)
                 return
 
         reservations = self.device_reservations + self.node_reservations + self.fip_reservations + self.network_reservations
@@ -390,13 +394,8 @@ class Lease:
         if wait_for_active:
             self.wait(status="active", timeout=wait_timeout)
 
-        if "widget" in show:
-            self.show(type="widget", wait_for_active=wait_for_active)
-        if "text" in show:
-            self.show(type="text", wait_for_active=wait_for_active)
-
-    def _get_existing_lease(self):
-        return get_lease(self.name);
+        if show:
+            self.show(type=show, wait_for_active=wait_for_active)
 
     def wait(self, status="active", timeout=300):
         print("Waiting for lease to start... This can take up to 60 seconds")
@@ -915,6 +914,29 @@ def list_leases() -> List[Lease]:
 
     return leases
 
+def _get_lease_from_blazar(ref: str):
+    blazar_client = blazar()
+
+    try:
+        lease_dict = blazar_client.lease.get(ref)
+        return lease_dict
+    except BlazarClientException as err:
+        # Blazar's exception class is a bit odd and stores the actual code
+        # in 'kwargs'. The 'code' attribute on the exception is just the default
+        # code. Prefer to use .kwargs['code'] if present, fall back to .code
+        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
+        if code == 404:
+            try:
+                lease_id = get_lease_id(ref)
+                lease_dict = blazar_client.lease.get(lease_id)
+                return lease_dict
+            except Exception:
+                # If we still can't find the lease, return None
+                return None
+        else:
+            raise
+
+
 def get_lease(ref: str) -> Union[Lease, None]:
     """
     Get a lease by its ID or name.
@@ -925,26 +947,10 @@ def get_lease(ref: str) -> Union[Lease, None]:
     Returns:
         A Lease object matching the ID or name, or None if not found.
     """
-    blazar_client = blazar()
-
-    try:
-        lease_dict = blazar_client.lease.get(ref)
-        return Lease(lease_json=lease_dict)
-    except BlazarClientException as err:
-        # Blazar's exception class is a bit odd and stores the actual code
-        # in 'kwargs'. The 'code' attribute on the exception is just the default
-        # code. Prefer to use .kwargs['code'] if present, fall back to .code
-        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
-        if code == 404:
-            try:
-                lease_id = get_lease_id(ref)
-                lease_dict = blazar_client.lease.get(lease_id)
-                return Lease(lease_json=lease_dict)
-            except BlazarClientException:
-                # If we still can't find the lease, return None
-                return None
-        else:
-            raise
+    blazar_lease = _get_lease_from_blazar(ref)
+    if blazar_lease == None:
+        raise CHIValueError(f"Lease not found maching {ref}")
+    return Lease(lease_json=blazar_lease)
 
 
 def get_lease_id(lease_name) -> str:
@@ -1020,9 +1026,8 @@ def delete_lease(ref):
         ref (str): The name or ID of the lease.
     """
     lease = get_lease(ref)
-    lease_id = lease["id"]
-    blazar().lease.delete(lease_id)
-    print(f"Deleted lease with id {lease_id}")
+    lease.delete()
+    print(f"Deleted lease {ref}")
 
 
 def wait_for_active(ref):
