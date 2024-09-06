@@ -12,12 +12,14 @@ LOG = logging.getLogger(__name__)
 
 node_types = []
 
+
 @dataclass
 class Node:
     """
     Represents the Chameleon hardware that goes into a single node.
     A dataclass for node information directly from the hardware browser.
     """
+
     site: str
     name: str
     type: str
@@ -40,10 +42,11 @@ class Node:
             A tuple containing the start and end datetime of the next available timeslot.
             If no timeslot is available, returns (end_datetime_of_last_allocation, None).
         """
+
         def get_host_id(items, target_uid):
             for item in items:
-                if item.get('uid') == target_uid:
-                    return item['id']
+                if item.get("uid") == target_uid:
+                    return item["id"]
             return None
 
         blazarclient = blazar()
@@ -58,23 +61,23 @@ class Node:
         if not allocation:
             return (now, None)
 
-        reservations = sorted(allocation['reservations'], key=lambda x: x['start_date'])
+        reservations = sorted(allocation["reservations"], key=lambda x: x["start_date"])
 
         def parse_datetime(dt_str: str) -> datetime:
             dt = datetime.fromisoformat(dt_str)
             return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
-        if parse_datetime(reservations[0]['start_date']) > now:
-            return (now, parse_datetime(reservations[0]['start_date']))
+        if parse_datetime(reservations[0]["start_date"]) > now:
+            return (now, parse_datetime(reservations[0]["start_date"]))
 
         for i in range(len(reservations) - 1):
-            current_end = parse_datetime(reservations[i]['end_date'])
-            next_start = parse_datetime(reservations[i+1]['start_date'])
+            current_end = parse_datetime(reservations[i]["end_date"])
+            next_start = parse_datetime(reservations[i + 1]["start_date"])
 
             if current_end < next_start:
                 return (current_end, next_start)
 
-        last_end = parse_datetime(reservations[-1]['end_date'])
+        last_end = parse_datetime(reservations[-1]["end_date"])
         return (last_end, None)
 
 
@@ -86,12 +89,13 @@ def _call_api(endpoint):
     data = resp.json()
     return data
 
+
 def get_nodes(
-        all_sites: bool = False,
-        filter_reserved: bool = False,
-        gpu: Optional[bool] = None,
-        min_number_cpu: Optional[int] = None,
-    ) -> List[Node]:
+    all_sites: bool = False,
+    filter_reserved: bool = False,
+    gpu: Optional[bool] = None,
+    min_number_cpu: Optional[int] = None,
+) -> List[Node]:
     """
     Retrieve a list of nodes based on the specified criteria.
 
@@ -111,7 +115,7 @@ def get_nodes(
 
     sites = []
     if all_sites:
-        sites = [site.get("name") for site in _call_api("sites")['items']]
+        sites = [site.get("name") for site in _call_api("sites")["items"]]
     else:
         sites.append(get("region_name"))
 
@@ -120,13 +124,15 @@ def get_nodes(
     for site in sites:
         # Soufiane: Skipping CHI@EDGE since it is not enrolled in the hardware API,
         if site == "CHI@Edge":
-            print("Please visit the Hardware discovery page for information about CHI@Edge devices")
+            print(
+                "Please visit the Hardware discovery page for information about CHI@Edge devices"
+            )
             continue
 
         endpoint = f"sites/{site.split('@')[1].lower()}/clusters/chameleon/nodes"
         data = _call_api(endpoint)
 
-        for node_data in data['items']:
+        for node_data in data["items"]:
             node = Node(
                 site=site,
                 name=node_data.get("node_name"),
@@ -146,16 +152,22 @@ def get_nodes(
                 node_types.append(node.type)
 
             if isinstance(node.gpu, list):
-                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu[0]['gpu']))
+                gpu_filter = gpu is None or (
+                    node.gpu and gpu == bool(node.gpu[0]["gpu"])
+                )
             else:
-                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu['gpu']))
+                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu["gpu"]))
 
-            cpu_filter = min_number_cpu is None or node.architecture['smt_size'] >= min_number_cpu
+            cpu_filter = (
+                min_number_cpu is None
+                or node.architecture["smt_size"] >= min_number_cpu
+            )
 
             if gpu_filter and cpu_filter:
                 nodes.append(node)
 
     return nodes
+
 
 def get_node_types() -> List[str]:
     """

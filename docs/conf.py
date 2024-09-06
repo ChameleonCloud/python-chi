@@ -11,7 +11,6 @@ version = "0.1"
 release = "0.1"
 
 extensions = [
-    "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
@@ -32,9 +31,7 @@ pygments_style = "sphinx"
 
 # -- Options for HTML output -------------------------------------------------
 
-html_theme = "sphinx_rtd_theme"
-html_static_path = ["_static"]
-html_extra_path = ["_extra"]
+html_theme = "furo"
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -93,48 +90,3 @@ intersphinx_mapping = {
     "MySQLdb": ("https://mysqlclient.readthedocs.io/", None),
     "novaclient": ("https://docs.openstack.org/python-novaclient/latest/", None),
 }
-
-notebook_examples = [
-    (
-        "Making a reservation",
-        "notebooks/reservations.ipynb",
-        [
-            "tests/test_lease.py:example_reserve_node",
-            "tests/test_lease.py:example_reserve_floating_ip",
-            "tests/test_lease.py:example_reserve_network",
-            "tests/test_lease.py:example_reserve_multiple_resources",
-        ],
-    ),
-    (
-        "Launching a bare metal instance",
-        "notebooks/baremetal.ipynb",
-        [
-            "tests/test_server.py:example_create_server",
-            "tests/test_server.py:example_wait_for_connectivity",
-        ],
-    ),
-    (
-        "Launching a container",
-        "notebooks/container.ipynb",
-        [
-            "tests/test_container.py:example_create_container",
-        ],
-    ),
-]
-
-nbsphinx_execute = "never"
-# This is processed by Jinja2 and inserted before each notebook
-nbsphinx_prolog = r"""
-{% set docname = env.doc2path(env.docname, base=None) %}
-
-.. figure:: https://img.shields.io/badge/Chameleon-Open%20Notebook-brightgreen
-   :target: https://jupyter.chameleoncloud.org/hub/import?deposition_repo=http&deposition_id=https://python-chi.readthedocs.io/en/latest/{{ docname|e }}&ephemeral=true
-
-"""
-
-import generate_notebook
-
-for title, file, examples in notebook_examples:
-    generate_notebook.generate(examples, output_file=file, title=title)
-    # Also copy to the extras folder
-    generate_notebook.generate(examples, output_file=f"_extras/{file}", title=title)

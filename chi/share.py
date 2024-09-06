@@ -4,14 +4,14 @@ from .exception import CHIValueError, ResourceError
 from manilaclient.exceptions import NotFound
 
 __all__ = [
-    'create_share',
-    'delete_share',
-    'extend_share',
-    'get_access_rules',
-    'get_share',
-    'get_share_id',
-    'list_shares',
-    'shrink_share',
+    "create_share",
+    "delete_share",
+    "extend_share",
+    "get_access_rules",
+    "get_share",
+    "get_share_id",
+    "list_shares",
+    "shrink_share",
 ]
 
 
@@ -25,8 +25,7 @@ def _get_default_share_type_id():
     return share_types[0].id
 
 
-def create_share(size, name=None, description=None, metadata=None,
-                 is_public=False):
+def create_share(size, name=None, description=None, metadata=None, is_public=False):
     """Create a share.
 
     Args:
@@ -45,7 +44,7 @@ def create_share(size, name=None, description=None, metadata=None,
         description=description,
         metadata=metadata,
         share_type=_get_default_share_type_id(),
-        is_public=is_public
+        is_public=is_public,
     )
     return share
 
@@ -112,7 +111,7 @@ def get_share_id(name):
         ValueError: If the share could not be found, or if multiple shares
             matched the name.
     """
-    shares = list(manila().shares.list(search_opts={'name': name}))
+    shares = list(manila().shares.list(search_opts={"name": name}))
     if not shares:
         raise CHIValueError(f'No shares found matching name "{name}"')
     elif len(shares) > 1:

@@ -4,17 +4,7 @@
 chi.lease
 =========
 
-The :mod:`chi.lease` module exposes both a functional interface and an
-object-oriented interface for interacting with resource leases.
-
-Functional interface
-====================
+The :mod:`chi.lease` module can be used for interacting with resource leases.
 
 .. automodule:: chi.lease
-   :members:
-
-Object-oriented interface
-=========================
-
-.. autoclass:: chi.lease.Lease
    :members:

@@ -12,44 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
 import io
-import os
 import logging
+import os
 import tarfile
 import time
-import typing
+from typing import List, Optional, Tuple
 
-from typing import List, Tuple, Optional
-from IPython.display import display, HTML
-
+from IPython.display import HTML, display
 from zunclient.exceptions import NotFound
 
 from .clients import zun
-from .exception import CHIValueError, ResourceError
-from .network import bind_floating_ip, get_free_floating_ip, get_network_id
-
-if typing.TYPE_CHECKING:
-    from zunclient.v1.containers import Container
+from .exception import ResourceError
+from .network import bind_floating_ip, get_free_floating_ip
 
 DEFAULT_IMAGE_DRIVER = "docker"
 DEFAULT_NETWORK = "containernet1"
 LOG = logging.getLogger(__name__)
-
-__all__ = [
-    "list_containers",
-    "get_container",
-    "create_container",
-    "snapshot_container",
-    "destroy_container",
-    "get_logs",
-    "execute",
-    "upload",
-    "download",
-    "wait_for_active",
-    "associate_floating_ip",
-]
-
 
 
 class Container:
@@ -75,16 +54,19 @@ class Container:
         runtime (str): The runtime environment for the container.
         id (str): The ID of the container.
         created_at (str): The timestamp when the container was created.
-        _status (str): The current status of the container.
+        status (str): The current status of the container.
     """
-    def __init__(self,
-                 name: str,
-                 image_ref: str,
-                 exposed_ports: List[str],
-                 reservation_id: str = None,
-                 start: bool = True,
-                 start_timeout: int = 0,
-                 runtime: str = None):
+
+    def __init__(
+        self,
+        name: str,
+        image_ref: str,
+        exposed_ports: List[str],
+        reservation_id: str = None,
+        start: bool = True,
+        start_timeout: int = 0,
+        runtime: str = None,
+    ):
         self.name = name
         self.image_ref = image_ref
         self.exposed_ports = exposed_ports
@@ -115,8 +97,13 @@ class Container:
             self._status = container.status
         return self._status
 
-    def submit(self, wait_for_active: bool = True, wait_timeout: int = None,
-               show: str = "widget", idempotent: bool = False):
+    def submit(
+        self,
+        wait_for_active: bool = True,
+        wait_timeout: int = None,
+        show: str = "widget",
+        idempotent: bool = False,
+    ):
         """
         Submits the container for creation and performs additional actions based on the provided parameters.
 
@@ -148,7 +135,7 @@ class Container:
             reservation_id=self.reservation_id,
             start=self.start,
             start_timeout=self.start_timeout,
-            runtime=self.runtime
+            runtime=self.runtime,
         )
 
         if container:
@@ -182,18 +169,18 @@ class Container:
             self._status = None
 
     def wait(self, status: str = "Running", timeout: int = None):
-            """
-            Waits for the container to reach the specified status.
+        """
+        Waits for the container to reach the specified status.
 
-            Args:
-                status (str, optional): The status to wait for. Defaults to "Running".
-                timeout (int, optional): The maximum time to wait in seconds. Defaults to None.
+        Args:
+            status (str, optional): The status to wait for. Defaults to "Running".
+            timeout (int, optional): The maximum time to wait in seconds. Defaults to None.
 
-            Returns:
-                None
-            """
-            wait_for_active(self.id, timeout=timeout)
-            self._status = status
+        Returns:
+            None
+        """
+        wait_for_active(self.id, timeout=timeout)
+        self._status = status
 
     def show(self, type: str = "text", wait_for_active: bool = False):
         """
@@ -226,7 +213,7 @@ class Container:
             "Created at": str(self.created_at),
             "Exposed Ports": self.exposed_ports if self.exposed_ports else "None",
             "Reservation ID": self.reservation_id if self.reservation_id else "None",
-            "Runtime": self.runtime if self.runtime else "Default"
+            "Runtime": self.runtime if self.runtime else "Default",
         }
 
         html_table = """
@@ -252,43 +239,43 @@ class Container:
         display(HTML(html_table))
 
     def execute(self, command: str) -> Tuple[str, str]:
-            """
-            Executes a command inside the container and returns the output and exit code.
+        """
+        Executes a command inside the container and returns the output and exit code.
 
-            Args:
-                command (str): The command to be executed inside the container.
+        Args:
+            command (str): The command to be executed inside the container.
 
-            Returns:
-                Tuple[str, str]: A tuple containing the output of the command and the exit code.
-            """
-            result = execute(self.id, command)
-            return result.get('output', ''), str(result.get('exit_code', ''))
+        Returns:
+            Tuple[str, str]: A tuple containing the output of the command and the exit code.
+        """
+        result = execute(self.id, command)
+        return result.get("output", ""), str(result.get("exit_code", ""))
 
     def upload(self, source: str, remote_dest: str) -> None:
-            """
-            Uploads a file from the local machine to the remote destination in the container.
+        """
+        Uploads a file from the local machine to the remote destination in the container.
 
-            Args:
-                source (str): The path of the file on the local machine.
-                remote_dest (str): The destination path in the container where the file will be uploaded.
+        Args:
+            source (str): The path of the file on the local machine.
+            remote_dest (str): The destination path in the container where the file will be uploaded.
 
-            Returns:
-                None
-            """
-            upload(self.id, source, remote_dest)
+        Returns:
+            None
+        """
+        upload(self.id, source, remote_dest)
 
     def download(self, remote_source: str, dest: str) -> None:
-            """
-            Downloads a file from a remote source to the specified destination.
+        """
+        Downloads a file from a remote source to the specified destination.
 
-            Args:
-                remote_source (str): The URL or path of the remote file to download.
-                dest (str): The destination path where the file will be saved.
+        Args:
+            remote_source (str): The URL or path of the remote file to download.
+            dest (str): The destination path where the file will be saved.
 
-            Returns:
-                None
-            """
-            download(self.id, remote_source, dest)
+        Returns:
+            None
+        """
+        download(self.id, remote_source, dest)
 
     def associate_floating_ip(self, fip: str = None):
         """
@@ -315,8 +302,11 @@ def create_container(
     start_timeout: "int" = None,
     platform_version: "int" = 2,
     **kwargs,
-) -> "Container":
-    """Create a container instance.
+):
+    """
+    .. deprecated:: 1.0
+
+    Create a container instance.
 
     Args:
         name (str): The name to give the container.
@@ -385,8 +375,6 @@ def create_container(
     return container
 
 
-from typing import List
-
 def list_containers() -> List[Container]:
     """
     Retrieve a list of containers.
@@ -418,7 +406,10 @@ def get_container(name: str) -> Optional[Container]:
 def snapshot_container(
     container_ref: "str", repository: "str", tag: "str" = "latest"
 ) -> "str":
-    """Create a snapshot of a running container.
+    """
+    .. deprecated:: 1.0
+
+    Create a snapshot of a running container.
 
     This will store the container's file system in Glance as a new Image.
     You can then specify the Image ID in container create requests.
@@ -433,7 +424,10 @@ def snapshot_container(
 
 
 def destroy_container(container_ref: "str"):
-    """Delete the container.
+    """
+    .. deprecated:: 1.0
+
+    Delete the container.
 
     This will automatically stop the container if it is currently running.
 
@@ -444,7 +438,10 @@ def destroy_container(container_ref: "str"):
 
 
 def get_logs(container_ref: "str", stdout=True, stderr=True):
-    """Print all logs outputted by the container.
+    """
+    .. deprecated:: 1.0
+
+    Print all logs outputted by the container.
 
     Args:
         container_ref (str): The name or ID of the container.
@@ -459,7 +456,10 @@ def get_logs(container_ref: "str", stdout=True, stderr=True):
 
 
 def execute(container_ref: "str", command: "str") -> "dict":
-    """Execute a one-off process inside a running container.
+    """
+    .. deprecated:: 1.0
+
+    Execute a one-off process inside a running container.
 
     Args:
         container_ref (str): The name or ID of the container.
@@ -472,7 +472,10 @@ def execute(container_ref: "str", command: "str") -> "dict":
 
 
 def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
-    """Upload a file or directory to a running container.
+    """
+    .. deprecated:: 1.0
+
+    Upload a file or directory to a running container.
 
     This method requires your running container to include
     the GNU tar utility.
@@ -492,7 +495,10 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
 
 
 def download(container_ref: "str", source: "str", dest: "str"):
-    """Download a file or directory from a running container.
+    """
+    .. deprecated:: 1.0
+
+    Download a file or directory from a running container.
 
     This method requires your running container to include
     both the POSIX sh and GNU tar utilities.
@@ -509,7 +515,10 @@ def download(container_ref: "str", source: "str", dest: "str"):
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
-    """Wait for a container to transition to the running state.
+    """
+    .. deprecated:: 1.0
+
+    Wait for a container to transition to the running state.
 
     Args:
         container_ref (str): The name or ID of the container.
@@ -527,7 +536,9 @@ def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container
 def _wait_for_status(
     container_ref: "str", status: "str", timeout: int = (60 * 2)
 ) -> "Container":
-    print(f"Waiting for container {container_ref} status to turn to Running. This can take a while depending on the image")
+    print(
+        f"Waiting for container {container_ref} status to turn to Running. This can take a while depending on the image"
+    )
     start_time = time.perf_counter()
 
     while True:
@@ -547,7 +558,10 @@ def _wait_for_status(
 
 
 def associate_floating_ip(container_ref: "str", floating_ip_address=None) -> "str":
-    """Assign a Floating IP address to a container.
+    """
+    .. deprecated:: 1.0
+
+    Assign a Floating IP address to a container.
 
     The container's first address will be used for the assignment.
 

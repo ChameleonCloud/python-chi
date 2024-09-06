@@ -1,6 +1,5 @@
 from typing import Optional, List
 from datetime import timedelta
-from IPython.display import display
 
 from .server import Server
 from .container import Container
@@ -8,7 +7,10 @@ from .exception import ResourceError
 from .lease import Lease, delete_lease
 from .image import list_images
 from .hardware import get_node_types
-from .context import DEFAULT_NODE_TYPE, DEFAULT_IMAGE_NAME, DEFAULT_SITE, DEFAULT_NETWORK, get
+from .context import (
+    DEFAULT_NETWORK,
+    get,
+)
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -29,11 +31,11 @@ def visualize_resources(leases: List[Lease]):
 
     # Colors for different resource types
     colors = {
-        'node': '#ADD8E6',  # Light Blue
-        'network': '#90EE90',  # Light Green
-        'fip': '#FFB6C1',  # Light Pink
-        'device': '#FAFAD2',  # Light Goldenrod
-        'idle': '#D3D3D3'  # Light Gray
+        "node": "#ADD8E6",  # Light Blue
+        "network": "#90EE90",  # Light Green
+        "fip": "#FFB6C1",  # Light Pink
+        "device": "#FAFAD2",  # Light Goldenrod
+        "idle": "#D3D3D3",  # Light Gray
     }
 
     node_positions = {}
@@ -51,15 +53,17 @@ def visualize_resources(leases: List[Lease]):
             node_name = f"Node_{node_count}"
             G.add_node(node_name)
             node_positions[node_name] = (node_count, 0)
-            node_colors.append(colors['node'])
-            node_labels[node_name] = f"Node\n{node_res.get('min', 'N/A')}-{node_res.get('max', 'N/A')}"
+            node_colors.append(colors["node"])
+            node_labels[node_name] = (
+                f"Node\n{node_res.get('min', 'N/A')}-{node_res.get('max', 'N/A')}"
+            )
             node_count += 1
 
         for net_res in lease.network_reservations:
             net_name = f"Net_{network_count}"
             G.add_node(net_name)
             node_positions[net_name] = (network_count, 1)
-            node_colors.append(colors['network'])
+            node_colors.append(colors["network"])
             node_labels[net_name] = f"Network\n{net_res.get('network_name', 'N/A')}"
             network_count += 1
 
@@ -67,7 +71,7 @@ def visualize_resources(leases: List[Lease]):
             fip_name = f"FIP_{fip_count}"
             G.add_node(fip_name)
             node_positions[fip_name] = (fip_count, 2)
-            node_colors.append(colors['fip'])
+            node_colors.append(colors["fip"])
             node_labels[fip_name] = f"FIP\n{fip_res.get('amount', 'N/A')}"
             fip_count += 1
 
@@ -75,8 +79,10 @@ def visualize_resources(leases: List[Lease]):
             device_name = f"Device_{device_count}"
             G.add_node(device_name)
             node_positions[device_name] = (device_count, 3)
-            node_colors.append(colors['device'])
-            node_labels[device_name] = f"Device\n{device_res.get('min', 'N/A')}-{device_res.get('max', 'N/A')}"
+            node_colors.append(colors["device"])
+            node_labels[device_name] = (
+                f"Device\n{device_res.get('min', 'N/A')}-{device_res.get('max', 'N/A')}"
+            )
             device_count += 1
 
     idle_resources = max(node_count, network_count, fip_count, device_count)
@@ -84,20 +90,29 @@ def visualize_resources(leases: List[Lease]):
         idle_name = f"Idle_{i}"
         G.add_node(idle_name)
         node_positions[idle_name] = (i, 4)
-        node_colors.append(colors['idle'])
+        node_colors.append(colors["idle"])
         node_labels[idle_name] = "Idle"
 
     plt.figure(figsize=(12, 8))
     nx.draw(G, pos=node_positions, node_color=node_colors, node_size=3000, alpha=0.8)
     nx.draw_networkx_labels(G, pos=node_positions, labels=node_labels, font_size=8)
 
-    legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'{key.capitalize()}',
-                                  markerfacecolor=value, markersize=10)
-                       for key, value in colors.items()]
-    plt.legend(handles=legend_elements, loc='upper right')
+    legend_elements = [
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            label=f"{key.capitalize()}",
+            markerfacecolor=value,
+            markersize=10,
+        )
+        for key, value in colors.items()
+    ]
+    plt.legend(handles=legend_elements, loc="upper right")
 
     plt.title("Resource Visualization")
-    plt.axis('off')
+    plt.axis("off")
     plt.tight_layout()
     plt.show()
 
@@ -107,7 +122,7 @@ def cleanup_resources(lease_name: str):
     Cleans up resources associated with the given lease name.
 
     Args:
-        laese_name (str): The name of the lease to be cleaned up.
+        lease_name (str): The name of the lease to be cleaned up.
     """
     delete_lease(lease_name)
 
@@ -140,30 +155,29 @@ def create_container(
         Container: The created container object.
     """
     if get("region_name") != "CHI@Edge":
-        raise ResourceError("Launching containers is only supported on CHI@Edge, please launch servers or change site")
+        raise ResourceError(
+            "Launching containers is only supported on CHI@Edge, please launch servers or change site"
+        )
 
-    lease = Lease(
-        name=f"lease-{container_name}",
-        duration=duration
+    lease = Lease(name=f"lease-{container_name}", duration=duration)
+
+    lease.add_device_reservation(
+        amount=1, machine_type=device_type, device_name=device_name
     )
-
-    lease.add_device_reservation(amount=1,
-                                 machine_type=device_type,
-                                 device_name=device_name)
     lease.submit(idempotent=True)
 
     if show == "widget":
         lease.show(type="widget")
 
-    container_name = container_name.replace('_', '-')
+    container_name = container_name.replace("_", "-")
     container_name = container_name.lower()
 
     container = Container(
         name=container_name,
-        reservation_id=lease.device_reservations[0]['id'],
+        reservation_id=lease.device_reservations[0]["id"],
         image_ref=container_image,
         exposed_ports=exposed_ports,
-        runtime=runtime
+        runtime=runtime,
     )
 
     container = container.submit(wait_for_active=True, show=show, idempotent=True)
@@ -181,10 +195,10 @@ def create_server(
     image_name: Optional[str] = None,
     reserve_fip: bool = True,
     duration: timedelta = timedelta(hours=24),
-    show: str = "widget"
+    show: str = "widget",
 ) -> Server:
     """
-    Creates a server with the given parameters.
+    Creates a server with the given parameters. Will automatically create a reservation.
 
     Args:
         server_name (str): The name of the server.
@@ -199,24 +213,19 @@ def create_server(
 
     """
     if get("region_name") == "CHI@Edge":
-        raise ResourceError("Launching servers is not supported on CHI@Edge, please launch containers or change site")
+        raise ResourceError(
+            "Launching servers is not supported on CHI@Edge, please launch containers or change site"
+        )
 
     if node_type is None:
-        node_type = _get_user_input(
-            options=get_node_types(),
-            description="Node Type"
-        )
+        node_type = _get_user_input(options=get_node_types(), description="Node Type")
 
     if image_name is None:
         image_name = _get_user_input(
-            options=[image.name for image in list_images()],
-            description="Image"
+            options=[image.name for image in list_images()], description="Image"
         )
 
-    lease = Lease(
-        name=f"lease-{server_name}",
-        duration=duration
-    )
+    lease = Lease(name=f"lease-{server_name}", duration=duration)
 
     lease.add_node_reservation(amount=1, node_type=node_type)
     lease.submit(idempotent=True)
@@ -226,9 +235,9 @@ def create_server(
 
     server = Server(
         name=server_name,
-        reservation_id=lease.node_reservations[0]['id'],
+        reservation_id=lease.node_reservations[0]["id"],
         image_name=image_name,
-        network_name=network_name  # Change this to a DEFAULT var ASAP
+        network_name=network_name,  # Change this to a DEFAULT var ASAP
     )
 
     server = server.submit(wait_for_active=True, show=show, idempotent=True)

@@ -1,7 +1,5 @@
 click
-nbformat
-nbsphinx
 rstcheck
 sphinx
 sphinx-autobuild
-sphinx-rtd-theme
+furo

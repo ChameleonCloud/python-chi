@@ -66,6 +66,7 @@ For more details about the modules available refer to their respective pages.
    :maxdepth: 1
 
    modules/context
+   modules/hardware
    modules/lease
    modules/server
    modules/network
@@ -73,6 +74,9 @@ For more details about the modules available refer to their respective pages.
    modules/container
    modules/share
    modules/ssh
+   modules/magic
+   modules/clients
+   modules/exception
 
 .. toctree::
    :caption: Examples
