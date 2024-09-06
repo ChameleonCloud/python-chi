@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from blazarclient.client import Client as BlazarClient
     from cinderclient.client import Client as CinderClient
     from glanceclient.client import Client as GlanceClient
-    from gnocchiclient.v1.client import Client as GnocchiClient
     from manilaclient.client import Client as ManilaClient
     from neutronclient.v2_0.client import Client as NeutronClient
     from novaclient.client import Client as NovaClient
@@ -37,6 +36,8 @@ def connection(session=None) -> "Connection":
        are useful for operations that span a few services, such as assigning
        a Floating IP to a server instance.
 
+    See `the documentation <https://docs.openstack.org/openstacksdk/latest/user/connection.html>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -61,6 +62,8 @@ def connection(session=None) -> "Connection":
 def blazar(session=None) -> "BlazarClient":
     """Get a preconfigured client for Blazar, the reservation service.
 
+    See `the documentation <https://opendev.org/openstack/python-blazarclient/>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -78,6 +81,8 @@ def blazar(session=None) -> "BlazarClient":
 def cinder(session=None) -> "CinderClient":
     """Get a preconfigured client for Cinder, the persistent volume service.
 
+    See `the documentation <https://docs.openstack.org/python-cinderclient/latest/>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -93,6 +98,8 @@ def cinder(session=None) -> "CinderClient":
 def glance(session=None) -> "GlanceClient":
     """Get a preconfigured client for Glance, the image service.
 
+    See `the documentation <https://docs.openstack.org/python-glanceclient/latest/>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -105,28 +112,10 @@ def glance(session=None) -> "GlanceClient":
     return GlanceClient("2", session=(session or session_factory()))
 
 
-def gnocchi(session=None) -> "GnocchiClient":
-    """Get a preconfigured client for Gnocchi, the metrics service.
-
-    Args:
-        session (Session): An authentication session object. By default a
-            new session is created via :func:`chi.session`.
-
-    Returns:
-        A new Gnocchi client.
-    """
-    from gnocchiclient.v1.client import Client as GnocchiClient
-
-    sess = session or session_factory()
-    session_options = dict(auth=sess.session.auth)
-    adapter_options = dict(interface=sess.interface, region_name=sess.region_name)
-    return GnocchiClient(
-        adapter_options=adapter_options, session_options=session_options
-    )
-
-
 def manila(session=None) -> "ManilaClient":
     """Get a preconfigured client for Manila, the share service.
+
+    See `the documentation <https://docs.openstack.org/python-manilaclient/latest/user/api.html>`__ for usage.
 
     Args:
         session (Session): An authentication session object. By default a
@@ -143,6 +132,8 @@ def manila(session=None) -> "ManilaClient":
 def neutron(session=None) -> "NeutronClient":
     """Get a preconfigured client for Neutron, the networking service.
 
+    See `the documentation <https://docs.openstack.org/python-neutronclient/latest/reference/index.html>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -158,6 +149,8 @@ def neutron(session=None) -> "NeutronClient":
 def nova(session=None) -> "NovaClient":
     """Get a preconfigured client for Nova, the compute service.
 
+    See `the documentation <https://docs.openstack.org/python-novaclient/latest/user/python-api.html>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -172,6 +165,8 @@ def nova(session=None) -> "NovaClient":
 
 def ironic(session=None) -> "IronicClient":
     """Get a preconfigured client for Ironic, the bare metal service.
+
+    See `the documentation <https://docs.openstack.org/python-ironicclient/latest/api_v1.html>`__ for usage.
 
     Args:
         session (Session): An authentication session object. By default a
@@ -195,6 +190,8 @@ def ironic(session=None) -> "IronicClient":
 def keystone(session=None) -> "KeystoneClient":
     """Get a preconfigured client for Keystone, the authentication service.
 
+    See `the documentation <https://docs.openstack.org/python-keystoneclient/latest/>`__ for usage.
+
     Args:
         session (Session): An authentication session object. By default a
             new session is created via :func:`chi.session`.
@@ -215,6 +212,17 @@ def keystone(session=None) -> "KeystoneClient":
 
 
 def zun(session=None) -> "ZunClient":
+    """Get a preconfigured client for Zun, the edge container service.
+
+    See `the documentation <https://docs.openstack.org/python-zunclient/latest/user/python-api.html>`__ for usage.
+
+    Args:
+        session (Session): An authentication session object. By default a
+            new session is created via :func:`chi.session`.
+
+    Returns:
+        A new Zun client.
+    """
     from zunclient.client import Client as ZunClient
 
     return ZunClient(ZUN_API_VERSION, session=(session or session_factory()))

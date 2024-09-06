@@ -1,28 +1,25 @@
-from datetime import datetime, timedelta, timezone
 import json
+import logging
 import numbers
 import re
-import sys
 import time
-
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, List, Optional, Union
-from ipywidgets import HTML
-from IPython.display import display
+
 from blazarclient.exception import BlazarClientException
+from IPython.display import display
+from ipywidgets import HTML
 
-from .clients import blazar, neutron
+from .clients import blazar
+from .context import _is_ipynb
 from .exception import CHIValueError, ResourceError, ServiceError
-from .context import get as get_from_context, session, _is_ipynb
 from .hardware import Node
-from .network import get_network_id, PUBLIC_NETWORK, list_floating_ips
-from .server import Server, ServerError
-from .util import random_base32, utcnow
-
-import logging
+from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
+from .util import utcnow
 
 if TYPE_CHECKING:
     from typing import Pattern
-import pprint
+
 
 LOG = logging.getLogger(__name__)
 
@@ -32,23 +29,6 @@ class ErrorParsers:
         r"not enough (?P<resource_type>([\w\s\-\._]+)) available"
     )
 
-
-__all__ = [
-    "add_node_reservation",
-    "add_network_reservation",
-    "add_fip_reservation",
-    "add_device_reservation",
-    "get_node_reservation",
-    "get_device_reservation",
-    "get_reserved_floating_ips",
-    "lease_duration",
-    "list_leases",
-    "get_lease",
-    "get_lease_id",
-    "create_lease",
-    "delete_lease",
-    "wait_for_active",
-]
 
 BLAZAR_TIME_FORMAT = "%Y-%m-%d %H:%M"
 DEFAULT_NODE_TYPE = "compute_skylake"
@@ -69,6 +49,8 @@ def lease_create_args(
     network_resource_properties=DEFAULT_NETWORK_RESOURCE_PROPERTIES,
 ):
     """
+    .. deprecated:: 1.0
+
     Generates the nested object that needs to be sent to the Blazar client
     to create the lease. Provides useful defaults for Chameleon.
 
@@ -147,6 +129,8 @@ def lease_create_args(
 
 def lease_create_nodetype(*args, **kwargs):
     """
+    .. deprecated:: 1.0
+
     Wrapper for :py:func:`lease_create_args` that adds the
     ``resource_properties`` payload to specify node type.
 
@@ -159,6 +143,7 @@ def lease_create_nodetype(*args, **kwargs):
         raise CHIValueError("no node_type specified")
     kwargs["node_resource_properties"] = ["==", "$node_type", node_type]
     return lease_create_args(*args, **kwargs)
+
 
 class Lease:
     """
@@ -184,28 +169,17 @@ class Lease:
         node_reservations (list): List of node reservations associated with the lease.
         fip_reservations (list): List of floating IP reservations associated with the lease.
         network_reservations (list): List of network reservations associated with the lease.
-        _events (list): List of events associated with the lease.
-
-    Methods:
-        add_node_reservation: Adds a node reservation to the lease.
-        add_fip_reservation: Adds a floating IP reservation to the lease.
-        add_network_reservation: Adds a network reservation to the lease.
-        submit: Submits the lease for creation.
-        wait: Waits for the lease to reach a specific status.
-        refresh: Refreshes the lease data from the Blazar API.
-        delete: Deletes the lease.
-        show: Displays the lease details.
-
-    Properties:
-        events: List of events associated with the lease.
-        status: The status of the lease.
+        events (list): List of events associated with the lease.
     """
-    def __init__(self,
-                    name: Optional[str] = None,
-                    start_date: Optional[datetime] = None,
-                    end_date: Optional[datetime] = None,
-                    duration: Optional[timedelta] = None,
-                    lease_json: Optional[dict] = None):
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        duration: Optional[timedelta] = None,
+        lease_json: Optional[dict] = None,
+    ):
         self.id = None
         self.status = None
         self.user_id = None
@@ -222,13 +196,15 @@ class Lease:
             self._populate_from_json(lease_json)
         else:
             if name is None:
-                raise CHIValueError("Name must be specified when lease_json is not provided")
+                raise CHIValueError(
+                    "Name must be specified when lease_json is not provided"
+                )
 
             self.name = name
             if start_date:
                 self.start_date = start_date.strftime(BLAZAR_TIME_FORMAT)
             else:
-                self.start_date = 'now'
+                self.start_date = "now"
 
             if end_date and duration:
                 raise CHIValueError("Specify either end_date or duration, not both")
@@ -240,40 +216,48 @@ class Lease:
                 raise CHIValueError("Either end_date or duration must be specified")
 
     def _populate_from_json(self, lease_json):
-        self.name = lease_json.get('name')
-        self.id = lease_json.get('id')
-        self.status = lease_json.get('status')
-        self.user_id = lease_json.get('user_id')
-        self.project_id = lease_json.get('project_id')
+        self.name = lease_json.get("name")
+        self.id = lease_json.get("id")
+        self.status = lease_json.get("status")
+        self.user_id = lease_json.get("user_id")
+        self.project_id = lease_json.get("project_id")
 
-        self.created_at = datetime.fromisoformat(lease_json.get('created_at'))
-        self.start_date = datetime.strptime(lease_json.get('start_date'), "%Y-%m-%dT%H:%M:%S.%f")
-        self.end_date = datetime.strptime(lease_json.get('end_date'), "%Y-%m-%dT%H:%M:%S.%f")
-        self.created_at = datetime.strptime(lease_json.get('created_at'), "%Y-%m-%d %H:%M:%S")
+        self.created_at = datetime.fromisoformat(lease_json.get("created_at"))
+        self.start_date = datetime.strptime(
+            lease_json.get("start_date"), "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        self.end_date = datetime.strptime(
+            lease_json.get("end_date"), "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        self.created_at = datetime.strptime(
+            lease_json.get("created_at"), "%Y-%m-%d %H:%M:%S"
+        )
 
         self.device_reservations.clear()
         self.node_reservations.clear()
         self.fip_reservations.clear()
         self.network_reservations.clear()
 
-        for reservation in lease_json.get('reservations', []):
-            resource_type = reservation.get('resource_type')
-            if resource_type == 'device':
+        for reservation in lease_json.get("reservations", []):
+            resource_type = reservation.get("resource_type")
+            if resource_type == "device":
                 self.device_reservations.append(reservation)
-            if resource_type == 'physical:host':
+            if resource_type == "physical:host":
                 self.node_reservations.append(reservation)
-            elif resource_type == 'virtual:floatingip':
+            elif resource_type == "virtual:floatingip":
                 self.fip_reservations.append(reservation)
-            elif resource_type == 'network':
+            elif resource_type == "network":
                 self.network_reservations.append(reservation)
 
         # self.events = lease_json.get('events', [])
 
-    def add_device_reservation(self,
-                               amount: int = None,
-                               machine_type: str = None,
-                               device_model: str = None,
-                               device_name: str = None):
+    def add_device_reservation(
+        self,
+        amount: int = None,
+        machine_type: str = None,
+        device_model: str = None,
+        device_name: str = None,
+    ):
         """
         Add a IoT device reservation to the list of device reservations.
 
@@ -283,17 +267,21 @@ class Lease:
             device_model (str, optional): The model of the device to reserve. Defaults to None.
             device_name (str, optional): The name of the device to reserve. Defaults to None.
         """
-        add_device_reservation(reservation_list=self.device_reservations,
-                               count=amount,
-                               machine_name=machine_type,
-                               device_model=device_model,
-                               device_name=device_name)
+        add_device_reservation(
+            reservation_list=self.device_reservations,
+            count=amount,
+            machine_name=machine_type,
+            device_model=device_model,
+            device_name=device_name,
+        )
 
-    def add_node_reservation(self,
-                             amount: int = None,
-                             node_type: str = None,
-                             node_name: str = None,
-                             nodes: List[Node] = None):
+    def add_node_reservation(
+        self,
+        amount: int = None,
+        node_type: str = None,
+        node_name: str = None,
+        nodes: List[Node] = None,
+    ):
         """
         Add a node reservation to the lease.
 
@@ -309,15 +297,20 @@ class Lease:
         """
         if nodes:
             if any([amount, node_type, node_name]):
-                raise CHIValueError("When specifying nodes, no other arguments should be included")
+                raise CHIValueError(
+                    "When specifying nodes, no other arguments should be included"
+                )
             for node in nodes:
-                add_node_reservation(reservation_list=self.node_reservations,
-                                     node_name=node.name)
+                add_node_reservation(
+                    reservation_list=self.node_reservations, node_name=node.name
+                )
         else:
-            add_node_reservation(reservation_list=self.node_reservations,
-                                 count=amount,
-                                 node_type=node_type,
-                                 node_name=node_name)
+            add_node_reservation(
+                reservation_list=self.node_reservations,
+                count=amount,
+                node_type=node_type,
+                node_name=node_name,
+            )
 
     def add_fip_reservation(self, amount: int):
         """
@@ -329,13 +322,11 @@ class Lease:
         Returns:
             None
         """
-        add_fip_reservation(reservation_list=self.fip_reservations,
-                            count=amount)
+        add_fip_reservation(reservation_list=self.fip_reservations, count=amount)
 
-    def add_network_reservation(self,
-                                network_name: str,
-                                usage_type: str = None,
-                                stitch_provider: str = None):
+    def add_network_reservation(
+        self, network_name: str, usage_type: str = None, stitch_provider: str = None
+    ):
         """
         Add a network reservation to the list of network reservations.
 
@@ -344,16 +335,20 @@ class Lease:
             usage_type (str, optional): The type of usage for the network reservation. Defaults to None.
             stitch_provider (str, optional): The stitch provider for the network reservation. Defaults to None.
         """
-        add_network_reservation(reservation_list=self.network_reservations,
-                                network_name=network_name,
-                                usage_type=usage_type,
-                                stitch_provider=stitch_provider)
+        add_network_reservation(
+            reservation_list=self.network_reservations,
+            network_name=network_name,
+            usage_type=usage_type,
+            stitch_provider=stitch_provider,
+        )
 
-    def submit(self,
-               wait_for_active: bool = True,
-               wait_timeout: int = 300,
-               show: Optional[str] = None,
-               idempotent: bool = False):
+    def submit(
+        self,
+        wait_for_active: bool = True,
+        wait_timeout: int = 300,
+        show: Optional[str] = None,
+        idempotent: bool = False,
+    ):
         """
         Submits the lease for creation.
 
@@ -379,12 +374,19 @@ class Lease:
                     self.show(type=show, wait_for_active=wait_for_active)
                 return
 
-        reservations = self.device_reservations + self.node_reservations + self.fip_reservations + self.network_reservations
+        reservations = (
+            self.device_reservations
+            + self.node_reservations
+            + self.fip_reservations
+            + self.network_reservations
+        )
 
-        response = create_lease(lease_name=self.name,
-                                reservations=reservations,
-                                start_date=self.start_date,
-                                end_date=self.end_date)
+        response = create_lease(
+            lease_name=self.name,
+            reservations=reservations,
+            start_date=self.start_date,
+            end_date=self.end_date,
+        )
 
         if response:
             self._populate_from_json(response)
@@ -406,14 +408,18 @@ class Lease:
                 print(f"Lease {self.name} has reached status {self.status.lower()}")
                 return
             time.sleep(15)
-        raise ServiceError(f"Lease did not reach '{status}' status within {timeout} seconds")
+        raise ServiceError(
+            f"Lease did not reach '{status}' status within {timeout} seconds"
+        )
 
     def refresh(self):
         if self.id:
             lease_data = blazar().lease.get(self.id)
             self._populate_from_json(lease_data)
         else:
-            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
+            raise ResourceError(
+                "Lease object does not yet have a valid id, please submit the object for creation first"
+            )
 
     def delete(self):
         if self.id:
@@ -421,7 +427,9 @@ class Lease:
             self.id = None
             self.status = "DELETED"
         else:
-            raise ResourceError("Lease object does not yet have a valid id, please submit the object for creation first")
+            raise ResourceError(
+                "Lease object does not yet have a valid id, please submit the object for creation first"
+            )
 
     def show(self, type=["text", "widget"], wait_for_active=False):
         if wait_for_active:
@@ -476,7 +484,7 @@ class Lease:
         display(widget)
 
     def _show_text(self):
-        print(f"Lease Details:")
+        print("Lease Details:")
         print(f"Name: {self.name}")
         print(f"ID: {self.id or 'N/A'}")
         print(f"Status: {self.status or 'N/A'}")
@@ -487,20 +495,27 @@ class Lease:
 
         print("\nNode Reservations:")
         for r in self.node_reservations:
-            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Min: {r.get('min', 'N/A')}, Max: {r.get('max', 'N/A')}")
+            print(
+                f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Min: {r.get('min', 'N/A')}, Max: {r.get('max', 'N/A')}"
+            )
 
         print("\nFloating IP Reservations:")
         for r in self.fip_reservations:
-            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Amount: {r.get('amount', 'N/A')}")
+            print(
+                f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Amount: {r.get('amount', 'N/A')}"
+            )
 
         print("\nNetwork Reservations:")
         for r in self.network_reservations:
-            print(f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}")
+            print(
+                f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}"
+            )
 
         print("\nEvents:")
         for e in self.events:
-            print(f"Type: {e.get('event_type', 'N/A')}, Time: {e.get('time', 'N/A')}, Status: {e.get('status', 'N/A')}")
-
+            print(
+                f"Type: {e.get('event_type', 'N/A')}, Time: {e.get('time', 'N/A')}, Status: {e.get('status', 'N/A')}"
+            )
 
     @property
     def events(self):
@@ -545,7 +560,10 @@ def add_node_reservation(
     node_name=None,
     architecture=None,
 ):
-    """Add a node reservation to a reservation list.
+    """
+    .. deprecated:: 1.0
+
+    Add a node reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
@@ -575,8 +593,15 @@ def add_node_reservation(
     if architecture:
         extra_constraints.append(["==", "$architecture.platform_type", architecture])
     if node_name:
-        if count != 1 or node_type != None or resource_properties != None or architecture != None:
-            raise CHIValueError("If node name is specified, no other resource constraint can be specified")
+        if (
+            count != 1
+            or node_type is not None
+            or resource_properties is not None
+            or architecture is not None
+        ):
+            raise CHIValueError(
+                "If node name is specified, no other resource constraint can be specified"
+            )
         extra_constraints.append(["==", "$node_name", node_name])
 
     resource_properties = _format_resource_properties(
@@ -597,7 +622,10 @@ def add_node_reservation(
 def get_node_reservation(
     lease_ref, count=None, resource_properties=None, node_type=None, architecture=None
 ):
-    """Retrieve a reservation ID for a node reservation.
+    """
+    .. deprecated:: 1.0
+
+    Retrieve a reservation ID for a node reservation.
 
     The reservation ID is useful to have when launching bare metal instances.
 
@@ -640,8 +668,13 @@ def get_node_reservation(
     return res["id"]
 
 
-def get_device_reservation(lease_ref, count=None, machine_name=None, device_model=None, device_name=None):
-    """Retrieve a reservation ID for a device reservation.
+def get_device_reservation(
+    lease_ref, count=None, machine_name=None, device_model=None, device_name=None
+):
+    """
+    .. deprecated:: 1.0
+
+    Retrieve a reservation ID for a device reservation.
 
     The reservation ID is useful to have when requesting containers.
 
@@ -688,7 +721,10 @@ def get_device_reservation(lease_ref, count=None, machine_name=None, device_mode
 
 
 def get_reserved_floating_ips(lease_ref) -> "list[str]":
-    """Get a list of Floating IP addresses reserved in a lease.
+    """
+    .. deprecated:: 1.0
+
+    Get a list of Floating IP addresses reserved in a lease.
 
     Args:
         lease_ref (str): The ID or name of the lease.
@@ -743,7 +779,10 @@ def add_network_reservation(
     resource_properties=None,
     physical_network="physnet1",
 ):
-    """Add a network reservation to a reservation list.
+    """
+    .. deprecated:: 1.0
+
+    Add a network reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
@@ -771,24 +810,19 @@ def add_network_reservation(
     if vswitch_name:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
-
-
     user_constraints = (resource_properties or []).copy()
     extra_constraints = []
 
-
-
     if physical_network:
         extra_constraints.append(["==", "$physical_network", physical_network])
-    if stitch_provider and stitch_provider != 'fabric':
+    if stitch_provider and stitch_provider != "fabric":
         extra_constraints.append(["==", "$stitch_provider", stitch_provider])
     else:
         raise CHIValueError("stitch_provider must be 'fabric' or None")
-    if usage_type and usage_type != 'storage':
+    if usage_type and usage_type != "storage":
         extra_constraints.append(["==", "$usage_type", usage_type])
     else:
         raise CHIValueError("usage_type must be 'storage' or None")
-
 
     resource_properties = _format_resource_properties(
         user_constraints, extra_constraints
@@ -806,7 +840,10 @@ def add_network_reservation(
 
 
 def add_fip_reservation(reservation_list, count=1):
-    """Add a floating IP reservation to a reservation list.
+    """
+    .. deprecated:: 1.0
+
+    Add a floating IP reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
@@ -825,7 +862,10 @@ def add_fip_reservation(reservation_list, count=1):
 def add_device_reservation(
     reservation_list, count=1, machine_name=None, device_model=None, device_name=None
 ):
-    """Add an IoT/edge device reservation to a reservation list.
+    """
+    .. deprecated:: 1.0
+
+    Add an IoT/edge device reservation to a reservation list.
 
     Args:
         reservation_list (list[dict]): The list of reservations to add to.
@@ -872,7 +912,8 @@ def add_device_reservation(
 
 
 def lease_duration(days=1, hours=0):
-    """Compute the start and end dates for a lease given its desired duration.
+    """
+    Compute the start and end dates for a lease given its desired duration.
 
     When providing both ``days`` and ``hours``, the duration is summed. So,
     the following would be a lease for one and a half days:
@@ -897,6 +938,7 @@ def lease_duration(days=1, hours=0):
 # Leases
 #########
 
+
 def list_leases() -> List[Lease]:
     """
     Return a list of user leases.
@@ -913,6 +955,7 @@ def list_leases() -> List[Lease]:
         leases.append(lease)
 
     return leases
+
 
 def _get_lease_from_blazar(ref: str):
     blazar_client = blazar()
@@ -948,7 +991,7 @@ def get_lease(ref: str) -> Union[Lease, None]:
         A Lease object matching the ID or name, or None if not found.
     """
     blazar_lease = _get_lease_from_blazar(ref)
-    if blazar_lease == None:
+    if blazar_lease is None:
         raise CHIValueError(f"Lease not found maching {ref}")
     return Lease(lease_json=blazar_lease)
 
@@ -966,7 +1009,7 @@ def get_lease_id(lease_name) -> str:
         ValueError: If the lease could not be found, or if multiple leases were
             found with the same name.
     """
-    matching = [l for l in blazar().lease.list() if l["name"] == lease_name]
+    matching = [lease for lease in blazar().lease.list() if lease["name"] == lease_name]
     if not matching:
         raise CHIValueError(f"No leases found for name {lease_name}")
     elif len(matching) > 1:
@@ -975,7 +1018,10 @@ def get_lease_id(lease_name) -> str:
 
 
 def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
-    """Create a new lease with some requested reservations.
+    """
+    .. deprecated:: 1.0
+
+    Create a new lease with some requested reservations.
 
     Args:
         lease_name (str): The name to give the new lease.
@@ -1020,7 +1066,10 @@ def create_lease(lease_name, reservations=[], start_date=None, end_date=None):
 
 
 def delete_lease(ref):
-    """Delete the lease.
+    """
+    .. deprecated:: 1.0
+
+    Delete the lease.
 
     Args:
         ref (str): The name or ID of the lease.
@@ -1031,7 +1080,10 @@ def delete_lease(ref):
 
 
 def wait_for_active(ref):
-    """Wait for the lease to become active.
+    """
+    .. deprecated:: 1.0
+
+    Wait for the lease to become active.
 
     This function will wait for 2.5 minutes, which is a somewhat arbitrary
     amount of time.

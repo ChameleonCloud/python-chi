@@ -1,6 +1,79 @@
 CHANGES
 =======
 
+* Added Hardware RST file under docs/modules
+* Soufianej lease 1.0 (#61)
+* Soufianej hardware 1.0 (#60)
+* Soufianej exception 1.0 (#59)
+* Python-chi 1.0 context module
+* added filter argument to tar.extactall when extracting downloaded file incontainer.download()
+* Added pip install setuptools step to pypi action
+* Added download and associate\_floating\_ip methods to \_\_all\_\_ in container.py
+* Fix to release versioning when pushing to PyPi
+* Added release versioning when pushing to PyPi
+* Added some methods to \_\_all\_\_ in container.py
+* reformatted container.download() docstring
+* reformatted container.download() docstring
+* Added release version to pypi release tag in publish-pypi action and removed workflow dispatch
+* removed workflow dispatch
+* Update readthedocs
+* added release version to pypi release tag
+* Added workflow dispatch trigger to PyPI publish action
+* Github action to publish python-chi to pypi
+
+v0.17.12
+--------
+
+* Fix to container.upload()'s behavior
+* Fix to container.upload()'s behavior
+* Remove the node type check when creating a lease (#47)
+* Include docs for chi.ssh (#46)
+* manila share uses list with argument search\_opt (#44)
+
+0.17.11
+-------
+
+* Add Cinder client generator (#43)
+* Add note about setting project domain name
+
+v0.17.10
+--------
+
+* bump minimum API version for zun
+
+v0.17.9
+-------
+
+* Allow passthrough arguments for SSH connections (#37)
+
+v0.17.8
+-------
+
+* Use correct bounds parameters for reservation search (#36)
+
+v0.17.7
+-------
+
+* Handle mixed leases when searching for reservations with counts (#35)
+
+v0.17.6
+-------
+
+* Revert "Merge pull request #24 from ChameleonCloud/feature/idempotent"
+
+v0.17.5
+-------
+
+* Use alternative jupyterhub token API
+* Fixed minor typos
+* Implemented Adam's try/except suggestion
+* Addressed changes suggested by Mark
+* Addressed changes and fixed issues
+* Added ipywidgets to requirements
+* Apply wrappers to resource creation methods
+* Fix existing wrappers and add new
+* Update ChangeLog
+
 v0.17.4
 -------
 
@@ -83,6 +156,7 @@ v0.15.0
 * Update CODEOWNERS
 * Create CODEOWNERS
 * Add container.download function
+* add some idempotent methods
 * Add example notebook for container
 * Add test for create\_container
 * Add device profiles documentation

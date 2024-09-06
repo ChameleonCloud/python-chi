@@ -1,11 +1,11 @@
 .. _context-module:
 
-===
-chi
-===
+===========
+chi.context
+===========
 
-The :mod:`chi` module exposes a global context object and helpers for generating
+The :mod:`chi.context` module exposes a global context object and helpers for generating
 clients for interfacing with the various Chameleon services.
 
-.. automodule:: chi
+.. automodule:: chi.context
    :members:

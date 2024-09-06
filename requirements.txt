@@ -1,5 +1,4 @@
 fabric
-gnocchiclient
 keystoneauth1
 openstacksdk
 paramiko

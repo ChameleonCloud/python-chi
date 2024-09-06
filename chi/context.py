@@ -1,27 +1,21 @@
+import logging
 import os
 import sys
 import time
-import openstack
-
 from typing import List, Optional
-from keystoneauth1.identity.v3 import OidcAccessToken
-from keystoneauth1 import loading
-from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
-from keystoneauth1 import session
-from keystoneclient.v3.client import Client as KeystoneClient
-from oslo_config import cfg
-from IPython.display import display
 
 import ipywidgets as widgets
+import openstack
 import requests
+from IPython.display import display
+from keystoneauth1 import loading, session
+from keystoneauth1.identity.v3 import OidcAccessToken
+from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
+from keystoneclient.v3.client import Client as KeystoneClient
+from oslo_config import cfg
 
 from . import jupyterhub
 from .exception import CHIValueError, ResourceError
-
-import openstack
-import ipywidgets as widgets
-import requests
-import logging
 
 LOG = logging.getLogger(__name__)
 
@@ -32,6 +26,7 @@ DEFAULT_AUTH_TYPE = "v3token"
 DEFAULT_NETWORK = "sharednet1"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
+
 
 def default_key_name():
     username = os.getenv("USER")
@@ -79,7 +74,7 @@ def printerr(msg):
     return print(msg, file=sys.stderr)
 
 
-class SessionWithAccessTokenRefresh(session.Session):
+class _SessionWithAccessTokenRefresh(session.Session):
     # How many seconds before expiration should we try to refresh
     REFRESH_THRESHOLD = 60  # seconds
 
@@ -126,7 +121,7 @@ class SessionWithAccessTokenRefresh(session.Session):
 
 
 class SessionLoader(loading.session.Session):
-    plugin_class = SessionWithAccessTokenRefresh
+    plugin_class = _SessionWithAccessTokenRefresh
 
 
 def _auth_plugins():
@@ -182,23 +177,17 @@ def _check_deprecated(key):
     )
     return deprecated_extra_opts[key]
 
+
 def _is_ipynb() -> bool:
     try:
         from IPython import get_ipython
-        if 'IPKernelApp' not in get_ipython().config:
+
+        if "IPKernelApp" not in get_ipython().config:
             return False
     except ImportError:
         return False
     return True
 
-def _is_ipynb() -> bool:
-    try:
-        from IPython import get_ipython
-        if 'IPKernelApp' not in get_ipython().config:
-            return False
-    except ImportError:
-        return False
-    return True
 
 def set(key, value):
     """Set a context parameter by name.
@@ -254,6 +243,7 @@ def get(key):
     else:
         return cfg.CONF[_auth_section(_auth_plugin)][key]
 
+
 def params():
     """List all parameters currently set on the context.
 
@@ -290,18 +280,22 @@ def list_sites(show: Optional[str] = None) -> List[str]:
         res.raise_for_status()
         items = res.json().get("items", [])
         _sites = {s["name"]: s for s in items}
-        _sites = dict(sorted(_sites.items(),
-                             key=lambda x: (x[1]['site_class'], x[0] not in ["CHI@TACC", "CHI@UC"])))
+        _sites = dict(
+            sorted(
+                _sites.items(),
+                key=lambda x: (x[1]["site_class"], x[0] not in ["CHI@TACC", "CHI@UC"]),
+            )
+        )
         _sites["KVM@TACC"] = {
-        "name": "KVM@TACC",
-        "web": "https://kvm.tacc.chameleoncloud.org",
-        "location": "Austin, Texas, USA",
-        "user_support_contact": "help@chameleoncloud.org",
+            "name": "KVM@TACC",
+            "web": "https://kvm.tacc.chameleoncloud.org",
+            "location": "Austin, Texas, USA",
+            "user_support_contact": "help@chameleoncloud.org",
         }
         if not _sites:
             raise ResourceError("No sites returned.")
 
-    if show == None:
+    if show is None:
         return _sites
     elif show == "widget" and _is_ipynb():
         # Constructing the table HTML
@@ -383,8 +377,9 @@ def use_site(site_name: str) -> None:
     if not site:
         raise CHIValueError(
             (
-                f'No site named "{site_name}" exists! Possible values: '
-                ", ".join(_sites.keys())
+                f'No site named "{site_name}" exists! Possible values: ' ", ".join(
+                    _sites.keys()
+                )
             )
         )
 
@@ -398,6 +393,7 @@ def use_site(site_name: str) -> None:
         f'Support contact: {site.get("user_support_contact")}',
     ]
     print("\n".join(output))
+
 
 def choose_site() -> None:
     """
@@ -415,8 +411,7 @@ def choose_site() -> None:
         print("Please choose a site in the dropdown below")
 
         site_dropdown = widgets.Dropdown(
-            options=_sites.keys(),
-            description="Select Site"
+            options=_sites.keys(), description="Select Site"
         )
 
         output = widgets.Output()
@@ -425,9 +420,9 @@ def choose_site() -> None:
             with output:
                 output.clear_output()
                 print(f"Selected site: {change['new']}")
-                use_site(change['new'])
+                use_site(change["new"])
 
-        site_dropdown.observe(on_change, names='value')
+        site_dropdown.observe(on_change, names="value")
 
         display(widgets.VBox([site_dropdown, output]))
     else:
@@ -471,10 +466,11 @@ def list_projects(show: str = None) -> List[str]:
         display(widgets.HTML(table_html))
     elif show == "text":
         print("\n".join(project_names))
-    elif show == None:
+    elif show is None:
         return list(project_names)
     else:
         raise CHIValueError("Invalid value for 'show' parameter.")
+
 
 def use_project(project: str) -> None:
     """
@@ -486,8 +482,9 @@ def use_project(project: str) -> None:
     Returns:
         None
     """
-    set('project_name', project)
+    set("project_name", project)
     print(f"Now using project: {project}")
+
 
 def choose_project() -> None:
     """
@@ -499,8 +496,7 @@ def choose_project() -> None:
         projects = list_projects()
 
         project_dropdown = widgets.Dropdown(
-            options=projects,
-            description="Select Project"
+            options=projects, description="Select Project"
         )
 
         output = widgets.Output()
@@ -509,9 +505,9 @@ def choose_project() -> None:
             with output:
                 output.clear_output()
                 print(f"Selected project: {change['new']}")
-                use_project(change['new'])
+                use_project(change["new"])
 
-        project_dropdown.observe(on_change, names='value')
+        project_dropdown.observe(on_change, names="value")
 
         # Use the first project as the default
         use_project(projects[0])
@@ -522,22 +518,27 @@ def choose_project() -> None:
 
         display(widgets.VBox([project_dropdown, output]))
     else:
-        print("Choose project feature is only available in Jupyter notebook environment.")
+        print(
+            "Choose project feature is only available in Jupyter notebook environment."
+        )
+
 
 def check_credentials() -> None:
     """
-    Prints authentication metadata (e.g. username, site) and if credentials are currently valid and user is authenticated.
+    Prints authentication metadata (e.g. username, site) and if credentials are currently
+    valid and user is authenticated.
     """
     try:
         print(f"Username: {os.getenv('USER')}")
-        print(f"Currently site: {get('region_name')}" )
-        print(f"Currently project: {get('project_name')}" )
+        print(f"Currently site: {get('region_name')}")
+        print(f"Currently project: {get('project_name')}")
         print("Projects:")
         for project in list_projects():
             print(project)
         print("Authentication is valid.")
     except Exception as e:
         print("Authentication failed: ", str(e))
+
 
 def set_log_level(level: str = "ERROR") -> None:
     """Configures logger for python-chi. By default, only errors are shown.
@@ -553,7 +554,10 @@ def set_log_level(level: str = "ERROR") -> None:
         openstack.enable_logging(debug=False, http_debug=False)
         LOG.setLevel(logging.ERROR)
     else:
-        raise CHIValueError("Invalid log level value, please choose between 'ERROR' and 'DEBUG'")
+        raise CHIValueError(
+            "Invalid log level value, please choose between 'ERROR' and 'DEBUG'"
+        )
+
 
 def session():
     """Get a Keystone Session object suitable for authenticating a client.
@@ -569,6 +573,7 @@ def session():
             cfg.CONF, CONF_GROUP, session=sess
         )
     return _session
+
 
 def reset():
     """Reset the context, removing all overrides and defaults.

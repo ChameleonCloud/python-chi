@@ -6,80 +6,71 @@ from neutronclient.common.exceptions import NotFound
 import json
 
 __all__ = [
-    'get_network',
-    'get_network_id',
-    'create_network',
-    'delete_network',
-    'update_network',
-    'list_networks',
-
-    'get_subnet',
-    'get_subnet_id',
-    'create_subnet',
-    'delete_subnet',
-    'update_subnet',
-    'list_subnets',
-
-    'get_port',
-    'get_port_id',
-    'create_port',
-    'update_port',
-    'delete_port',
-    'list_ports',
-
-    'get_router',
-    'get_router_id',
-    'create_router',
-    'delete_router',
-    'update_router',
-    'list_routers',
-
-    'add_route_to_router',
-    'add_routes_to_router',
-    'remove_route_from_router',
-    'remove_routes_from_router',
-    'remove_all_routes_from_router',
-    'add_port_to_router',
-    'add_port_to_router_by_name',
-    'add_subnet_to_router',
-    'add_subnet_to_router_by_name',
-    'remove_subnet_from_router',
-    'remove_port_from_router',
-
-    'get_free_floating_ip',
-    'get_floating_ip',
-    'list_floating_ips',
-    'bind_floating_ip',
-
-    'nuke_network',
+    "get_network",
+    "get_network_id",
+    "create_network",
+    "delete_network",
+    "update_network",
+    "list_networks",
+    "get_subnet",
+    "get_subnet_id",
+    "create_subnet",
+    "delete_subnet",
+    "update_subnet",
+    "list_subnets",
+    "get_port",
+    "get_port_id",
+    "create_port",
+    "update_port",
+    "delete_port",
+    "list_ports",
+    "get_router",
+    "get_router_id",
+    "create_router",
+    "delete_router",
+    "update_router",
+    "list_routers",
+    "add_route_to_router",
+    "add_routes_to_router",
+    "remove_route_from_router",
+    "remove_routes_from_router",
+    "remove_all_routes_from_router",
+    "add_port_to_router",
+    "add_port_to_router_by_name",
+    "add_subnet_to_router",
+    "add_subnet_to_router_by_name",
+    "remove_subnet_from_router",
+    "remove_port_from_router",
+    "get_free_floating_ip",
+    "get_floating_ip",
+    "list_floating_ips",
+    "bind_floating_ip",
+    "nuke_network",
 ]
 
-PUBLIC_NETWORK = 'public'
+PUBLIC_NETWORK = "public"
 
 
 def _resolve_id(resource, name) -> str:
-    list_fn = getattr(neutron(), f'list_{resource}', None)
+    list_fn = getattr(neutron(), f"list_{resource}", None)
     if not callable(list_fn):
         raise CHIValueError(f'Invalid resource type "{resource}"')
-    resources = [
-        x for x in list_fn()[resource]
-        if x['name'] == name
-    ]
+    resources = [x for x in list_fn()[resource] if x["name"] == name]
     if not resources:
-        raise CHIValueError(f'No {resource} found with name {name}')
+        raise CHIValueError(f"No {resource} found with name {name}")
     elif len(resources) > 1:
-        raise ResourceError(f'Found multiple {resource} with name {name}')
-    return resources[0]['id']
+        raise ResourceError(f"Found multiple {resource} with name {name}")
+    return resources[0]["id"]
 
 
 def _resolve_resource(resource, name_or_id) -> dict:
-    get_fn = getattr(neutron(), f'show_{resource}', None)
+    get_fn = getattr(neutron(), f"show_{resource}", None)
     if not callable(get_fn):
         raise CHIValueError(f'Invalid resource type "{resource}"')
     try:
         res = get_fn(name_or_id)
     except NotFound:
-        resource_id = _resolve_id(f'{resource}s', name_or_id)
+        resource_id = _resolve_id(f"{resource}s", name_or_id)
         res = get_fn(resource_id)
     # Unwrap nested structure
     return res.get(resource)
@@ -88,6 +79,7 @@ def _resolve_resource(resource, name_or_id) -> dict:
 ###########
 # Networks
 ###########
+
 
 def get_network(ref) -> dict:
     """Get a network by its name or ID.
@@ -102,7 +94,7 @@ def get_network(ref) -> dict:
         RuntimeError: If the network could not be found, or multiple networks
             were returned for the search term.
     """
-    return _resolve_resource('network', ref)
+    return _resolve_resource("network", ref)
 
 
 def get_network_id(name) -> str:
@@ -118,12 +110,17 @@ def get_network_id(name) -> str:
         RuntimeError: If the network could not be found, or multiple networks
             were returned for the search term.
     """
-    return _resolve_id('networks', name)
+    return _resolve_id("networks", name)
 
 
-def create_network(network_name, of_controller_ip=None, of_controller_port=None,
-                   vswitch_name=None, provider='physnet1',
-                   port_security_enabled=True) -> dict:
+def create_network(
+    network_name,
+    of_controller_ip=None,
+    of_controller_port=None,
+    vswitch_name=None,
+    provider="physnet1",
+    port_security_enabled=True,
+) -> dict:
     """Create a network.
 
     For an OpenFlow network include the IP and port of an OpenFlow controller
@@ -143,21 +140,23 @@ def create_network(network_name, of_controller_ip=None, of_controller_port=None,
     """
     desc_parts = []
     if of_controller_ip and of_controller_port:
-        desc_parts.append(f'OFController={of_controller_ip}:{of_controller_port}')
+        desc_parts.append(f"OFController={of_controller_ip}:{of_controller_port}")
     if vswitch_name != None:
-        desc_parts.append(f'VSwitchName={vswitch_name}')
+        desc_parts.append(f"VSwitchName={vswitch_name}")
 
-    network = neutron().create_network(body={
-        'network': {
-            'name': network_name,
-            'description': ','.join(desc_parts),
-            'provider:physical_network': provider,
-            'provider:network_type': 'vlan',
-            'port_security_enabled': port_security_enabled,
+    network = neutron().create_network(
+        body={
+            "network": {
+                "name": network_name,
+                "description": ",".join(desc_parts),
+                "provider:physical_network": provider,
+                "provider:network_type": "vlan",
+                "port_security_enabled": port_security_enabled,
+            }
         }
-    })
+    )
 
-    return network['network']
+    return network["network"]
 
 
 def delete_network(network_id):
@@ -179,7 +178,7 @@ def update_network(network_id):
     raise NotImplementedError()
 
 
-def list_networks() -> 'list[dict]':
+def list_networks() -> "list[dict]":
     """List all networks associated with the current project.
 
     Returns:
@@ -191,6 +190,7 @@ def list_networks() -> 'list[dict]':
 ##########
 # Subnets
 ##########
+
 
 def get_subnet(ref) -> dict:
     """Get a subnet by its name or ID.
@@ -205,7 +205,7 @@ def get_subnet(ref) -> dict:
         RuntimeError: If the subnet could not be found, or multiple subnets
             were returned for the search term.
     """
-    return _resolve_resource('subnet', ref)
+    return _resolve_resource("subnet", ref)
 
 
 def get_subnet_id(name) -> str:
@@ -221,14 +221,17 @@ def get_subnet_id(name) -> str:
         RuntimeError: If the subnet could not be found, or multiple subnets
             were returned for the search term.
     """
-    return _resolve_id('subnets', name)
+    return _resolve_id("subnets", name)
 
 
-def create_subnet(subnet_name, network_id,
-                  cidr='192.168.1.0/24',
-                  allocation_pool_start=None,
-                  allocation_pool_end=None,
-                  gateway_ip=None) -> dict:
+def create_subnet(
+    subnet_name,
+    network_id,
+    cidr="192.168.1.0/24",
+    allocation_pool_start=None,
+    allocation_pool_end=None,
+    gateway_ip=None,
+) -> dict:
     """Create a subnet on a network.
 
     Args:
@@ -243,27 +246,24 @@ def create_subnet(subnet_name, network_id,
         The new subnet representation.
     """
     subnet = {
-        'name': subnet_name,
-        'cidr': cidr,
-        'ip_version': 4,
-        'network_id': network_id,
+        "name": subnet_name,
+        "cidr": cidr,
+        "ip_version": 4,
+        "network_id": network_id,
     }
     if gateway_ip:
-        subnet['gateway_ip'] = gateway_ip
+        subnet["gateway_ip"] = gateway_ip
     if allocation_pool_start and allocation_pool_end:
-        subnet['allocation_pools']= [
+        subnet["allocation_pools"] = [
             {
-            "start": allocation_pool_start,
-            "end": allocation_pool_end,
+                "start": allocation_pool_start,
+                "end": allocation_pool_end,
             }
         ]
 
+    subnet_rtn = neutron().create_subnet(body={"subnets": [subnet]})
 
-    subnet_rtn = neutron().create_subnet(body={
-        'subnets': [ subnet ]
-    })
-
-    return subnet_rtn['subnets'][0]
+    return subnet_rtn["subnets"][0]
 
 
 def delete_subnet(subnet_id):
@@ -279,7 +279,7 @@ def update_subnet(subnet_id):
     raise NotImplementedError()
 
 
-def list_subnets() -> 'list[dict]':
+def list_subnets() -> "list[dict]":
     """List all subnets associated with the current project.
 
     Returns:
@@ -291,6 +291,7 @@ def list_subnets() -> 'list[dict]':
 ########
 # Ports
 ########
+
 
 def get_port(ref) -> dict:
     """Get a port by its name or ID.
@@ -305,7 +306,7 @@ def get_port(ref) -> dict:
         RuntimeError: If the port could not be found, or multiple ports
             were returned for the search term.
     """
-    return _resolve_resource('port', ref)
+    return _resolve_resource("port", ref)
 
 
 def get_port_id(name) -> str:
@@ -321,11 +322,17 @@ def get_port_id(name) -> str:
         RuntimeError: If the port could not be found, or multiple ports
             were returned for the search term.
     """
-    return _resolve_id('ports', name)
+    return _resolve_id("ports", name)
 
 
-def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_address=None,
-               port_security_enabled=True) -> dict:
+def create_port(
+    port_name,
+    network_id,
+    fixed_ips=None,
+    subnet_id=None,
+    ip_address=None,
+    port_security_enabled=True,
+) -> dict:
     """Create a new port on a network.
 
     This function has a short-form and a long-form invocation. In the short form,
@@ -365,20 +372,20 @@ def create_port(port_name, network_id, fixed_ips=None, subnet_id=None, ip_addres
         The created port representation.
     """
     port = {
-        'name': port_name,
-        'network_id': network_id,
-        'port_security_enabled': port_security_enabled,
+        "name": port_name,
+        "network_id": network_id,
+        "port_security_enabled": port_security_enabled,
     }
 
     if fixed_ips is None and subnet_id is not None:
-        fixed_ip = {'subnet_id': subnet_id}
+        fixed_ip = {"subnet_id": subnet_id}
         if ip_address is not None:
-            fixed_ip['ip_address'] = ip_address
+            fixed_ip["ip_address"] = ip_address
         fixed_ips = [fixed_ip]
 
-    port['fixed_ips'] = fixed_ips
+    port["fixed_ips"] = fixed_ips
 
-    return neutron().create_port(body={'port': port})
+    return neutron().create_port(body={"port": port})
 
 
 def update_port(port_id, subnet_id=None, ip_address=None):
@@ -394,7 +401,7 @@ def delete_port(port_id):
     return neutron().delete_port(port_id)
 
 
-def list_ports() -> 'list[dict]':
+def list_ports() -> "list[dict]":
     """List all ports associated with the current project.
 
     Returns:
@@ -406,6 +413,7 @@ def list_ports() -> 'list[dict]':
 ##########
 # Routers
 ##########
+
 
 def get_router(ref) -> dict:
     """Get a router by its name or ID.
@@ -420,7 +428,7 @@ def get_router(ref) -> dict:
         RuntimeError: If the router could not be found, or multiple routers
             were returned for the search term.
     """
-    return _resolve_resource('router', ref)
+    return _resolve_resource("router", ref)
 
 
 def get_router_id(name) -> str:
@@ -436,7 +444,7 @@ def get_router_id(name) -> str:
         RuntimeError: If the router could not be found, or multiple routers
             were returned for the search term.
     """
-    return _resolve_id('routers', name)
+    return _resolve_id("routers", name)
 
 
 def create_router(router_name, gw_network_name=None) -> dict:
@@ -452,7 +460,9 @@ def create_router(router_name, gw_network_name=None) -> dict:
     router = {"name": router_name, "admin_state_up": True}
 
     if gw_network_name:
-        router["external_gateway_info"] = {"network_id": get_network_id(gw_network_name)}
+        router["external_gateway_info"] = {
+            "network_id": get_network_id(gw_network_name)
+        }
 
     response = neutron().create_router(body={"router": router})
     return response["router"]
@@ -471,7 +481,7 @@ def update_router(router_id):
     raise NotImplementedError()
 
 
-def list_routers() -> 'list[dict]':
+def list_routers() -> "list[dict]":
     """List all routers associated with the current project.
 
     Returns:
@@ -484,6 +494,7 @@ def list_routers() -> 'list[dict]':
 # Router operations
 ####################
 
+
 def add_route_to_router(router_id, cidr, nexthop):
     """Add a new route to a router.
 
@@ -492,9 +503,7 @@ def add_route_to_router(router_id, cidr, nexthop):
         cidr (str): The destination subnet CIDR for the route.
         nexthop (str): The nexthop address for the route.
     """
-    return add_routes_to_router(router_id, [
-        {'destination': cidr, 'nexthop': nexthop}
-    ])
+    return add_routes_to_router(router_id, [{"destination": cidr, "nexthop": nexthop}])
 
 
 def add_routes_to_router(router_id, routes):
@@ -513,9 +522,9 @@ def add_routes_to_router(router_id, routes):
                 ]
 
     """
-    return neutron().add_extra_routes_to_router(router_id, {
-        'router': {'routes': routes}
-    })
+    return neutron().add_extra_routes_to_router(
+        router_id, {"router": {"routes": routes}}
+    )
 
 
 def remove_route_from_router(router_id, cidr, nexthop):
@@ -526,9 +535,9 @@ def remove_route_from_router(router_id, cidr, nexthop):
         cidr (str): The destination subnet CIDR for the route.
         nexthop (str): The nexthop address for the route.
     """
-    return remove_routes_from_router(router_id, [
-        {'destination': cidr, 'nexthop': nexthop}
-    ])
+    return remove_routes_from_router(
+        router_id, [{"destination": cidr, "nexthop": nexthop}]
+    )
 
 
 def remove_routes_from_router(router_id, routes):
@@ -547,11 +556,9 @@ def remove_routes_from_router(router_id, routes):
                 ]
 
     """
-    return neutron().remove_extra_routes_from_router(router_id, {
-        'router': {
-            'routes': routes
-        }
-    })
+    return neutron().remove_extra_routes_from_router(
+        router_id, {"router": {"routes": routes}}
+    )
 
 
 def remove_all_routes_from_router(router_id):
@@ -560,8 +567,7 @@ def remove_all_routes_from_router(router_id):
     Args:
         router_id (str): The router ID.
     """
-    return remove_routes_from_router(router_id,
-        get_router(router_id)['routes'])
+    return remove_routes_from_router(router_id, get_router(router_id)["routes"])
 
 
 def add_port_to_router(router_id, port_id):
@@ -571,7 +577,7 @@ def add_port_to_router(router_id, port_id):
         router_id (str): The router ID.
         port_id (str): The port ID.
     """
-    return neutron().add_interface_router(router_id, {'port_id': port_id})
+    return neutron().add_interface_router(router_id, {"port_id": port_id})
 
 
 def add_port_to_router_by_name(router_name, port_name):
@@ -593,7 +599,7 @@ def remove_port_from_router(router_id, port_id):
         router_id (str): The router ID.
         port_id (str): The port ID.
     """
-    return neutron().remove_interface_router(router_id, {'port_id': port_id})
+    return neutron().remove_interface_router(router_id, {"port_id": port_id})
 
 
 def add_subnet_to_router(router_id, subnet_id):
@@ -603,7 +609,7 @@ def add_subnet_to_router(router_id, subnet_id):
         router_id (str): The router ID.
         subnet_id (str): The subnet ID.
     """
-    return neutron().add_interface_router(router_id, {'subnet_id': subnet_id})
+    return neutron().add_interface_router(router_id, {"subnet_id": subnet_id})
 
 
 def add_subnet_to_router_by_name(router_name, subnet_name):
@@ -625,14 +631,13 @@ def remove_subnet_from_router(router_id, subnet_id):
         router_id (str): The router ID.
         subnet_id (str): The subnet ID.
     """
-    return neutron().remove_interface_router(router_id, {
-        'subnet_id': subnet_id
-    })
+    return neutron().remove_interface_router(router_id, {"subnet_id": subnet_id})
 
 
 ###############
 # Floating IPs
 ###############
+
 
 def get_free_floating_ip(allocate=True) -> dict:
     """Get the first unallocated floating IP available to your project.
@@ -645,23 +650,26 @@ def get_free_floating_ip(allocate=True) -> dict:
         The free floating IP representation.
     """
     _neutron = neutron()
-    ips = _neutron.list_floatingips()['floatingips']
-    unbound = (ip for ip in ips if ip['port_id'] is None)
+    ips = _neutron.list_floatingips()["floatingips"]
+    unbound = (ip for ip in ips if ip["port_id"] is None)
     try:
         fip = next(unbound)
         return fip
     except StopIteration:
         if not allocate:
             raise ResourceError(
-                "No free floating IPs in project and not allocating a new one")
-        return _neutron.create_floatingip({
-            "floatingip": {
-                "floating_network_id": get_network_id(PUBLIC_NETWORK),
+                "No free floating IPs in project and not allocating a new one"
+            )
+        return _neutron.create_floatingip(
+            {
+                "floatingip": {
+                    "floating_network_id": get_network_id(PUBLIC_NETWORK),
+                }
             }
-        })["floatingip"]
+        )["floatingip"]
 
 
-def get_or_create_floating_ip() -> 'tuple[dict,bool]':
+def get_or_create_floating_ip() -> "tuple[dict,bool]":
     """Get the first unallocated floating IP or allocate one to the project.
 
     Returns:
@@ -678,11 +686,9 @@ def get_or_create_floating_ip() -> 'tuple[dict,bool]':
         created = False
     except Exception:
         network_id = get_network_id(PUBLIC_NETWORK)
-        fip = neutron().create_floatingip({
-            'floatingip': {
-                'floating_network_id': network_id
-            }
-        })['floatingip']
+        fip = neutron().create_floatingip(
+            {"floatingip": {"floating_network_id": network_id}}
+        )["floatingip"]
         created = True
         print(f'Allocated new floating IP {fip["floating_ip_address"]}')
     return fip, created
@@ -697,15 +703,15 @@ def get_floating_ip(ip_address) -> dict:
     Returns:
         The floating IP representation.
     """
-    ips = neutron().list_floatingips()['floatingips']
+    ips = neutron().list_floatingips()["floatingips"]
 
     for fip in ips:
-        if fip['floating_ip_address'] == ip_address:
+        if fip["floating_ip_address"] == ip_address:
             return fip
     raise CHIValueError(f"Floating IP {ip_address} not found")
 
 
-def list_floating_ips() -> 'list[dict]':
+def list_floating_ips() -> "list[dict]":
     """List all floating ips associated with the current project.
 
     Returns:
@@ -729,12 +735,15 @@ def bind_floating_ip(ip_address, port_id=None, fixed_ip_address=None):
             default the first IP in a port is bound.
     """
     fip = get_floating_ip(ip_address)
-    neutron().update_floatingip(fip["id"], body={
-        "floatingip": {
-            "port_id": port_id,
-            "fixed_ip_address": fixed_ip_address,
-        }
-    })
+    neutron().update_floatingip(
+        fip["id"],
+        body={
+            "floatingip": {
+                "port_id": port_id,
+                "fixed_ip_address": fixed_ip_address,
+            }
+        },
+    )
 
 
 def nuke_network(network_ref: str):
@@ -762,10 +771,12 @@ def nuke_network(network_ref: str):
     network = get_network(network_ref)
     network_id = network["id"]
 
-    #Detach the router from all of its networks
+    # Detach the router from all of its networks
     router_ports = [
-        port for port in neutron().list_ports()["ports"]
-        if port["device_owner"] == "network:router_interface" and port["network_id"] == network_id
+        port
+        for port in neutron().list_ports()["ports"]
+        if port["device_owner"] == "network:router_interface"
+        and port["network_id"] == network_id
     ]
 
     for port in router_ports:
@@ -773,23 +784,24 @@ def nuke_network(network_ref: str):
             router_id = port["device_id"]
             remove_subnet_from_router(router_id, fixed_ip["subnet_id"])
 
-    #Delete the router
+    # Delete the router
     for port in router_ports:
         delete_router(port["device_id"])
 
-    #Delete the subnet
-    for subnet in neutron().list_subnets()['subnets']:
-        if subnet['network_id'] == network_id:
-            subnet_id=subnet['id']
+    # Delete the subnet
+    for subnet in neutron().list_subnets()["subnets"]:
+        if subnet["network_id"] == network_id:
+            subnet_id = subnet["id"]
             delete_subnet(subnet_id)
 
-    #Delete the network
+    # Delete the network
     delete_network(network_id)
 
 
 ###################
 # Wizard functions
 ###################
+
 
 class wizard(object):
     """A collection of "wizard" functions.
@@ -798,8 +810,9 @@ class wizard(object):
     """
 
     @staticmethod
-    def create_network(name_prefix, of_controller_ip=None,
-                       of_controller_port=None, gateway=False):
+    def create_network(
+        name_prefix, of_controller_ip=None, of_controller_port=None, gateway=False
+    ):
         """Create a network and subnet, and connect the subnet to a new router.
 
         Args:
@@ -812,20 +825,20 @@ class wizard(object):
         Returns:
             The created network representation.
         """
-        network_name = f'{name_prefix}Net'
-        vswitch_name = f'{name_prefix}VSwitch'
-        router_name = f'{name_prefix}Router'
-        subnet_name = f'{name_prefix}Subnet'
+        network_name = f"{name_prefix}Net"
+        vswitch_name = f"{name_prefix}VSwitch"
+        router_name = f"{name_prefix}Router"
+        subnet_name = f"{name_prefix}Subnet"
         network = create_network(
             network_name,
             of_controller_ip=of_controller_ip,
             of_controller_port=of_controller_port,
             vswitch_name=vswitch_name,
-            provider='physnet1'
+            provider="physnet1",
         )
-        subnet = create_subnet(subnet_name, network['id'])
+        subnet = create_subnet(subnet_name, network["id"])
         router = create_router(router_name, gateway=gateway)
-        add_subnet_to_router(router['id'], subnet['id'])
+        add_subnet_to_router(router["id"], subnet["id"])
 
         return network
 
@@ -836,4 +849,4 @@ class wizard(object):
         Args:
             name_prefix (str): The common name prefix for all created entities.
         """
-        return nuke_network(f'{name_prefix}Net')
+        return nuke_network(f"{name_prefix}Net")
