@@ -256,7 +256,7 @@ def params():
     return keys
 
 
-def list_sites(show: Optional[str] = None) -> List[str]:
+def list_sites(show: Optional[str] = None) -> dict:
     """
     Retrieves a list of Chameleon sites.
 
@@ -268,7 +268,7 @@ def list_sites(show: Optional[str] = None) -> List[str]:
     Returns:
         If `show` is set to "widget", it displays the site names as a text widget.
         If `show` is set to "text", it prints the site names as plain text.
-        If `show` is set to None, it returns a list of site names.
+        If `show` is set to None, it returns a dictionary of site names to their properties.
 
     Raises:
         ValueError: If no sites are returned or if an invalid value is provided for the `show` parameter.
@@ -395,23 +395,28 @@ def use_site(site_name: str) -> None:
     print("\n".join(output))
 
 
-def choose_site() -> None:
+def choose_site(default: str = None) -> None:
     """
     Displays a dropdown menu to select a chameleon site.
 
     Only works if running in a Ipynb notebook environment.
+
+    Args:
+        default (str, optional): the site to default to
     """
     if _is_ipynb():
         global _sites
         if not _sites:
             _sites = list_sites()
 
-        use_site(list(_sites.keys())[0])
-
-        print("Please choose a site in the dropdown below")
-
+        if default:
+            initial_site = default
+        else:
+            initial_site = next(iter(_sites.keys()))
         site_dropdown = widgets.Dropdown(
-            options=_sites.keys(), description="Select Site"
+            options=_sites.keys(),
+            description="Select Site",
+            value=initial_site,
         )
 
         output = widgets.Output()
@@ -419,10 +424,10 @@ def choose_site() -> None:
         def on_change(change):
             with output:
                 output.clear_output()
-                print(f"Selected site: {change['new']}")
                 use_site(change["new"])
 
         site_dropdown.observe(on_change, names="value")
+        on_change({"new": initial_site})
 
         display(widgets.VBox([site_dropdown, output]))
     else:
@@ -467,7 +472,7 @@ def list_projects(show: str = None) -> List[str]:
     elif show == "text":
         print("\n".join(project_names))
     elif show is None:
-        return list(project_names)
+        return project_names
     else:
         raise CHIValueError("Invalid value for 'show' parameter.")
 
@@ -504,17 +509,11 @@ def choose_project() -> None:
         def on_change(change):
             with output:
                 output.clear_output()
-                print(f"Selected project: {change['new']}")
                 use_project(change["new"])
 
         project_dropdown.observe(on_change, names="value")
-
-        # Use the first project as the default
-        use_project(projects[0])
-
-        # Display the initial selection
-        with output:
-            print(f"Initial project: {projects[0]}")
+        if projects:
+            on_change({"new": projects[0]})
 
         display(widgets.VBox([project_dropdown, output]))
     else:
@@ -523,21 +522,26 @@ def choose_project() -> None:
         )
 
 
-def check_credentials() -> None:
+def check_credentials() -> bool:
     """
     Prints authentication metadata (e.g. username, site) and if credentials are currently
     valid and user is authenticated.
+
+    Returns:
+        Whether the credentails are valid
     """
     try:
-        print(f"Username: {os.getenv('USER')}")
+        print(f"Username: {os.getenv('OS_USERNAME')}")
         print(f"Currently site: {get('region_name')}")
         print(f"Currently project: {get('project_name')}")
         print("Projects:")
         for project in list_projects():
-            print(project)
+            print("\t", project)
         print("Authentication is valid.")
+        return True
     except Exception as e:
         print("Authentication failed: ", str(e))
+        return False
 
 
 def set_log_level(level: str = "ERROR") -> None:

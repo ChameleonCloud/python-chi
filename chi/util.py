@@ -1,8 +1,11 @@
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
 from dateutil import tz
 from hashlib import md5
 import os
+import ipywidgets as widgets
+from IPython.display import display
 
 
 def random_base32(n_bytes):
@@ -31,3 +34,48 @@ def get_public_network(neutronclient):
 
 def utcnow():
     return datetime.now(tz=tz.tzutc())
+
+
+class TimerProgressBar:
+    def __init__(self):
+        self.progress = widgets.IntProgress(
+            value=0,
+            min=0,
+            max=100,
+            bar_style="success",
+            orientation="horizontal",
+        )
+        self.label = widgets.Label()
+
+    def display(self):
+        display(widgets.HBox([self.label, self.progress]))
+
+    def wait(self, callback, expected_timeout, timeout):
+        """Wait and update the progress bar.
+
+        Args:
+            callback (function): bool function for whether to break
+            expected_timeout (int): how long the progress bar should expect to wait for in seconds. Will display 90% when reached
+            timeout (int): The time to reach 100% of the progress bar
+
+        Returns:
+            Whether callback returned true before timeout
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if callback():
+                self.progress.value = 100
+                return True
+            elapased = timedelta(seconds=(time.time() - start_time))
+            self.label.value = f"{str(elapased).split('.')[0]} elapsed."
+
+            if elapased.total_seconds() < expected_timeout:
+                self.progress.value = 100 * elapased.total_seconds() / expected_timeout
+            else:
+                self.progress.value = (
+                    10
+                    * (elapased.total_seconds() - expected_timeout)
+                    / (timeout - expected_timeout)
+                )
+            time.sleep(5)
+        return False

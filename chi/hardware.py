@@ -1,6 +1,9 @@
+from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
+
+from chi import exception
 
 from .clients import blazar
 from .context import get, RESOURCE_API_URL
@@ -34,9 +37,14 @@ class Node:
     uid: str
     version: str
 
-    def next_free_timeslot(self) -> Tuple[datetime, Optional[datetime]]:
+    def next_free_timeslot(
+        self, minimum_hours: int = 1
+    ) -> Tuple[datetime, Optional[datetime]]:
         """
         Finds the next available timeslot for the hardware using the Blazar client.
+
+        Args:
+            minimum_hours (int, optional): The minimum number of hours for this timeslot.
 
         Returns:
             A tuple containing the start and end datetime of the next available timeslot.
@@ -63,22 +71,21 @@ class Node:
 
         reservations = sorted(allocation["reservations"], key=lambda x: x["start_date"])
 
-        def parse_datetime(dt_str: str) -> datetime:
-            dt = datetime.fromisoformat(dt_str)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        buffer = timedelta(hours=minimum_hours)
+        # Next time this interval could possibly start
+        possible_start = now
+        for i in range(len(reservations)):
+            # Check we have enough time between last known free period and this reservation
+            this_start = _parse_blazar_dt(reservations[i]["start_date"])
+            if possible_start + buffer < this_start:
+                # We found a gap
+                return (possible_start, this_start)
 
-        if parse_datetime(reservations[0]["start_date"]) > now:
-            return (now, parse_datetime(reservations[0]["start_date"]))
-
-        for i in range(len(reservations) - 1):
-            current_end = parse_datetime(reservations[i]["end_date"])
-            next_start = parse_datetime(reservations[i + 1]["start_date"])
-
-            if current_end < next_start:
-                return (current_end, next_start)
-
-        last_end = parse_datetime(reservations[-1]["end_date"])
-        return (last_end, None)
+            # Otherwise, no possible start until end of this reservation
+            this_end = _parse_blazar_dt(reservations[i]["end_date"])
+            possible_start = this_end
+        # If there was no gap, use the last reservation's end time
+        return (possible_start, None)
 
 
 def _call_api(endpoint):
@@ -95,6 +102,7 @@ def get_nodes(
     filter_reserved: bool = False,
     gpu: Optional[bool] = None,
     min_number_cpu: Optional[int] = None,
+    node_type: Optional[str] = None,
 ) -> List[Node]:
     """
     Retrieve a list of nodes based on the specified criteria.
@@ -108,6 +116,7 @@ def get_nodes(
             Defaults to None.
         min_number_cpu (int, optional): Minimum number of CPU logical cores per node.
             Defaults to None.
+        node_type (str, optional): The node type to filter by
 
     Returns:
         List[Node]: A list of Node objects that match the specified criteria.
@@ -131,6 +140,24 @@ def get_nodes(
 
         endpoint = f"sites/{site.split('@')[1].lower()}/clusters/chameleon/nodes"
         data = _call_api(endpoint)
+
+        allocations = defaultdict(list)
+        reserved_now = set()
+        blazarclient = blazar()
+        now = datetime.now(timezone.utc)
+        if filter_reserved:
+            hosts_by_id = {}
+            for host in blazarclient.host.list():
+                hosts_by_id[host["id"]] = host
+            for resource in blazarclient.host.list_allocations():
+                for allocation in resource["reservations"]:
+                    blazar_host = hosts_by_id.get(resource["resource_id"], None)
+                    if blazar_host:
+                        allocations[blazar_host["hypervisor_hostname"]].append(
+                            allocation
+                        )
+                        if _reserved_now(allocation, now):
+                            reserved_now.add(blazar_host["hypervisor_hostname"])
 
         for node_data in data["items"]:
             node = Node(
@@ -163,10 +190,36 @@ def get_nodes(
                 or node.architecture["smt_size"] >= min_number_cpu
             )
 
-            if gpu_filter and cpu_filter:
+            if (
+                gpu_filter
+                and cpu_filter
+                and (not filter_reserved or node.uid not in reserved_now)
+                and (node_type is None or node.type == node_type)
+            ):
                 nodes.append(node)
 
+    if node_type not in node_types:
+        if all_sites:
+            raise exception.CHIValueError(
+                f"Unknown node_type '{node_type}' at all sites."
+            )
+        else:
+            raise exception.CHIValueError(
+                f"Unknown node_type '{node_type}' at {get("region_name")}."
+            )
+
     return nodes
+
+
+def _parse_blazar_dt(datetime_string):
+    d = datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M:%S.%f")
+    return d.replace(tzinfo=timezone.utc)
+
+
+def _reserved_now(allocation, now=datetime.now(timezone.utc)):
+    start_dt_object = _parse_blazar_dt(allocation["start_date"])
+    end_dt_object = _parse_blazar_dt(allocation["end_date"])
+    return start_dt_object < now and now < end_dt_object
 
 
 def get_node_types() -> List[str]:
