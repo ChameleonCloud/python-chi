@@ -211,7 +211,7 @@ class Lease:
             elif end_date:
                 self.end_date = end_date.strftime(BLAZAR_TIME_FORMAT)
             elif duration:
-                self.start_date, self.end_date = lease_duration(days=duration.days)
+                self.end_date = (utcnow() + duration).strftime(BLAZAR_TIME_FORMAT)
             else:
                 raise CHIValueError("Either end_date or duration must be specified")
 
@@ -366,7 +366,8 @@ class Lease:
         """
         if idempotent:
             existing_lease = _get_lease_from_blazar(self.name)
-            if existing_lease:
+            if existing_lease and existing_lease["status"] != "TERMINATED":
+                print("Found existing lease")
                 self._populate_from_json(existing_lease)
                 if wait_for_active:
                     self.wait(status="active", timeout=wait_timeout)
@@ -520,7 +521,7 @@ class Lease:
     @property
     def events(self):
         if self.id:
-            # Fetch latest events from Blazar API
+            # TODO Fetch latest events from Blazar API
             pass
         return self._events
 
@@ -533,6 +534,21 @@ class Lease:
     @status.setter
     def status(self, value):
         self._status = value
+
+    def get_reserved_floating_ips(self):
+        """Get reserved floating ips from this lease
+
+        Returns:
+            List[str] of fip addresses
+        """
+        fips = list_floating_ips()
+        return [
+            fip["floating_ip_address"]
+            for fip in fips
+            if any(
+                f"reservation:{r['id']}" in fip["tags"] for r in self.fip_reservations
+            )
+        ]
 
 
 def _format_resource_properties(user_constraints, extra_constraints):
@@ -752,8 +768,8 @@ def _reservation_matching(lease_ref, match_fn, multiple=False):
         LOG.info("Blazar returned nested JSON structure, unpacking.")
         try:
             reservations = json.loads(reservations)
-        except Exception:
-            pass
+        except Exception as e:
+            LOG.error(f"Error loading json data: {e}")
 
     matches = [r for r in reservations if match_fn(r)]
 
@@ -911,7 +927,7 @@ def add_device_reservation(
     reservation_list.append(reservation)
 
 
-def lease_duration(days=1, hours=0):
+def lease_duration(days=1, hours=0, td=None):
     """
     Compute the start and end dates for a lease given its desired duration.
 

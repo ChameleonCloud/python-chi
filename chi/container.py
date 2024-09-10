@@ -289,9 +289,6 @@ class Container:
         """
         return associate_floating_ip(self.id, fip)
 
-    def detach_floating_ip(self, fip: str):
-        raise NotImplementedError()
-
 
 def create_container(
     name: "str",

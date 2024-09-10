@@ -10,10 +10,15 @@ from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
 
+from fabric import Connection
+from paramiko.client import WarningPolicy
+
+import chi
+
 from .clients import connection, nova
 from .exception import CHIValueError, ResourceError, ServiceError
 from .context import get as get_from_context, session, DEFAULT_IMAGE_NAME, _is_ipynb
-from .image import get_image_id, get_image_name
+from .image import Image, get_image_id, get_image_name
 from .keypair import Keypair
 from .network import (
     get_network,
@@ -21,6 +26,7 @@ from .network import (
     get_free_floating_ip,
 )
 from .util import random_base32, sshkey_fingerprint
+from chi import util
 
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
@@ -103,7 +109,7 @@ class Server:
         name: str,
         reservation_id: Optional[str] = None,
         image_name: str = DEFAULT_IMAGE_NAME,
-        image: Optional[str] = None,
+        image: Optional[Image] = None,
         flavor_name: str = BAREMETAL_FLAVOR,
         key_name: str = None,
         keypair: Optional[Keypair] = None,
@@ -112,15 +118,17 @@ class Server:
         self.name = name
         self.reservation_id = reservation_id or None
         # Add this once chi.image is implemented
-        # self.image = image or get_image(image_name)
-        self.image_name = image_name
+        self.image = image or chi.image.get_image(image_name)
+        self.image_name = self.image.name
         self.flavor_name = flavor_name
 
         if keypair:
             self.keypair = keypair
+        elif key_name:
+            self.keypair = get_keypair(key_name)
         else:
             update_keypair()
-            self.keypair = get_keypair(key_name or get_from_context("keypair_name"))
+            self.keypair = get_keypair(get_from_context("keypair_name"))
 
         self.network_name = network_name
 
@@ -162,9 +170,6 @@ class Server:
             show (str, optional): The type of server information to display after creation. Defaults to "widget".
             idempotent (bool, optional): Whether to create the server only if it doesn't already exist. Defaults to False.
 
-        Returns:
-            Server: The created server object.
-
         Raises:
             Conflict: If the server creation fails due to a conflict and idempotent mode is not enabled.
         """
@@ -176,7 +181,7 @@ class Server:
             if existing_server:
                 server = Server._from_nova_server(existing_server)
                 if wait_for_active:
-                    self.wait()
+                    self.wait(show=show)
                 if show:
                     server.show(type=show)
                 return server
@@ -194,15 +199,13 @@ class Server:
         except Conflict as e:
             raise ResourceError(e.message)  # Re-raise the exception if not handled
 
-        server = Server._from_nova_server(nova_server)
+        # TODO use nova_server to update self
 
         if wait_for_active:
             self.wait()
 
         if show:
-            server.show(type=show)
-
-        return server
+            self.show(type=show)
 
     @classmethod
     def _from_nova_server(cls, nova_server):
@@ -305,12 +308,13 @@ class Server:
         except Exception as e:
             raise ResourceError(f"Could not refresh server: {e}")
 
-    def wait(self, status: str = "ACTIVE") -> None:
+    def wait(self, status: str = "ACTIVE", show: str = "widget") -> None:
         """
         Waits for the server's status to reach the specified status.
 
         Args:
             status (str): The status to wait for. Defaults to "ACTIVE".
+            show (str, optional): The type of server information to display after creation. Defaults to "widget".
 
         Raises:
             ServiceError: If the server does not reach the specified status within the timeout period.
@@ -319,17 +323,23 @@ class Server:
             None
         """
         print(
-            f"Waiting for server {self.name}'s status to turn to {status}. This can take up to 18 minutes"
+            f"Waiting for server {self.name}'s status to become {status}. This typically takes 10 minutes, but can take up to 20 minutes."
         )
-        timeout = 1800  # 12 minutes
-        start_time = time.time()
-        while time.time() - start_time < timeout:
+
+        pb = util.TimerProgressBar()
+        if show == "widget" and _is_ipynb():
+            pb.display()
+
+        def _callback():
             self.refresh()
             if self.status == status.upper() or self.status == "ERROR":
                 print(f"Server has moved to status {self.status}")
-                return
-            time.sleep(5)  # Wait for 5 seconds before checking again
-        raise ServiceError(f"Timeout waiting for server to reach {status} status")
+                return True
+            return False
+
+        res = pb.wait(_callback, 10 * 60, 20 * 60)
+        if not res:
+            raise ServiceError(f"Timeout waiting for server to reach {status} status")
 
     def show(self, type: str = "text", wait_for_active: bool = False) -> None:
         """
@@ -432,7 +442,6 @@ class Server:
         Returns:
             None
         """
-        raise NotImplementedError("Floating IP association not working yet")
         associate_floating_ip(self.id, fip)
 
     def detach_floating_ip(self, fip: str) -> None:
@@ -445,26 +454,116 @@ class Server:
         Returns:
             None
         """
-        raise NotImplementedError("Floating IP dissociation not working yet")
-        detach_floating_ip(self.name, fip)
+        detach_floating_ip(self.id, fip)
+
+    def _can_connect_to_port(self, host, port, timeout):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            return False
+
+    def get_floating_ip(self):
+        """Get an attached floating ip of this server, if exists
+
+        Returns:
+            str: Floating IP address of server
+        """
+        for net, addresses in self.addresses.items():
+            for address in addresses:
+                if address.get("OS-EXT-IPS:type") == "floating":
+                    return address["addr"]
+        return None
 
     def check_connectivity(
         self,
         wait: bool = True,
         port: int = 22,
         timeout: int = 500,
-        type: Optional[str] = "widget",
+        show: str = "widget",
     ) -> bool:
-        # Implementation for checking server connectivity
-        pass
+        """Checks for server TCP connectivity
+
+        Args:
+            wait (bool, optional): Should this method block. Defaults to True.
+            port (int, optional): The TCP port to connect to. Defaults to 22.
+            timeout (int, optional): The number of seconds to wait before timeout. Defaults to 500.
+            show (str, optional): The type of server information to display after creation. Defaults to "widget".
+
+        Raises:
+            ResourceError: If timeout occurs.
+
+        Returns:
+            bool: whether connectivity could be established
+        """
+        host = self.get_floating_ip()
+        if show:
+            print(f"Checking connectivity to {host} port {port}.")
+
+        def _callback():
+            return self._can_connect_to_port(host, port, timeout)
+
+        pb = util.TimerProgressBar()
+        if show == "widget" and _is_ipynb():
+            pb.display()
+
+        if wait:
+            res = pb.wait(_callback, timeout * 0.9, timeout)
+            if not res:
+                raise ResourceError(
+                    (
+                        f"Waited too long for the port {port} on host {host} to "
+                        "start accepting connections."
+                    )
+                )
+        else:
+            res = _callback()
+        if show:
+            if res:
+                print("Connection successful")
+            else:
+                print("Connection failed")
+
+    def ssh_connection(self, **kwargs) -> Connection:
+        """
+            Args:
+                kwargs: Arguments for the Fabric Connection
+
+            Returns:
+                `Fabric Connection
+        <https://docs.fabfile.org/en/latest/api/connection.html#fabric.connection.Connection>`__ to this server.
+        """
+        if not kwargs.get("connect_kwargs"):
+            kwargs["connect_kwargs"] = {}
+        key_filename = get_from_context("keypair_private_key")
+        kwargs["connect_kwargs"].setdefault("key_filename", key_filename)
+        ip = self.get_floating_ip()
+        conn = Connection(ip, **kwargs)
+        # Default policy is to reject unknown hosts - for our use-case,
+        # printing a warning is probably enough, given the host is almost
+        # always guaranteed to be unknown.
+        conn.client.set_missing_host_key_policy(WarningPolicy)
+        return conn
 
     def upload(self, file: str, remote_path: str = "") -> None:
+        """Upload a local file to this server
+
+        Args:
+            file (str): the path of the local file
+            remote_path (str, optional): the remote path. Defaults to "".
+        """
         # Implementation for uploading files to the server
-        pass
+        with self.ssh_connection() as conn:
+            conn.put(file, remote_path)
 
     def execute(self, command: str):
-        # Implementation for executing commands on the server
-        pass
+        """Execute a command on this server
+
+        Args:
+            command (str): the shell command to execute.
+        """
+        with self.ssh_connection() as conn:
+            return conn.run(command)
 
 
 ##########
@@ -689,7 +788,8 @@ def associate_floating_ip(server_id, floating_ip_address=None):
     if not floating_ip_address:
         floating_ip_address = get_free_floating_ip()["floating_ip_address"]
 
-    connection().compute.add_floating_ip_to_server(server_id, floating_ip_address)
+    conn = connection()
+    conn.add_ips_to_server(conn.get_server_by_id(server_id), ips=[floating_ip_address])
 
     return floating_ip_address
 
