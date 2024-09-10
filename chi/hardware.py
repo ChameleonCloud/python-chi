@@ -205,7 +205,7 @@ def get_nodes(
             )
         else:
             raise exception.CHIValueError(
-                f"Unknown node_type '{node_type}' at {get("region_name")}."
+                f"Unknown node_type '{node_type}' at {get('region_name')}."
             )
 
     return nodes
