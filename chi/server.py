@@ -101,7 +101,6 @@ class Server:
         hypervisor_hostname (Optional[str]): The hostname of the hypervisor where the server is running.
         is_locked (bool): Indicates whether the server is locked.
         status (Optional[str]): The status of the server.
-        fault (Optional[dict]): The fault information of the server.
     """
 
     def __init__(
@@ -142,7 +141,6 @@ class Server:
         self.hypervisor_hostname: Optional[str] = None
         self.is_locked: bool = False
         self._status: Optional[str] = None
-        self.fault: Optional[dict] = None
 
     @property
     def addresses(self) -> Dict[str, List[str]]:
@@ -276,9 +274,6 @@ class Server:
         server.host_status = host_status
         server.hypervisor_hostname = hypervisor_hostname
         server.is_locked = is_locked
-        server.fault = (
-            connection(session()).compute.get_server(get_server_id(server.name)).fault
-        )
 
         return server
 
@@ -304,7 +299,6 @@ class Server:
             self.host_status = conn_server.host_status
             self.hypervisor_hostname = conn_server.hypervisor_hostname
             self.is_locked = conn_server.is_locked
-            self.fault = conn_server.fault
         except Exception as e:
             raise ResourceError(f"Could not refresh server: {e}")
 
@@ -380,7 +374,6 @@ class Server:
         print(f"  Host Status: {server.host_status}")
         print(f"  Hypervisor Hostname: {server.hypervisor_hostname}")
         print(f"  Is Locked: {server.is_locked}")
-        print(f"  Fault: {server.fault}")
 
     def _show_widget(self, server):
         html = "<table style='border-collapse: collapse; width: 100%;'>"
@@ -403,7 +396,6 @@ class Server:
             "host_status",
             "hypervisor_hostname",
             "is_locked",
-            "fault",
         ]
 
         for attr in attributes:
