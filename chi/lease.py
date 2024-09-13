@@ -16,6 +16,7 @@ from .exception import CHIValueError, ResourceError, ServiceError
 from .hardware import Node
 from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .util import utcnow
+from chi import util
 
 if TYPE_CHECKING:
     from typing import Pattern
@@ -400,18 +401,40 @@ class Lease:
         if show:
             self.show(type=show, wait_for_active=wait_for_active)
 
-    def wait(self, status="active", timeout=300):
+    def wait(self, status="active", show: str = "widget", timeout: int = 500):
+        """
+        Waits for the lease's status to reach the specified status.
+
+        Args:
+            status (str): The status to wait for. Defaults to "ACTIVE".
+            show (str, optional): The type of server information to display after creation. Defaults to "widget".
+            timeout (int): How long to wait for lease to start
+
+        Raises:
+            ServiceError: If the server does not reach the specified status within the timeout period.
+
+        Returns:
+            None
+        """
+
         print("Waiting for lease to start... This can take up to 60 seconds")
-        start_time = time.time()
-        while time.time() - start_time < timeout:
+
+        pb = util.TimerProgressBar()
+        if show == "widget" and _is_ipynb():
+            pb.display()
+
+        def _callback():
             self.refresh()
-            if self.status.lower() == status.lower():
+            if self.status == status.upper() or self.status == "ERROR":
                 print(f"Lease {self.name} has reached status {self.status.lower()}")
-                return
-            time.sleep(15)
-        raise ServiceError(
-            f"Lease did not reach '{status}' status within {timeout} seconds"
-        )
+                return True
+            return False
+
+        res = pb.wait(_callback, 60, timeout)
+        if not res:
+            raise ServiceError(
+                f"Lease did not reach '{status}' status within 120 seconds, check its start time."
+            )
 
     def refresh(self):
         if self.id:

@@ -126,8 +126,7 @@ class Server:
         elif key_name:
             self.keypair = get_keypair(key_name)
         else:
-            update_keypair()
-            self.keypair = get_keypair(get_from_context("keypair_name"))
+            self.keypair = update_keypair()
 
         self.network_name = network_name
 
@@ -435,6 +434,7 @@ class Server:
             None
         """
         associate_floating_ip(self.id, fip)
+        self.refresh()
 
     def detach_floating_ip(self, fip: str) -> None:
         """
@@ -447,6 +447,7 @@ class Server:
             None
         """
         detach_floating_ip(self.id, fip)
+        self.refresh()
 
     def _can_connect_to_port(self, host, port, timeout):
         try:
@@ -516,7 +517,7 @@ class Server:
             else:
                 print("Connection failed")
 
-    def ssh_connection(self, **kwargs) -> Connection:
+    def ssh_connection(self, user="cc", **kwargs) -> Connection:
         """
             Args:
                 kwargs: Arguments for the Fabric Connection
@@ -528,16 +529,18 @@ class Server:
         if not kwargs.get("connect_kwargs"):
             kwargs["connect_kwargs"] = {}
         key_filename = get_from_context("keypair_private_key")
-        kwargs["connect_kwargs"].setdefault("key_filename", key_filename)
+        # Set key file only if user did not specify
+        if not kwargs["connect_kwargs"].get("key_filename") and not kwargs["connect_kwargs"].get("pkey"):
+            kwargs["connect_kwargs"].setdefault("key_filename", key_filename)
         ip = self.get_floating_ip()
-        conn = Connection(ip, **kwargs)
+        conn = Connection(ip, user=user, **kwargs)
         # Default policy is to reject unknown hosts - for our use-case,
         # printing a warning is probably enough, given the host is almost
         # always guaranteed to be unknown.
         conn.client.set_missing_host_key_policy(WarningPolicy)
         return conn
 
-    def upload(self, file: str, remote_path: str = "") -> None:
+    def upload(self, file: str, remote_path: str = "", **kwargs) -> None:
         """Upload a local file to this server
 
         Args:
@@ -545,16 +548,16 @@ class Server:
             remote_path (str, optional): the remote path. Defaults to "".
         """
         # Implementation for uploading files to the server
-        with self.ssh_connection() as conn:
+        with self.ssh_connection(**kwargs) as conn:
             conn.put(file, remote_path)
 
-    def execute(self, command: str):
+    def execute(self, command: str, **kwargs):
         """Execute a command on this server
 
         Args:
             command (str): the shell command to execute.
         """
-        with self.ssh_connection() as conn:
+        with self.ssh_connection(**kwargs) as conn:
             return conn.run(command)
 
 
@@ -947,8 +950,8 @@ def update_keypair(key_name=None, public_key=None) -> "NovaKeypair":
             with open(public_key_path, "r") as pubkey:
                 public_key = pubkey.read().strip()
 
-    assert key_name is not None
-    assert public_key is not None
+    if not key_name or not public_key:
+        return None
 
     _nova = nova()
     try:
