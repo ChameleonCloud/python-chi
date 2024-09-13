@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List
 
 import manilaclient
@@ -138,6 +139,20 @@ def get_share(ref) -> Share:
     return Share._from_manilla_share(share)
 
 
+@dataclass
+class Object:
+    container: str
+    name: str
+    size: int
+
+    def download(self, file_dest: str):
+        conn = swiftclient.Connection(session=session())
+        obj_tuple = conn.get_object(self.container, self.name)
+        object_content = obj_tuple[1]
+        with open(file_dest, 'wb') as f:
+            f.write(object_content)
+
+
 class ObjectBucket:
     """Class representing an object store bucket
 
@@ -153,11 +168,22 @@ class ObjectBucket:
         # TODO idempotent
         conn.put_container(self.name)
 
+    def list_objects(self) -> List[Object]:
+        conn = swiftclient.Connection(session=session())
+        container_info, res_objects = conn.get_container(self.name)
+        objects = []
+        for obj in res_objects:
+            objects.append(Object(container=self.name, name=obj["name"], size=obj["bytes"]))
+        return objects
+
     def upload(self, file_src: str):
         self.swift = swiftclient.service.SwiftService()
         self.upload_object = swiftclient.service.SwiftUploadObject(
             file_src, object_name=self.name
         )
+
+    def download(self, object_name: str, file_dest: str):
+        Object(container=self.name, name=object_name).download(file_dest)
 
 
 def list_buckets() -> List[ObjectBucket]:
