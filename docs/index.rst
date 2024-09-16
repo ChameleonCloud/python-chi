@@ -74,6 +74,7 @@ For more details about the modules available refer to their respective pages.
    modules/container
    modules/share
    modules/ssh
+   modules/storage
    modules/magic
    modules/clients
    modules/exception

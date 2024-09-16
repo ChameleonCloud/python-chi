@@ -181,8 +181,8 @@ def _check_deprecated(key):
 def _is_ipynb() -> bool:
     try:
         from IPython import get_ipython
-
-        if "IPKernelApp" not in get_ipython().config:
+        ip = get_ipython()
+        if not ip or "IPKernelApp" not in ip.config:
             return False
     except ImportError:
         return False
