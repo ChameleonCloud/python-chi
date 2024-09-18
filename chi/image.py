@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from glanceclient.exc import NotFound
 
+from chi import context
+
 from .clients import glance
 from .exception import CHIValueError, ResourceError
 
@@ -75,13 +77,17 @@ def get_image(name: str) -> Image:
         CHIValueError: If no image is found with the given name.
         ResourceError: If multiple images are found with the same name.
     """
-    glance_images = list(glance().images.list(filters={"name": name}))
-    if not glance_images:
-        raise CHIValueError(f'No images found matching name "{name}"')
-    elif len(glance_images) > 1:
-        raise ResourceError(f'Multiple images found matching name "{name}"')
-
-    return Image.from_glance_image(glance_images[0])
+    if context.version == "dev":
+        glance_images = list(glance().images.list(filters={"name": name}))
+        if not glance_images:
+            raise CHIValueError(f'No images found matching name "{name}"')
+        elif len(glance_images) > 1:
+            raise ResourceError(f'Multiple images found matching name "{name}"')
+        return Image.from_glance_image(glance_images[0])
+    try:
+        return glance().images.get(name)
+    except NotFound:
+        return glance().images.get(get_image_id(name))
 
 
 def get_image_name(id: str) -> str:

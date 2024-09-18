@@ -18,6 +18,8 @@ from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .util import utcnow
 from chi import util
 
+from chi import context
+
 if TYPE_CHECKING:
     from typing import Pattern
 
@@ -1029,10 +1031,20 @@ def get_lease(ref: str) -> Union[Lease, None]:
     Returns:
         A Lease object matching the ID or name, or None if not found.
     """
-    blazar_lease = _get_lease_from_blazar(ref)
-    if blazar_lease is None:
-        raise CHIValueError(f"Lease not found maching {ref}")
-    return Lease(lease_json=blazar_lease)
+    if context.version == "dev":
+        blazar_lease = _get_lease_from_blazar(ref)
+        if blazar_lease is None:
+            raise CHIValueError(f"Lease not found maching {ref}")
+        return Lease(lease_json=blazar_lease)
+    try:
+        return blazar().lease.get(ref)
+    except BlazarClientException as err:
+        # Blazar's exception class is a bit odd and stores the actual code
+        # in 'kwargs'. The 'code' attribute on the exception is just the default
+        # code. Prefer to use .kwargs['code'] if present, fall back to .code
+        code = getattr(err, "kwargs", {}).get("code", getattr(err, "code", None))
+        if code == 404:
+            return blazar().lease.get(get_lease_id(ref))
 
 
 def get_lease_id(lease_name) -> str:

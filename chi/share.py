@@ -3,6 +3,7 @@ from .exception import CHIValueError, ResourceError
 
 from manilaclient.exceptions import NotFound
 
+
 __all__ = [
     "create_share",
     "delete_share",

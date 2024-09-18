@@ -70,6 +70,10 @@ _session = None
 _sites = {}
 
 
+# Whether to use stable or dev release
+version = "stable"
+
+
 def printerr(msg):
     return print(msg, file=sys.stderr)
 
