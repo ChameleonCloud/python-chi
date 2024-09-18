@@ -1,4 +1,4 @@
-class CHIValueError(Exception):
+class CHIValueError(ValueError):
     """Raised when argument is not valid. These errors might be fixed by
     checking hardware catalog or documentation. Examples where this might
     be seen are:

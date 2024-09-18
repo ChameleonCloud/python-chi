@@ -28,6 +28,8 @@ from .network import (
 from .util import random_base32, sshkey_fingerprint
 from chi import util
 
+from chi import context
+
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
 DEFAULT_NETWORK = "sharednet1"
@@ -670,15 +672,17 @@ def show_flavor_by_name(name) -> NovaFlavor:
 ##########
 
 
-def list_servers() -> List[Server]:
+def list_servers(**kwargs) -> List[Server]:
     """
     Returns a list of all servers in the current project.
 
     :return: A list of Server objects representing the servers.
     """
-    nova_servers = nova().servers.list()
-    servers = [Server._from_nova_server(server) for server in nova_servers]
-    return servers
+    if context.version == "dev":
+        nova_servers = nova().servers.list()
+        servers = [Server._from_nova_server(server) for server in nova_servers]
+        return servers
+    return nova().servers.list(**kwargs)
 
 
 def get_server(name: str) -> Server:
@@ -695,8 +699,13 @@ def get_server(name: str) -> Server:
         Exception: If the server with the given name does not exist.
 
     """
-    nova_server = nova().servers.get(get_server_id(name))
-    return Server._from_nova_server(nova_server)
+    if context.version == "dev":
+        nova_server = nova().servers.get(get_server_id(name))
+        return Server._from_nova_server(nova_server)
+    try:
+        return show_server(name)
+    except NotFound:
+        return show_server(get_server_id(name))
 
 
 def get_server_id(name) -> str:

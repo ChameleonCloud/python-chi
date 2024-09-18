@@ -22,6 +22,8 @@ from typing import List, Optional, Tuple
 from IPython.display import HTML, display
 from zunclient.exceptions import NotFound
 
+from chi import context
+
 from .clients import zun
 from .exception import ResourceError
 from .network import bind_floating_ip, get_free_floating_ip
@@ -379,8 +381,10 @@ def list_containers() -> List[Container]:
     Returns:
         A list of Container objects representing the containers.
     """
-    zun_containers = zun().containers.list()
-    return [Container.from_zun_container(c) for c in zun_containers]
+    if context.version == "dev":
+        zun_containers = zun().containers.list()
+        return [Container.from_zun_container(c) for c in zun_containers]
+    return zun().containers.list()
 
 
 def get_container(name: str) -> Optional[Container]:
@@ -393,11 +397,13 @@ def get_container(name: str) -> Optional[Container]:
     Returns:
         Optional[Container]: The retrieved container object, or None if the container does not exist.
     """
-    try:
-        zun_container = zun().containers.get(name)
-    except NotFound:
-        return None
-    return Container.from_zun_container(zun_container)
+    if context.version == "dev":
+        try:
+            zun_container = zun().containers.get(name)
+        except NotFound:
+            return None
+        return Container.from_zun_container(zun_container)
+    return zun().containers.get(name)
 
 
 def snapshot_container(
