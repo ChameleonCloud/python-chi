@@ -61,6 +61,27 @@ For more details about the modules available refer to their respective pages.
   chi.lease.create_lease(
       lease_name, reservations, start_date=start_date, end_date=end_date)
 
+Versions
+========
+In python-chi version 1.0, we've deprecated older versions of functions that return
+inconsistent types. For backwards compatability, the following functions continue to
+return the old types. 
+
+- chi.container.get_container
+- chi.container.list_containers
+- chi.image.get_image
+- chi.lease.get_lease
+- chi.server.get_server
+- chi.server.list_servers
+
+In order enable the new return types, set the context version explicitly. In the next
+version of python-chi, this will no longer be needed.
+
+.. code-block:: python
+
+  from chi import context
+  context.version = "1.0"
+
 .. toctree::
    :caption: Modules
    :maxdepth: 1

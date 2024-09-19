@@ -1,35 +1,30 @@
+import socket
+import time
 from datetime import datetime
 from operator import attrgetter
 from typing import Dict, List, Optional, Union
-from IPython.display import display, HTML
-import socket
-import time
 
-from novaclient.exceptions import NotFound, Conflict
+from fabric import Connection
+from IPython.display import HTML, display
+from novaclient.exceptions import Conflict, NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
-
-from fabric import Connection
+from packaging.version import Version
 from paramiko.client import WarningPolicy
 
 import chi
+from chi import context, util
 
 from .clients import connection, nova
+from .context import DEFAULT_IMAGE_NAME, _is_ipynb
+from .context import get as get_from_context
+from .context import session
 from .exception import CHIValueError, ResourceError, ServiceError
-from .context import get as get_from_context, session, DEFAULT_IMAGE_NAME, _is_ipynb
 from .image import Image, get_image_id, get_image_name
 from .keypair import Keypair
-from .network import (
-    get_network,
-    get_network_id,
-    get_free_floating_ip,
-)
+from .network import get_free_floating_ip, get_network, get_network_id
 from .util import random_base32, sshkey_fingerprint
-from chi import util
-
-from chi import context
-
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
 DEFAULT_NETWORK = "sharednet1"
@@ -237,9 +232,9 @@ class Server:
             image_name=get_image_name(image_id),
             flavor_name=get_flavor(flavor_id).name,
             key_name=nova_server.key_name,
-            network_name=get_network(network_id)["name"]
-            if network_id is not None
-            else None,
+            network_name=(
+                get_network(network_id)["name"] if network_id is not None else None
+            ),
         )
 
         try:
@@ -473,14 +468,16 @@ class Server:
     def check_connectivity(
         self,
         wait: bool = True,
+        host: str = None,
         port: int = 22,
         timeout: int = 500,
         show: str = "widget",
     ) -> bool:
-        """Checks for server TCP connectivity
+        """Checks for server TCP connectivity from the local runtime.
 
         Args:
             wait (bool, optional): Should this method block. Defaults to True.
+            host (str, optional): The IP to connect to. Defaults to the value of `get_floating_ip()`, which returns the first floating IP of this server.
             port (int, optional): The TCP port to connect to. Defaults to 22.
             timeout (int, optional): The number of seconds to wait before timeout. Defaults to 500.
             show (str, optional): The type of server information to display after creation. Defaults to "widget".
@@ -491,7 +488,8 @@ class Server:
         Returns:
             bool: whether connectivity could be established
         """
-        host = self.get_floating_ip()
+        if not host:
+            host = self.get_floating_ip()
         if show:
             print(f"Checking connectivity to {host} port {port}.")
 
@@ -532,7 +530,9 @@ class Server:
             kwargs["connect_kwargs"] = {}
         key_filename = get_from_context("keypair_private_key")
         # Set key file only if user did not specify
-        if not kwargs["connect_kwargs"].get("key_filename") and not kwargs["connect_kwargs"].get("pkey"):
+        if not kwargs["connect_kwargs"].get("key_filename") and not kwargs[
+            "connect_kwargs"
+        ].get("pkey"):
             kwargs["connect_kwargs"].setdefault("key_filename", key_filename)
         ip = self.get_floating_ip()
         conn = Connection(ip, user=user, **kwargs)
@@ -678,7 +678,7 @@ def list_servers(**kwargs) -> List[Server]:
 
     :return: A list of Server objects representing the servers.
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         nova_servers = nova().servers.list()
         servers = [Server._from_nova_server(server) for server in nova_servers]
         return servers
@@ -699,7 +699,7 @@ def get_server(name: str) -> Server:
         Exception: If the server with the given name does not exist.
 
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         nova_server = nova().servers.get(get_server_id(name))
         return Server._from_nova_server(nova_server)
     try:

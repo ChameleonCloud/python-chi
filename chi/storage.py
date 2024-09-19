@@ -149,7 +149,7 @@ class Object:
         conn = swiftclient.Connection(session=session())
         obj_tuple = conn.get_object(self.container, self.name)
         object_content = obj_tuple[1]
-        with open(file_dest, 'wb') as f:
+        with open(file_dest, "wb") as f:
             f.write(object_content)
 
 
@@ -173,7 +173,9 @@ class ObjectBucket:
         container_info, res_objects = conn.get_container(self.name)
         objects = []
         for obj in res_objects:
-            objects.append(Object(container=self.name, name=obj["name"], size=obj["bytes"]))
+            objects.append(
+                Object(container=self.name, name=obj["name"], size=obj["bytes"])
+            )
         return objects
 
     def upload(self, file_src: str):

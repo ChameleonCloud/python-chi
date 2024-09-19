@@ -69,7 +69,6 @@ _auth_plugin = None
 _session = None
 _sites = {}
 
-
 # Whether to use stable or dev release
 version = "stable"
 
@@ -185,6 +184,7 @@ def _check_deprecated(key):
 def _is_ipynb() -> bool:
     try:
         from IPython import get_ipython
+
         ip = get_ipython()
         if not ip or "IPKernelApp" not in ip.config:
             return False
@@ -381,9 +381,8 @@ def use_site(site_name: str) -> None:
     if not site:
         raise CHIValueError(
             (
-                f'No site named "{site_name}" exists! Possible values: ' ", ".join(
-                    _sites.keys()
-                )
+                f'No site named "{site_name}" exists! Possible values: '
+                ", ".join(_sites.keys())
             )
         )
 

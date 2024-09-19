@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from glanceclient.exc import NotFound
+from packaging.version import Version
 
 from chi import context
 
@@ -77,7 +78,7 @@ def get_image(name: str) -> Image:
         CHIValueError: If no image is found with the given name.
         ResourceError: If multiple images are found with the same name.
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         glance_images = list(glance().images.list(filters={"name": name}))
         if not glance_images:
             raise CHIValueError(f'No images found matching name "{name}"')

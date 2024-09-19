@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from blazarclient.exception import BlazarClientException
 from IPython.display import display
 from ipywidgets import HTML
+from packaging.version import Version
+
+from chi import context, util
 
 from .clients import blazar
 from .context import _is_ipynb
@@ -16,9 +19,6 @@ from .exception import CHIValueError, ResourceError, ServiceError
 from .hardware import Node
 from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .util import utcnow
-from chi import util
-
-from chi import context
 
 if TYPE_CHECKING:
     from typing import Pattern
@@ -1031,7 +1031,7 @@ def get_lease(ref: str) -> Union[Lease, None]:
     Returns:
         A Lease object matching the ID or name, or None if not found.
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         blazar_lease = _get_lease_from_blazar(ref)
         if blazar_lease is None:
             raise CHIValueError(f"Lease not found maching {ref}")
