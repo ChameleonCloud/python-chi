@@ -20,6 +20,7 @@ import time
 from typing import List, Optional, Tuple
 
 from IPython.display import HTML, display
+from packaging.version import Version
 from zunclient.exceptions import NotFound
 
 from chi import context
@@ -381,7 +382,7 @@ def list_containers() -> List[Container]:
     Returns:
         A list of Container objects representing the containers.
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         zun_containers = zun().containers.list()
         return [Container.from_zun_container(c) for c in zun_containers]
     return zun().containers.list()
@@ -397,7 +398,7 @@ def get_container(name: str) -> Optional[Container]:
     Returns:
         Optional[Container]: The retrieved container object, or None if the container does not exist.
     """
-    if context.version == "dev":
+    if Version(context.version) >= Version("1.0"):
         try:
             zun_container = zun().containers.get(name)
         except NotFound:
