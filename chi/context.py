@@ -69,8 +69,8 @@ _auth_plugin = None
 _session = None
 _sites = {}
 
-# Whether to use stable or dev release
-version = "stable"
+# You must manually opt into our 1.0 features.
+version = "0.17.12"
 
 
 def printerr(msg):
