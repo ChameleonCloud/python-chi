@@ -595,9 +595,11 @@ def list_flavors() -> List[Flavor]:
     Returns:
         A list of all flavors.
     """
-    nova_client = nova()
-    flavors = nova_client.flavors.list()
-    return [Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors]
+    if Version(context.version) >= Version("1.0"):
+        nova_client = nova()
+        flavors = nova_client.flavors.list()
+        return [Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors]
+    return nova().flavors.list()
 
 
 def get_flavor(ref) -> NovaFlavor:
