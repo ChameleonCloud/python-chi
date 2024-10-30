@@ -180,14 +180,14 @@ def get_nodes(
 
             if isinstance(node.gpu, list):
                 gpu_filter = gpu is None or (
-                    node.gpu and gpu == bool(node.gpu[0]["gpu"])
+                    node.gpu and gpu == bool(node.gpu[0].get("gpu"))
                 )
             else:
-                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu["gpu"]))
+                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu.get("gpu")))
 
             cpu_filter = (
                 min_number_cpu is None
-                or node.architecture["smt_size"] >= min_number_cpu
+                or node.architecture.get("smt_size", 0) >= min_number_cpu
             )
 
             if (
@@ -198,7 +198,7 @@ def get_nodes(
             ):
                 nodes.append(node)
 
-    if node_type not in node_types:
+    if node_type is not None and node_type not in node_types:
         if all_sites:
             raise exception.CHIValueError(
                 f"Unknown node_type '{node_type}' at all sites."
