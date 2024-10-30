@@ -308,6 +308,10 @@ class Lease:
                     reservation_list=self.node_reservations, node_name=node.name
                 )
         else:
+            if not amount or not (node_type or node_name):
+                raise CHIValueError(
+                    "You must specify amount and either node_type or node_name"
+                )
             add_node_reservation(
                 reservation_list=self.node_reservations,
                 count=amount,
