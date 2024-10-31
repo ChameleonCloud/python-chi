@@ -274,6 +274,8 @@ class Server:
         return server
 
     def delete(self) -> None:
+        """Deletes the server.
+        """
         delete_server(self.id)
 
     def refresh(self):
