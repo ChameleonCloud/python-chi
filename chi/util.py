@@ -36,6 +36,17 @@ def utcnow():
     return datetime.now(tz=tz.tzutc())
 
 
+def date_string_in_future(days=1):
+    return (utcnow() + timedelta(days=days)).isoformat()
+
+
+def should_delete(delete_at):
+    try:
+        return datetime.fromisoformat(delete_at) < utcnow()
+    except ValueError:
+        return False
+
+
 class TimerProgressBar:
     def __init__(self):
         self.progress = widgets.IntProgress(
