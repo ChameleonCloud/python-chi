@@ -61,6 +61,9 @@ For more details about the modules available refer to their respective pages.
   chi.lease.create_lease(
       lease_name, reservations, start_date=start_date, end_date=end_date)
 
+For further examples, see the `examples <examples>`_ section.
+
+
 Versions
 ========
 In python-chi version 1.0, we've deprecated older versions of functions that return
@@ -103,7 +106,8 @@ version of python-chi, this will no longer be needed.
 .. toctree::
    :caption: Examples
    :glob:
-
+   
+   examples
    notebooks/*
 
 
