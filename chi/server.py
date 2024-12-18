@@ -155,6 +155,7 @@ class Server:
         wait_for_active: bool = True,
         show: str = "widget",
         idempotent: bool = False,
+        **kwargs,
     ) -> "Server":
         """
         Submits a server creation request to the Nova API.
@@ -187,6 +188,7 @@ class Server:
             flavor=self.flavor_name,
             key=self.keypair.name,
             net_ids=[get_network_id(DEFAULT_NETWORK)],
+            **kwargs,
         )
         try:
             nova_server = self.conn.compute.create_server(**server_args)
@@ -424,7 +426,7 @@ class Server:
 
     def associate_floating_ip(self, fip: Optional[str] = None) -> None:
         """
-        Associates a floating IP with the server. (BROKEN)
+        Associates a floating IP with the server.
 
         Args:
             fip (str, optional): The floating IP to associate with the server. If not provided, a new floating IP will be allocated.
@@ -437,7 +439,7 @@ class Server:
 
     def detach_floating_ip(self, fip: str) -> None:
         """
-        Detaches a floating IP from the server. (BROKEN)
+        Detaches a floating IP from the server.
 
         Args:
             fip (str): The floating IP to detach.
@@ -564,6 +566,11 @@ class Server:
         with self.ssh_connection(**kwargs) as conn:
             return conn.run(command)
 
+    def get_metadata(self):
+        return nova().servers.list_meta(self.id)["metadata"]
+
+    def set_metadata_item(self, key, value):
+        return nova().servers.set_meta_item(self.id, key, value)
 
 ##########
 # Flavors
