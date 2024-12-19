@@ -2,7 +2,6 @@
 requires = ["pbr>=6.0.0", "setuptools>=64.0.0"]
 build-backend = "pbr.build"
 
-
 [project]
 requires-python = ">=3.8"
 name = "python-chi"
@@ -28,7 +27,7 @@ dependencies = [
     "keystoneauth1",
     "openstacksdk",
     "paramiko",
-    "git+https://github.com/ChameleonCloud/python-blazarclient",
+    "python-blazarclient @ git+https://github.com/ChameleonCloud/python-blazarclient",
     "python-cinderclient",
     "python-glanceclient",
     "python-ironicclient",
