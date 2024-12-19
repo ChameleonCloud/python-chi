@@ -1,0 +1,61 @@
+[build-system]
+requires = ["pbr>=6.0.0", "setuptools>=64.0.0"]
+build-backend = "pbr.build"
+
+
+[project]
+requires-python = ">=3.8"
+name = "python-chi"
+authors = [
+    {name = "University of Chicago", email = "dev@lists.chameleoncloud.org"},
+]
+description = "Helper library for Chameleon Infrastructure (CHI) testbed"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: OpenStack",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+]
+readme = "README.rst"
+license = {file = "LICENSE"}
+
+dependencies = [
+    "fabric",
+    "keystoneauth1",
+    "openstacksdk",
+    "paramiko",
+    "git+https://github.com/ChameleonCloud/python-blazarclient",
+    "python-cinderclient",
+    "python-glanceclient",
+    "python-ironicclient",
+    "python-manilaclient",
+    "python-neutronclient",
+    "python-novaclient",
+    "python-swiftclient",
+    "python-zunclient",
+    "ipython",
+    "ipywidgets",
+    "networkx",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest",
+    "pytest-mock",
+    "pytest-watch",
+    "requests_mock"
+]
+
+[project.urls]
+Homepage = "https://www.chameleoncloud.org"
+Documentation = "https://python-chi.readthedocs.io/en/latest/"
+Repository = "https://github.com/chameleoncloud/python-chi"
+
+[tool.setuptools]
+packages = ["chi"]
