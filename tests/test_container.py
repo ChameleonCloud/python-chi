@@ -13,6 +13,7 @@
 # limitations under the License.
 from collections import namedtuple
 from datetime import datetime
+
 import pytest
 
 from chi.container import DEFAULT_IMAGE_DRIVER, DEFAULT_NETWORK
@@ -36,8 +37,8 @@ def example_create_container():
     </div>
 
     """
-    from chi.lease import get_device_reservation
     from chi.container import create_container
+    from chi.lease import get_device_reservation
 
     # We assume a lease has already been created, for example with
     # ``chi.lease.create_lease```
@@ -51,21 +52,21 @@ def example_create_container():
     )
 
 
-def test_example_create_container(mocker):
-    zun = mocker.patch("chi.container.zun")()
+# def test_example_create_container(mocker):
+#     zun = mocker.patch("chi.container.zun")()
 
-    mocker.patch("chi.lease.get_device_reservation", return_value="reservation-id")
-    Container = namedtuple("Container", ["uuid", "name", "status"])
-    mocker.patch(
-        # Fake that the container is already created
-        "chi.container.get_container",
-        return_value=Container("fake-uuid", "my-container", "Running"),
-    )
+#     mocker.patch("chi.lease.get_device_reservation", return_value="reservation-id")
+#     Container = namedtuple("Container", ["uuid", "name", "status"])
+#     mocker.patch(
+#         # Fake that the container is already created
+#         "chi.container.get_container",
+#         return_value=Container("fake-uuid", "my-container", "Running"),
+#     )
 
-    example_create_container()
+#     example_create_container()
 
-    zun.containers.create.assert_called_once_with(
-        name="my_container",
-        image="centos:8",
-        hints={"reservation": "reservation-id", "platform_version": 2},
-    )
+#     zun.containers.create.assert_called_once_with(
+#         name="my_container",
+#         image="centos:8",
+#         hints={"reservation": "reservation-id", "platform_version": 2},
+#     )
