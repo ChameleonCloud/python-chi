@@ -53,7 +53,7 @@ class Node:
 
         def get_host_id(items, target_uid):
             for item in items:
-                if item.get("uid") == target_uid:
+                if item.get("uid") == target_uid or item.get("hypervisor_hostname") == target_uid:
                     return item["id"]
             return None
 
@@ -62,6 +62,8 @@ class Node:
         # Get allocation for this specific host
         host_id = get_host_id(blazarclient.host.list(), self.uid)
 
+        if not host_id:
+            raise exception.ServiceError(f"Host for {self.uid} not found in Blazar")
         allocation = blazarclient.host.get_allocation(host_id)
 
         now = datetime.now(timezone.utc)
