@@ -2,8 +2,4 @@
 
 from setuptools import setup
 
-setup(
-    setup_requires=["pbr"],
-    pbr=True,
-    version='{{VERSION_PLACEHOLDER}}'
-)
+setup(setup_requires=["pbr"])
