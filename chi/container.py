@@ -515,7 +515,8 @@ def download(container_ref: "str", source: "str", dest: "str"):
     res = zun().containers.get_archive(container_ref, source)
     fd = io.BytesIO(res["data"])
     with tarfile.open(fileobj=fd, mode="r") as tar:
-        tar.extractall(dest, filter="fully_trusted")
+        tar.extraction_filter = (lambda member, path: member)
+        tar.extractall(dest)
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":
