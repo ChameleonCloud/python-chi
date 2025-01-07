@@ -811,6 +811,9 @@ def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
 
     conn = connection(session=session())
     if port_id:
+        ports = set(p["id"] for p in conn.network.ports(device_id=server_id))
+        if port_id not in ports:
+            raise exception.ResourceError(f"Port {port_id} not found on server {server_id}")
         try:
             return conn.network.update_ip(
                 floating_ip_obj["id"], port_id=port_id,
