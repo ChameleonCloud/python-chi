@@ -426,17 +426,19 @@ class Server:
                 )
         return formatted
 
-    def associate_floating_ip(self, fip: Optional[str] = None) -> None:
+    def associate_floating_ip(self, fip: Optional[str] = None, port_id: Optional[str] = None) -> None:
         """
         Associates a floating IP with the server.
 
         Args:
             fip (str, optional): The floating IP to associate with the server. If not provided, a new floating IP will be allocated.
+            port_id (str): Optional port ID to assign the floating IP to. If not
+                provided, the will use the first routable port on the server.
 
         Returns:
             None
         """
-        associate_floating_ip(self.id, fip)
+        associate_floating_ip(self.id, fip, port_id)
         self.refresh()
 
     def detach_floating_ip(self, fip: str) -> None:
