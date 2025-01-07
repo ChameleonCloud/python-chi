@@ -10,6 +10,7 @@ from novaclient.exceptions import Conflict, NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
+from openstack.exceptions import SDKException
 from packaging.version import Version
 from paramiko.client import WarningPolicy
 
@@ -23,8 +24,9 @@ from .context import session
 from .exception import CHIValueError, ResourceError, ServiceError
 from .image import Image, get_image_id, get_image_name
 from .keypair import Keypair
-from .network import get_free_floating_ip, get_network, get_network_id
+from chi import network as chi_network
 from .util import random_base32, sshkey_fingerprint
+from chi import exception
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
 DEFAULT_NETWORK = "sharednet1"
@@ -187,7 +189,7 @@ class Server:
             image=self.image_name,
             flavor=self.flavor_name,
             key=self.keypair.name,
-            net_ids=[get_network_id(DEFAULT_NETWORK)],
+            net_ids=[chi_network.get_network_id(DEFAULT_NETWORK)],
             **kwargs,
         )
         try:
@@ -235,7 +237,7 @@ class Server:
             flavor_name=get_flavor(flavor_id).name,
             key_name=nova_server.key_name,
             network_name=(
-                get_network(network_id)["name"] if network_id is not None else None
+                chi_network.get_network(network_id)["name"] if network_id is not None else None
             ),
         )
 
@@ -785,7 +787,7 @@ def show_server_by_name(name) -> NovaServer:
     return show_server(server_id)
 
 
-def associate_floating_ip(server_id, floating_ip_address=None):
+def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
     """
     .. deprecated:: 1.0
 
@@ -798,15 +800,36 @@ def associate_floating_ip(server_id, floating_ip_address=None):
         floating_ip_address (str): The IPv4 address of the Floating IP to
             assign. If specified, this Floating IP must already be allocated
             to the project.
+        port_id (str): Optional port ID to assign the floating IP to. If not
+            provided, the will use the first routable port on the server.
 
     """
     if not floating_ip_address:
-        floating_ip_address = get_free_floating_ip()["floating_ip_address"]
+        floating_ip_obj = chi_network.get_free_floating_ip()
+    else:
+        floating_ip_obj = chi_network.get_floating_ip(floating_ip_address)
 
-    conn = connection()
-    conn.add_ips_to_server(conn.get_server_by_id(server_id), ips=[floating_ip_address])
-
-    return floating_ip_address
+    conn = connection(session=session())
+    if port_id:
+        try:
+            return conn.network.update_ip(
+                floating_ip_obj["id"], port_id=port_id,
+            )["floating_ip_address"]
+        except SDKException:
+            raise exception.ResourceError(f"Port {port_id} cannot be assigned floating ip {floating_ip_address} on server {server_id}")
+    else:
+        ports = list(conn.network.ports(device_id=server_id))
+        for port in ports:
+            floating_ip_args = {'port_id': port['id']}
+            try:
+                return conn.network.update_ip(
+                    floating_ip_obj["id"], **floating_ip_args
+                )["floating_ip_address"]
+            except SDKException:
+                # Ignore errors and try the next port
+                pass
+    floating_ip_address = floating_ip_obj["floating_ip_obj"]
+    raise exception.ResourceError(f"None of the ports can route to floating ip {floating_ip_address} on server {server_id}")
 
 
 def detach_floating_ip(server_id, floating_ip_address):
@@ -1047,7 +1070,7 @@ def create_server(
     if not key_name:
         key_name = update_keypair().id
     if not network_id:
-        network_id = get_network_id(network_name)
+        network_id = chi_network.get_network_id(network_name)
     if not nics:
         nics = [{"net-id": network_id, "v4-fixed-ip": ""}]
     if not image_id:
