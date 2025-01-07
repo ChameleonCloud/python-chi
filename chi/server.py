@@ -810,18 +810,13 @@ def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
         floating_ip_obj = chi_network.get_floating_ip(floating_ip_address)
 
     conn = connection(session=session())
+    ports = list(conn.network.ports(device_id=server_id))
     if port_id:
-        ports = set(p["id"] for p in conn.network.ports(device_id=server_id))
-        if port_id not in ports:
+        port_obj = next(port for port in ports if port["id"] == port_id)
+        if not port_obj:
             raise exception.ResourceError(f"Port {port_id} not found on server {server_id}")
-        try:
-            return conn.network.update_ip(
-                floating_ip_obj["id"], port_id=port_id,
-            )["floating_ip_address"]
-        except SDKException:
-            raise exception.ResourceError(f"Port {port_id} cannot be assigned floating ip {floating_ip_address} on server {server_id}")
+        ports = [port_obj]
     else:
-        ports = list(conn.network.ports(device_id=server_id))
         for port in ports:
             floating_ip_args = {'port_id': port['id']}
             try:
