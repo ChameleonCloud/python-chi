@@ -49,12 +49,12 @@ def instance_create_args(
         "name": name,
         "flavorRef": get_flavor_id(flavor),
         "imageRef": get_image_id(image),
-        "scheduler_hints": {
-            "reservation": reservation,
-        },
+        "scheduler_hints": {},
         "key_name": key,
         "networks": net_ids,
     }
+    if reservation is not None:
+        server_args["scheduler_hints"]["reservation"] = reservation
 
     if net_ids is None:
         # automatically binds "the one" unless there's more than one
