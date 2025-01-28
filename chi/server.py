@@ -828,7 +828,7 @@ def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
             except SDKException:
                 # Ignore errors and try the next port
                 pass
-    floating_ip_address = floating_ip_obj["floating_ip_obj"]
+    floating_ip_address = floating_ip_obj["floating_ip_address"]
     raise exception.ResourceError(f"None of the ports can route to floating ip {floating_ip_address} on server {server_id}")
 
 
