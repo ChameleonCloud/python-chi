@@ -1,4 +1,5 @@
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
@@ -36,6 +37,7 @@ class Node:
     storage_devices: List[dict]
     uid: str
     version: str
+    reservable: bool
 
     def next_free_timeslot(
         self, minimum_hours: int = 1
@@ -140,20 +142,30 @@ def get_nodes(
             )
             continue
 
-        endpoint = f"sites/{site.split('@')[1].lower()}/clusters/chameleon/nodes"
-        data = _call_api(endpoint)
-
         allocations = defaultdict(list)
         reserved_now = set()
         blazarclient = blazar()
         now = datetime.now(timezone.utc)
+
+        endpoint = f"sites/{site.split('@')[1].lower()}/clusters/chameleon/nodes"
+
+        with ThreadPoolExecutor() as executor:
+            f1 = executor.submit(_call_api, endpoint)
+            f2 = executor.submit(blazarclient.host.list)
+            data = f1.result()
+            blazar_hosts = f2.result()
+
+        blazar_hosts_by_id = {}
+        for host in blazar_hosts:
+            blazar_hosts_by_id[host["id"]] = host
+        blazar_hosts_by_hypervisor_hostname = {}
+        for host in blazar_hosts:
+            blazar_hosts_by_hypervisor_hostname[host["hypervisor_hostname"]] = host
+
         if filter_reserved:
-            hosts_by_id = {}
-            for host in blazarclient.host.list():
-                hosts_by_id[host["id"]] = host
             for resource in blazarclient.host.list_allocations():
                 for allocation in resource["reservations"]:
-                    blazar_host = hosts_by_id.get(resource["resource_id"], None)
+                    blazar_host = blazar_hosts_by_id.get(resource["resource_id"], None)
                     if blazar_host:
                         allocations[blazar_host["hypervisor_hostname"]].append(
                             allocation
@@ -162,6 +174,7 @@ def get_nodes(
                             reserved_now.add(blazar_host["hypervisor_hostname"])
 
         for node_data in data["items"]:
+            blazar_host = blazar_hosts_by_hypervisor_hostname.get(node_data.get("uid"), None)
             node = Node(
                 site=site,
                 name=node_data.get("node_name"),
@@ -176,6 +189,7 @@ def get_nodes(
                 storage_devices=node_data.get("storage_devices"),
                 uid=node_data.get("uid"),
                 version=node_data.get("version"),
+                reservable=blazar_host.get("reservable"),
             )
             if node.type not in node_types:
                 node_types.append(node.type)
@@ -192,10 +206,11 @@ def get_nodes(
                 or node.architecture.get("smt_size", 0) >= min_number_cpu
             )
 
+            free_and_reservable = node.uid not in reserved_now and node.reservable
             if (
                 gpu_filter
                 and cpu_filter
-                and (not filter_reserved or node.uid not in reserved_now)
+                and (not filter_reserved or free_and_reservable)
                 and (node_type is None or node.type == node_type)
             ):
                 nodes.append(node)
