@@ -174,7 +174,7 @@ def get_nodes(
                             reserved_now.add(blazar_host["hypervisor_hostname"])
 
         for node_data in data["items"]:
-            blazar_host = blazar_hosts_by_hypervisor_hostname.get(node_data.get("uid"), None)
+            blazar_host = blazar_hosts_by_hypervisor_hostname.get(node_data.get("uid"), {})
             node = Node(
                 site=site,
                 name=node_data.get("node_name"),
