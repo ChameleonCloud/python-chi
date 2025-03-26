@@ -61,17 +61,18 @@ class TimerProgressBar:
     def display(self):
         display(widgets.HBox([self.label, self.progress]))
 
-    def wait(self, callback, expected_timeout, timeout):
+    def wait(self, callback, expected_timeout, timeout, interval=5):
         """Wait and update the progress bar.
 
         Args:
             callback (function): bool function for whether to break
             expected_timeout (int): how long the progress bar should expect to wait for in seconds. Will display 90% when reached
             timeout (int): The time to reach 100% of the progress bar
-
+            interval (int): The time to wait between checking the callback)
         Returns:
             Whether callback returned true before timeout
         """
+        expected_proportion = 0.9
         start_time = time.time()
         while time.time() - start_time < timeout:
             if callback():
@@ -81,12 +82,18 @@ class TimerProgressBar:
             self.label.value = f"{str(elapased).split('.')[0]} elapsed."
 
             if elapased.total_seconds() < expected_timeout:
-                self.progress.value = 100 * elapased.total_seconds() / expected_timeout
-            else:
                 self.progress.value = (
-                    10
+                    100
+                    * expected_proportion
+                    * elapased.total_seconds()
+                    / expected_timeout
+                )
+            else:
+                self.progress.value = 100 * (
+                    expected_proportion
+                    + (1 - expected_proportion)
                     * (elapased.total_seconds() - expected_timeout)
                     / (timeout - expected_timeout)
                 )
-            time.sleep(5)
+            time.sleep(interval)
         return False
