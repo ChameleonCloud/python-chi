@@ -237,7 +237,9 @@ class Server:
             flavor_name=get_flavor(flavor_id).name,
             key_name=nova_server.key_name,
             network_name=(
-                chi_network.get_network(network_id)["name"] if network_id is not None else None
+                chi_network.get_network(network_id)["name"]
+                if network_id is not None
+                else None
             ),
         )
 
@@ -278,8 +280,7 @@ class Server:
         return server
 
     def delete(self) -> None:
-        """Deletes the server.
-        """
+        """Deletes the server."""
         delete_server(self.id)
 
     def refresh(self):
@@ -304,13 +305,16 @@ class Server:
         except Exception as e:
             raise ResourceError(f"Could not refresh server: {e}")
 
-    def wait(self, status: str = "ACTIVE", show: str = "widget") -> None:
+    def wait(
+        self, status: str = "ACTIVE", show: str = "widget", timeout: int = 20 * 60
+    ) -> None:
         """
         Waits for the server's status to reach the specified status.
 
         Args:
             status (str): The status to wait for. Defaults to "ACTIVE".
             show (str, optional): The type of server information to display after creation. Defaults to "widget".
+            timeout (int): How long to wait for server to start in seconds. Default 20 minutes.
 
         Raises:
             ServiceError: If the server does not reach the specified status within the timeout period.
@@ -333,7 +337,7 @@ class Server:
                 return True
             return False
 
-        res = pb.wait(_callback, 10 * 60, 20 * 60)
+        res = pb.wait(_callback, 10 * 60, timeout)
         if not res:
             raise ServiceError(f"Timeout waiting for server to reach {status} status")
 
@@ -426,7 +430,9 @@ class Server:
                 )
         return formatted
 
-    def associate_floating_ip(self, fip: Optional[str] = None, port_id: Optional[str] = None) -> None:
+    def associate_floating_ip(
+        self, fip: Optional[str] = None, port_id: Optional[str] = None
+    ) -> None:
         """
         Associates a floating IP with the server.
 
@@ -576,6 +582,7 @@ class Server:
     def set_metadata_item(self, key, value):
         return nova().servers.set_meta_item(self.id, key, value)
 
+
 ##########
 # Flavors
 ##########
@@ -611,7 +618,9 @@ def list_flavors() -> List[Flavor]:
     if Version(context.version) >= Version("1.0"):
         nova_client = nova()
         flavors = nova_client.flavors.list()
-        return [Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors]
+        return [
+            Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors
+        ]
     return nova().flavors.list()
 
 
@@ -816,11 +825,13 @@ def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
     if port_id:
         port_obj = next(port for port in ports if port["id"] == port_id)
         if not port_obj:
-            raise exception.ResourceError(f"Port {port_id} not found on server {server_id}")
+            raise exception.ResourceError(
+                f"Port {port_id} not found on server {server_id}"
+            )
         ports = [port_obj]
     else:
         for port in ports:
-            floating_ip_args = {'port_id': port['id']}
+            floating_ip_args = {"port_id": port["id"]}
             try:
                 return conn.network.update_ip(
                     floating_ip_obj["id"], **floating_ip_args
@@ -829,7 +840,9 @@ def associate_floating_ip(server_id, floating_ip_address=None, port_id=None):
                 # Ignore errors and try the next port
                 pass
     floating_ip_address = floating_ip_obj["floating_ip_address"]
-    raise exception.ResourceError(f"None of the ports can route to floating ip {floating_ip_address} on server {server_id}")
+    raise exception.ResourceError(
+        f"None of the ports can route to floating ip {floating_ip_address} on server {server_id}"
+    )
 
 
 def detach_floating_ip(server_id, floating_ip_address):
