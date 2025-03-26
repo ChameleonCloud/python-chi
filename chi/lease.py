@@ -423,7 +423,7 @@ class Lease:
             None
         """
 
-        print("Waiting for lease to start... This can take up to 60 seconds")
+        print("Waiting for lease to start...")
 
         pb = util.TimerProgressBar()
         if show == "widget" and _is_ipynb():

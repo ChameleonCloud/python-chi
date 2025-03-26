@@ -192,10 +192,15 @@ class Server:
             net_ids=[chi_network.get_network_id(DEFAULT_NETWORK)],
             **kwargs,
         )
-        try:
-            nova_server = self.conn.compute.create_server(**server_args)
-        except Conflict as e:
-            raise ResourceError(e.message)  # Re-raise the exception if not handled
+
+        attempt = 0
+        while attempt < 3:
+            try:
+                nova_server = self.conn.compute.create_server(**server_args)
+                break
+            except Conflict as e:
+
+                raise ResourceError(e.message)  # Re-raise the exception if not handled
 
         # TODO use nova_server to update self
 
@@ -279,9 +284,24 @@ class Server:
 
         return server
 
-    def delete(self) -> None:
-        """Deletes the server."""
-        delete_server(self.id)
+    def delete(self, idempotent: bool = False, delete_ips: bool = True) -> None:
+        """
+        Deletes the server.
+
+        Args:
+            idempotent (bool, optional): Whether to create the server only if it doesn't already exist. Defaults to False.
+            delete_ips (bool, optional): Whether to delete the server IPs from this project. Defauls to False
+        """
+        if delete_ips:
+            conn = connection(session=session())
+            for addr in self.get_all_floating_ips():
+                floating_ip_obj = chi_network.get_floating_ip(addr)
+                conn.network.delete(floating_ip_obj["id"])
+        try:
+            delete_server(self.id)
+        except NotFound:
+            if not idempotent:
+                raise ResourceError(f"Server {self.name} not found")
 
     def refresh(self):
         """
@@ -447,17 +467,22 @@ class Server:
         associate_floating_ip(self.id, fip, port_id)
         self.refresh()
 
-    def detach_floating_ip(self, fip: str) -> None:
+    def detach_floating_ip(self, fip: str, delete: Optional[bool] = True) -> None:
         """
         Detaches a floating IP from the server.
 
         Args:
             fip (str): The floating IP to detach.
+            delete (Optional[bool], optional): Whether to delete the floating IP after disassociation. Defaults to True.
 
         Returns:
             None
         """
         detach_floating_ip(self.id, fip)
+        if delete:
+            conn = connection(session=session())
+            floating_ip_obj = chi_network.get_floating_ip(fip)
+            conn.network.delete(floating_ip_obj["id"])
         self.refresh()
 
     def _can_connect_to_port(self, host, port, timeout):
@@ -473,11 +498,23 @@ class Server:
         Returns:
             str: Floating IP address of server
         """
+        fips = self.get_all_floating_ips()
+        if fips:
+            return fips[0]
+        return None
+
+    def get_all_floating_ips(self):
+        """Get a list of attached floating ips of this server
+
+        Returns:
+            List[str[]: Floating IP addresses of server
+        """
+        fips = []
         for net, addresses in self.addresses.items():
             for address in addresses:
                 if address.get("OS-EXT-IPS:type") == "floating":
-                    return address["addr"]
-        return None
+                    fips.append(address["addr"])
+        return fips
 
     def check_connectivity(
         self,
