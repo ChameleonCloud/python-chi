@@ -18,7 +18,7 @@ from .context import _is_ipynb
 from .exception import CHIValueError, ResourceError, ServiceError
 from .hardware import Node
 from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
-from .util import utcnow
+from .util import retry_create, utcnow
 
 if TYPE_CHECKING:
     from typing import Pattern
@@ -355,6 +355,7 @@ class Lease:
         wait_timeout: int = 300,
         show: Optional[str] = None,
         idempotent: bool = False,
+        retry_on_error: bool = False,
     ):
         """
         Submits the lease for creation.
@@ -364,6 +365,7 @@ class Lease:
             wait_timeout (int, optional): The maximum time to wait for the lease to become active, in seconds. Defaults to 300.
             show (Optional[str], optional): The types of lease information to display. Defaults to None, options are "widget", "text".
             idempotent (bool, optional): Whether to create the lease only if it doesn't already exist. Defaults to False.
+            retry_on_error (bool, optional): Whether to retry the server creation if creation fails. Defaults to False.
 
         Raises:
             ResourceError: If unable to create the lease.
@@ -389,23 +391,35 @@ class Lease:
             + self.network_reservations
         )
 
-        response = create_lease(
-            lease_name=self.name,
-            reservations=reservations,
-            start_date=self.start_date,
-            end_date=self.end_date,
+        def _lease_create_func():
+            response = create_lease(
+                lease_name=self.name,
+                reservations=reservations,
+                start_date=self.start_date,
+                end_date=self.end_date,
+            )
+
+            if response:
+                self._populate_from_json(response)
+            else:
+                raise ResourceError("Unable to make lease")
+
+            if wait_for_active:
+                self.wait(status="active", timeout=wait_timeout)
+
+            if show:
+                self.show(type=show, wait_for_active=wait_for_active)
+
+        def _lease_cleanup_func():
+            try:
+                self.delete()
+            except Exception:
+                # Ignore any cleanup errors
+                pass
+
+        retry_create(
+            3 if retry_on_error else 1, _lease_create_func, _lease_cleanup_func
         )
-
-        if response:
-            self._populate_from_json(response)
-        else:
-            raise ResourceError("Unable to make lease")
-
-        if wait_for_active:
-            self.wait(status="active", timeout=wait_timeout)
-
-        if show:
-            self.show(type=show, wait_for_active=wait_for_active)
 
     def wait(self, status="active", show: str = "widget", timeout: int = 500):
         """
