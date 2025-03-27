@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Union
 
 from fabric import Connection
 from IPython.display import HTML, display
-from novaclient.exceptions import Conflict, NotFound
+from novaclient.exceptions import NotFound
 from novaclient.v2.flavor_access import FlavorAccess as NovaFlavor
 from novaclient.v2.keypairs import Keypair as NovaKeypair
 from novaclient.v2.servers import Server as NovaServer
@@ -25,7 +25,7 @@ from .exception import CHIValueError, ResourceError, ServiceError
 from .image import Image, get_image_id, get_image_name
 from .keypair import Keypair
 from chi import network as chi_network
-from .util import random_base32, sshkey_fingerprint
+from .util import random_base32, retry_create, sshkey_fingerprint
 from chi import exception
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
@@ -157,6 +157,7 @@ class Server:
         wait_for_active: bool = True,
         show: str = "widget",
         idempotent: bool = False,
+        retry_on_error: bool = False,
         **kwargs,
     ) -> "Server":
         """
@@ -166,6 +167,7 @@ class Server:
             wait_for_active (bool, optional): Whether to wait for the server to become active before returning. Defaults to True.
             show (str, optional): The type of server information to display after creation. Defaults to "widget".
             idempotent (bool, optional): Whether to create the server only if it doesn't already exist. Defaults to False.
+            retry_on_error (bool, optional): Whether to retry the server creation if creation fails. Defaults to False.
 
         Raises:
             Conflict: If the server creation fails due to a conflict and idempotent mode is not enabled.
@@ -193,22 +195,24 @@ class Server:
             **kwargs,
         )
 
-        attempt = 0
-        while attempt < 3:
+        def _server_create_func():
+            self.conn.compute.create_server(**server_args)
+            if wait_for_active:
+                self.wait()
+            if show:
+                self.show(type=show)
+
+        def _server_cleanup_func():
             try:
-                nova_server = self.conn.compute.create_server(**server_args)
-                break
-            except Conflict as e:
+                self.delete(idempotent=True, delete_ips=False)
+                time.sleep(10)
+            except Exception:
+                # Ignore any cleanup errors
+                pass
 
-                raise ResourceError(e.message)  # Re-raise the exception if not handled
-
-        # TODO use nova_server to update self
-
-        if wait_for_active:
-            self.wait()
-
-        if show:
-            self.show(type=show)
+        retry_create(
+            3 if retry_on_error else 1, _server_create_func, _server_cleanup_func
+        )
 
     @classmethod
     def _from_nova_server(cls, nova_server):

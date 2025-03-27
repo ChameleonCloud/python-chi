@@ -4,6 +4,7 @@ import time
 from dateutil import tz
 from hashlib import md5
 import os
+from chi.exception import ResourceError
 import ipywidgets as widgets
 from IPython.display import display
 
@@ -97,3 +98,17 @@ class TimerProgressBar:
                 )
             time.sleep(interval)
         return False
+
+
+def retry_create(max_attempts, create_func, cleanup_func):
+    attempt = 0
+    while attempt < 3:
+        try:
+            create_func()
+            break
+        except Exception as e:
+            attempt += 1
+            if attempt == max_attempts:
+                raise ResourceError(e)
+            print(f"Error creating resource on attempt {attempt}/{max_attempts}.")
+            cleanup_func()
