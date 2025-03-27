@@ -292,6 +292,21 @@ class Container:
         """
         return associate_floating_ip(self.id, fip)
 
+    def logs(self, stdout: str = True, stderr: str = True) -> str:
+        """
+        Print all logs outputted by the container.
+
+        Args:
+            container_ref (str): The name or ID of the container.
+            stdout (bool): Whether to include stdout logs. Default True.
+            stderr (bool): Whether to include stderr logs. Default True.
+
+        Returns:
+            A string containing all log output. Log lines will be delimited by
+                newline characters.
+        """
+        return get_logs(self.id, stdout=stdout, stderr=stderr)
+
 
 def create_container(
     name: "str",
@@ -515,7 +530,7 @@ def download(container_ref: "str", source: "str", dest: "str"):
     res = zun().containers.get_archive(container_ref, source)
     fd = io.BytesIO(res["data"])
     with tarfile.open(fileobj=fd, mode="r") as tar:
-        tar.extraction_filter = (lambda member, path: member)
+        tar.extraction_filter = lambda member, path: member
         tar.extractall(dest)
 
 
