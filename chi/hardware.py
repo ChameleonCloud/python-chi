@@ -2,12 +2,13 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 from chi import exception
 
-from .clients import blazar
-from .context import get, RESOURCE_API_URL
+from .clients import blazar, connection
+from .context import get, RESOURCE_API_URL, session
+
 
 import requests
 import logging
@@ -15,6 +16,31 @@ import logging
 LOG = logging.getLogger(__name__)
 
 node_types = []
+
+
+def _get_next_free_timeslot(allocation, minimum_hours):
+    now = datetime.now(timezone.utc)
+
+    if not allocation:
+        return (now, None)
+
+    reservations = sorted(allocation["reservations"], key=lambda x: x["start_date"])
+
+    buffer = timedelta(hours=minimum_hours)
+    # Next time this interval could possibly start
+    possible_start = now
+    for i in range(len(reservations)):
+        # Check we have enough time between last known free period and this reservation
+        this_start = _parse_blazar_dt(reservations[i]["start_date"])
+        if possible_start + buffer < this_start:
+            # We found a gap
+            return (possible_start, this_start)
+
+        # Otherwise, no possible start until end of this reservation
+        this_end = _parse_blazar_dt(reservations[i]["end_date"])
+        possible_start = this_end
+    # If there was no gap, use the last reservation's end time
+    return (possible_start, None)
 
 
 @dataclass
@@ -55,7 +81,10 @@ class Node:
 
         def get_host_id(items, target_uid):
             for item in items:
-                if item.get("uid") == target_uid or item.get("hypervisor_hostname") == target_uid:
+                if (
+                    item.get("uid") == target_uid
+                    or item.get("hypervisor_hostname") == target_uid
+                ):
                     return item["id"]
             return None
 
@@ -63,33 +92,12 @@ class Node:
 
         # Get allocation for this specific host
         host_id = get_host_id(blazarclient.host.list(), self.uid)
-
         if not host_id:
             raise exception.ServiceError(f"Host for {self.uid} not found in Blazar")
-        allocation = blazarclient.host.get_allocation(host_id)
 
-        now = datetime.now(timezone.utc)
-
-        if not allocation:
-            return (now, None)
-
-        reservations = sorted(allocation["reservations"], key=lambda x: x["start_date"])
-
-        buffer = timedelta(hours=minimum_hours)
-        # Next time this interval could possibly start
-        possible_start = now
-        for i in range(len(reservations)):
-            # Check we have enough time between last known free period and this reservation
-            this_start = _parse_blazar_dt(reservations[i]["start_date"])
-            if possible_start + buffer < this_start:
-                # We found a gap
-                return (possible_start, this_start)
-
-            # Otherwise, no possible start until end of this reservation
-            this_end = _parse_blazar_dt(reservations[i]["end_date"])
-            possible_start = this_end
-        # If there was no gap, use the last reservation's end time
-        return (possible_start, None)
+        return _get_next_free_timeslot(
+            blazarclient.host.get_allocation(host_id), minimum_hours
+        )
 
 
 def _call_api(endpoint):
@@ -115,7 +123,7 @@ def get_nodes(
         all_sites (bool, optional): Flag to indicate whether to retrieve nodes from all sites.
             Defaults to False.
         filter_reserved (bool, optional): Flag to indicate whether to filter out reserved nodes.
-            Defaults to False. (Not Currently implemented)
+            Defaults to False.
         gpu (bool, optional): Flag to indicate whether to filter nodes based on GPU availability.
             Defaults to None.
         min_number_cpu (int, optional): Minimum number of CPU logical cores per node.
@@ -137,9 +145,7 @@ def get_nodes(
     for site in sites:
         # Soufiane: Skipping CHI@EDGE since it is not enrolled in the hardware API,
         if site == "CHI@Edge":
-            print(
-                "Please visit the Hardware discovery page for information about CHI@Edge devices"
-            )
+            print("See `hardware.get_devices` for information about CHI@Edge devices")
             continue
 
         allocations = defaultdict(list)
@@ -199,7 +205,9 @@ def get_nodes(
                     node.gpu and gpu == bool(node.gpu[0].get("gpu"))
                 )
             else:
-                gpu_filter = gpu is None or (node.gpu and gpu == bool(node.gpu.get("gpu")))
+                gpu_filter = gpu is None or (
+                    node.gpu and gpu == bool(node.gpu.get("gpu"))
+                )
 
             cpu_filter = (
                 min_number_cpu is None
@@ -249,3 +257,153 @@ def get_node_types() -> List[str]:
     if len(node_types) < 1:
         get_nodes()
     return list(set(node_types))
+
+
+@dataclass
+class Device:
+    """
+    A dataclass for device information directly from the hardware browser.
+    """
+
+    device_name: str
+    device_type: str
+    supported_device_profiles: List[str]
+    authorized_projects: Set[str]
+    owning_project: str
+    uuid: str
+    reservable: bool
+
+    def next_free_timeslot(
+        self, minimum_hours: int = 1
+    ) -> Tuple[datetime, Optional[datetime]]:
+        """
+        Finds the next available timeslot for the device using the Blazar client.
+
+        Args:
+            minimum_hours (int, optional): The minimum number of hours for this timeslot.
+
+        Returns:
+            A tuple containing the start and end datetime of the next available timeslot.
+            If no timeslot is available, returns (end_datetime_of_last_allocation, None).
+        """
+
+        def get_device_id(items, target_uid):
+            for item in items:
+                if item.get("uid") == target_uid or item.get("uid") == target_uid:
+                    return item["id"]
+            return None
+
+        blazarclient = blazar()
+
+        # Get allocation for this specific device
+        device_id = get_device_id(blazarclient.device.list(), self.uuid)
+        if not device_id:
+            raise exception.ServiceError(f"Device for {self.uuid} not found in Blazar")
+
+        # Bug in Blazar API for devices means `get_alloction` doesn't work. We get around this with `list`
+        allocs = blazarclient.device.list_allocations()
+        this_alloc = None
+        for alloc in allocs:
+            if alloc["resource_id"] == device_id:
+                this_alloc = alloc
+        return _get_next_free_timeslot(this_alloc, minimum_hours)
+
+
+def get_devices(
+    device_type: Optional[str] = None,
+    filter_reserved: bool = False,
+    filter_unauthorized: bool = True,
+) -> List[Device]:
+    """
+    Retrieve a list of devices based on the specified criteria.
+
+    Args:
+        device_type (str, optional): The device type to filter by
+        filter_reserved (bool, optional): Flag to indicate whether to filter out reserved devices. Defaults to False.
+        filter_unauthorized (bool, optional): Filter devices that the current project is not authorized to use
+
+    Returns:
+        List[Device]: A list of Device objects that match the specified criteria.
+    """
+    # Query hardware API
+    url = "https://dev.chameleoncloud.org/edge-hw-discovery/devices"
+    res = requests.get(url)
+    try:
+        res.raise_for_status()
+    except requests.exceptions.HTTPError:
+        raise exception.ServiceError(
+            f"Failed to get devices. Status code {res.status_code}"
+        )
+
+    blazarclient = blazar()
+    # Blazar uid matches doni's uuid, so we need to map blazar id to blazar uid for allocations,
+    # and uid to id for reservable status
+    blazar_devices_by_id = {}
+    blazar_devices_by_uid = {}
+    for device in blazarclient.device.list():
+        blazar_devices_by_id[device["id"]] = device
+        blazar_devices_by_uid[device["uid"]] = device
+
+    devices = []
+    for dev_json in res.json():
+        blazar_host = blazar_devices_by_uid.get(dev_json.get("uid"), {})
+        devices.append(
+            Device(
+                device_name=dev_json["device_name"],
+                device_type=dev_json["device_type"],
+                supported_device_profiles=dev_json["supported_device_profiles"],
+                authorized_projects=set(dev_json["authorized_projects"]),
+                owning_project=dev_json["owning_project"],
+                uuid=dev_json["uuid"],
+                reservable=blazar_host.get(
+                    "reservable", False
+                ),  # not all devices will appear in blazar if registration failed
+            )
+        )
+
+    # Filter based on authorized projects
+    authorized_devices = [] if filter_unauthorized else devices
+    if filter_unauthorized:
+        conn = connection(session=session())
+        current_project_id = conn.current_project_id
+        for device in devices:
+            if (
+                "all" in device.authorized_projects
+                or current_project_id in device.authorized_projects
+            ):
+                authorized_devices.append(device)
+
+    # Filter based on device type
+    matching_type_devices = [] if device_type else authorized_devices
+    if device_type:
+        for device in authorized_devices:
+            if device.device_type == device_type:
+                matching_type_devices.append(device)
+
+    # Filter based on reserved status
+    unreserved_devices = [] if filter_reserved else matching_type_devices
+    if filter_reserved:
+        now = datetime.now(timezone.utc)
+
+        reserved_devices = set()
+        for resource in blazarclient.device.list_allocations():
+            blazar_device = blazar_devices_by_id.get(resource["resource_id"], None)
+            if blazar_device:
+                for allocation in resource["reservations"]:
+                    if _reserved_now(allocation, now):
+                        reserved_devices.add(blazar_device["uid"])
+        for device in matching_type_devices:
+            if device.uuid not in reserved_devices:
+                unreserved_devices.append(device)
+
+    return unreserved_devices
+
+
+def get_device_types() -> List[str]:
+    """
+    Retrieve a list of unique device types.
+
+    Returns:
+        List[str]: A list of unique device types.
+    """
+    return list(set(d.device_type for d in get_devices()))
