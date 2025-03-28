@@ -7,7 +7,7 @@ from typing import List, Optional, Set, Tuple
 from chi import exception
 
 from .clients import blazar, connection
-from .context import get, RESOURCE_API_URL, session
+from .context import get, RESOURCE_API_URL, EDGE_RESOURCE_API_URL, session
 
 
 import requests
@@ -180,7 +180,9 @@ def get_nodes(
                             reserved_now.add(blazar_host["hypervisor_hostname"])
 
         for node_data in data["items"]:
-            blazar_host = blazar_hosts_by_hypervisor_hostname.get(node_data.get("uid"), {})
+            blazar_host = blazar_hosts_by_hypervisor_hostname.get(
+                node_data.get("uid"), {}
+            )
             node = Node(
                 site=site,
                 name=node_data.get("node_name"),
@@ -326,8 +328,7 @@ def get_devices(
         List[Device]: A list of Device objects that match the specified criteria.
     """
     # Query hardware API
-    url = "https://dev.chameleoncloud.org/edge-hw-discovery/devices"
-    res = requests.get(url)
+    res = requests.get(EDGE_RESOURCE_API_URL)
     try:
         res.raise_for_status()
     except requests.exceptions.HTTPError:
