@@ -158,6 +158,7 @@ class Server:
         show: str = "widget",
         idempotent: bool = False,
         retry_on_error: bool = False,
+        wait_timeout: int = 20 * 60,
         **kwargs,
     ) -> "Server":
         """
@@ -168,6 +169,7 @@ class Server:
             show (str, optional): The type of server information to display after creation. Defaults to "widget".
             idempotent (bool, optional): Whether to create the server only if it doesn't already exist. Defaults to False.
             retry_on_error (bool, optional): Whether to retry the server creation if creation fails. Defaults to False.
+            wait_timeout (int): How long to wait for server to start in seconds. Default 20 minutes.
 
         Raises:
             Conflict: If the server creation fails due to a conflict and idempotent mode is not enabled.
@@ -198,7 +200,7 @@ class Server:
         def _server_create_func():
             self.conn.compute.create_server(**server_args)
             if wait_for_active:
-                self.wait()
+                self.wait(timeout=wait_timeout)
             if show:
                 self.show(type=show)
 

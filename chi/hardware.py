@@ -346,7 +346,7 @@ def get_devices(
 
     devices = []
     for dev_json in res.json():
-        blazar_host = blazar_devices_by_uid.get(dev_json.get("uid"), {})
+        blazar_host = blazar_devices_by_uid.get(dev_json.get("uuid"), {})
         devices.append(
             Device(
                 device_name=dev_json["device_name"],
@@ -393,7 +393,8 @@ def get_devices(
                     if _reserved_now(allocation, now):
                         reserved_devices.add(blazar_device["uid"])
         for device in matching_type_devices:
-            if device.uuid not in reserved_devices:
+            # Ensure the device is free and in `reservable` state
+            if device.uuid not in reserved_devices and device.reservable:
                 unreserved_devices.append(device)
 
     return unreserved_devices
