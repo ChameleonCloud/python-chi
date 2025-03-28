@@ -16,7 +16,7 @@ from chi import context, util
 from .clients import blazar
 from .context import _is_ipynb
 from .exception import CHIValueError, ResourceError, ServiceError
-from .hardware import Node
+from .hardware import Device, Node
 from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
 from .util import retry_create, utcnow
 
@@ -260,6 +260,7 @@ class Lease:
         machine_type: str = None,
         device_model: str = None,
         device_name: str = None,
+        devices: List[Device] = None,
     ):
         """
         Add a IoT device reservation to the list of device reservations.
@@ -269,14 +270,29 @@ class Lease:
             machine_type (str, optional): The type of machine to reserve. Defaults to None.
             device_model (str, optional): The model of the device to reserve. Defaults to None.
             device_name (str, optional): The name of the device to reserve. Defaults to None.
+            devices (List[Device]): A list of Device objects to reserve.
+
+        Raises:
+            CHIValueError: If devices are specified, no other arguments should be included.
         """
-        add_device_reservation(
-            reservation_list=self.device_reservations,
-            count=amount,
-            machine_name=machine_type,
-            device_model=device_model,
-            device_name=device_name,
-        )
+        if devices:
+            if any([amount, machine_type, device_model, device_name]):
+                raise CHIValueError(
+                    "When specifying nodes, no other arguments should be included"
+                )
+            for device in devices:
+                add_device_reservation(
+                    reservation_list=self.device_reservations,
+                    device_name=device.device_name,
+                )
+        else:
+            add_device_reservation(
+                reservation_list=self.device_reservations,
+                count=amount,
+                machine_name=machine_type,
+                device_model=device_model,
+                device_name=device_name,
+            )
 
     def add_node_reservation(
         self,

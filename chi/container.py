@@ -23,11 +23,14 @@ from IPython.display import HTML, display
 from packaging.version import Version
 from zunclient.exceptions import NotFound
 
-from chi import context
+from chi import context, util
 
-from .clients import zun
-from .exception import ResourceError
+from .clients import connection, zun
+from .context import session
+from .exception import ResourceError, ServiceError
 from .network import bind_floating_ip, get_free_floating_ip
+from chi import network as chi_network
+
 
 DEFAULT_IMAGE_DRIVER = "docker"
 DEFAULT_NETWORK = "containernet1"
@@ -46,6 +49,8 @@ class Container:
         start (bool, optional): Indicates whether to start the container. Defaults to True.
         start_timeout (int, optional): The timeout value for starting the container. Defaults to None.
         runtime (str, optional): The runtime environment for the container. Defaults to None.
+        command (List[str], optional): The command to run inside the container.
+        workdir (str, optional): The workdir to use in the container.
 
     Attributes:
         name (str): The name of the container.
@@ -69,6 +74,8 @@ class Container:
         start: bool = True,
         start_timeout: int = 0,
         runtime: str = None,
+        command: List[str] = None,
+        workdir: str = None,
     ):
         self.name = name
         self.image_ref = image_ref
@@ -80,6 +87,8 @@ class Container:
         self.id = None
         self.created_at = None
         self._status = None
+        self.command = command
+        self.workdir = workdir
 
     @classmethod
     def from_zun_container(cls, zun_container):
@@ -103,7 +112,7 @@ class Container:
     def submit(
         self,
         wait_for_active: bool = True,
-        wait_timeout: int = None,
+        wait_timeout: int = 5 * 60,
         show: str = "widget",
         idempotent: bool = False,
     ):
@@ -112,7 +121,7 @@ class Container:
 
         Args:
             wait_for_active (bool, optional): Whether to wait for the container to become active. Defaults to True.
-            wait_timeout (int, optional): The maximum time (in seconds) to wait for the container to become active. Defaults to None.
+            wait_timeout (int, optional): The maximum time (in seconds) to wait for the container to become active. Defaults to 5 minutes.
             show (str, optional): The type of output to display. Defaults to "widget".
             idempotent (bool, optional): Whether to update the existing container if it already exists. Defaults to False.
 
@@ -130,6 +139,11 @@ class Container:
                 if show:
                     existing.show(type=show, wait_for_active=wait_for_active)
                 return existing
+        kwargs = {}
+        if self.command:
+            kwargs["command"] = self.command
+        if self.workdir:
+            kwargs["workdir"] = self.workdir
 
         container = create_container(
             name=self.name,
@@ -139,6 +153,7 @@ class Container:
             start=self.start,
             start_timeout=self.start_timeout,
             runtime=self.runtime,
+            **kwargs,
         )
 
         if container:
@@ -171,19 +186,38 @@ class Container:
             self.id = None
             self._status = None
 
-    def wait(self, status: str = "Running", timeout: int = None):
+    def wait(
+        self, status: str = "Running", show: str = "widget", timeout: int = 5 * 60
+    ):
         """
         Waits for the container to reach the specified status.
 
         Args:
             status (str, optional): The status to wait for. Defaults to "Running".
-            timeout (int, optional): The maximum time to wait in seconds. Defaults to None.
+            show (str, optional): The type of container information to display after creation. Defaults to "widget".
+            timeout (int, optional): The maximum time to wait in seconds. Defaults to 5 minutes.
 
         Returns:
             None
         """
-        wait_for_active(self.id, timeout=timeout)
-        self._status = status
+
+        pb = util.TimerProgressBar()
+        if show == "widget" and context._is_ipynb():
+            pb.display()
+
+        def _callback():
+            # self.status is a property that refreshes itself
+            # NOTE: zun statuses are title case
+            if self.status.upper() == status.upper() or self.status == "Error":
+                print(f"Container has moved to status {self.status}")
+                return True
+            return False
+
+        res = pb.wait(_callback, 2 * 60, timeout)
+        if not res:
+            raise ServiceError(
+                f"Timeout waiting for container to reach {status} status"
+            )
 
     def show(self, type: str = "text", wait_for_active: bool = False):
         """
@@ -291,6 +325,21 @@ class Container:
             The result of the association operation.
         """
         return associate_floating_ip(self.id, fip)
+
+    def detach_floating_ip(self, fip: str) -> None:
+        """
+        Detaches and deletes a floating IP from the container.
+
+        Args:
+            fip (str): The floating IP to detach.
+            delete (Optional[bool], optional): Whether to delete the floating IP after disassociation. Defaults to True.
+
+        Returns:
+            None
+        """
+        conn = connection(session=session())
+        floating_ip_obj = chi_network.get_floating_ip(fip)
+        conn.network.delete(floating_ip_obj["id"])
 
     def logs(self, stdout: str = True, stderr: str = True) -> str:
         """
