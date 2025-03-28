@@ -26,6 +26,9 @@ DEFAULT_AUTH_TYPE = "v3token"
 DEFAULT_NETWORK = "sharednet1"
 CONF_GROUP = "chi"
 RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud.org")
+EDGE_RESOURCE_API_URL = os.getenv(
+    "EDGE_RESOURCE_API_URL", "https://chameleoncloud.org/edge-hw-discovery/devices"
+)
 
 
 def default_key_name():
