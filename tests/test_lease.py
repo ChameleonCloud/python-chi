@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+
 @pytest.fixture()
 def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
@@ -36,8 +37,8 @@ def example_reserve_node():
     reservations = []
     add_node_reservation(reservations, count=1, node_type=node_type)
     # Create the lease
-    lease = create_lease(lease_name, reservations, start_date=start_date,
-                         end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date,
+                 end_date=end_date)
 
 
 def test_example_reserve_node(mocker, now):
@@ -102,8 +103,8 @@ def example_reserve_network():
                             physical_network=physical_network)
 
     # Create the lease
-    lease = create_lease(lease_name, reservations, start_date=start_date,
-                         end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date,
+                 end_date=end_date)
 
 
 def test_example_reserve_network(mocker, now):
@@ -161,8 +162,8 @@ def example_reserve_floating_ip():
     add_fip_reservation(reservation_list, count=1)
 
     # Create the lease
-    lease = create_lease(lease_name, reservation_list, start_date=start_date,
-                         end_date=end_date)
+    create_lease(lease_name, reservation_list, start_date=start_date,
+                 end_date=end_date)
 
 
 def test_example_reserve_floating_ip(mocker, now):
@@ -215,8 +216,8 @@ def example_reserve_multiple_resources():
     add_fip_reservation(reservations, count=1)
 
     # Create the lease
-    lease = create_lease(lease_name, reservations, start_date=start_date,
-                         end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date,
+                 end_date=end_date)
 
 
 def test_example_reserve_multiple_resources(mocker, now):

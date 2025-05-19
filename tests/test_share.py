@@ -28,7 +28,7 @@ def example_create_share():
     from chi.share import create_share
 
     share_name = "my_share"
-    share = create_share(size=1, name=share_name)
+    create_share(size=1, name=share_name)
 
 
 def test_example_create_share(mocker):

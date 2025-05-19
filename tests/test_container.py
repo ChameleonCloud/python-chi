@@ -11,12 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import namedtuple
 from datetime import datetime
 
 import pytest
 
-from chi.container import DEFAULT_IMAGE_DRIVER, DEFAULT_NETWORK
 
 
 @pytest.fixture()
@@ -45,7 +43,7 @@ def example_create_container():
     lease_name = "my_lease"
     container_name = "my_container"
     reservation_id = get_device_reservation(lease_name)
-    container = create_container(
+    create_container(
         container_name,
         image="centos:8",
         reservation_id=reservation_id,

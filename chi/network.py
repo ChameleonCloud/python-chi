@@ -3,7 +3,6 @@ from .exception import CHIValueError, ResourceError
 
 from neutronclient.common.exceptions import NotFound
 
-import json
 
 __all__ = [
     "get_network",
@@ -141,7 +140,7 @@ def create_network(
     desc_parts = []
     if of_controller_ip and of_controller_port:
         desc_parts.append(f"OFController={of_controller_ip}:{of_controller_port}")
-    if vswitch_name != None:
+    if vswitch_name is not None:
         desc_parts.append(f"VSwitchName={vswitch_name}")
 
     network = neutron().create_network(
