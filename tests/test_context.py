@@ -37,7 +37,7 @@ def test_reset():
     value = "KEYNAME"
     chi.set("keypair_name", value)
     chi.reset()
-    assert chi.get("keypair_name") == None
+    assert chi.get("keypair_name") is None
 
 
 def test_session():

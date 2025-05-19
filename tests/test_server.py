@@ -1,7 +1,7 @@
 from datetime import datetime
 import pytest
 
-from chi.server import BAREMETAL_FLAVOR, DEFAULT_IMAGE, DEFAULT_NETWORK
+from chi.server import DEFAULT_IMAGE, DEFAULT_NETWORK
 from collections import namedtuple
 from contextlib import nullcontext
 
@@ -32,7 +32,7 @@ def example_create_server():
     lease_name = "my_lease"
     server_name = "my_server"
     reservation_id = get_node_reservation(lease_name)
-    server = create_server(server_name, reservation_id=reservation_id)
+    create_server(server_name, reservation_id=reservation_id)
 
 
 def test_example_create_server(mocker):

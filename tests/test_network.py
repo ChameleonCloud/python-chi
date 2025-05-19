@@ -1,7 +1,7 @@
 from neutronclient.common.exceptions import NotFound
 import pytest
 
-from chi.network import get_network, get_subnet, get_router, get_floating_ip
+from chi.network import get_network, get_subnet, get_router
 
 
 def fake_network():

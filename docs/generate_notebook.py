@@ -70,7 +70,7 @@ def get_source(fn):
         source = (source.replace(fn.__doc__, '')
             .replace('"""', '')
             .replace(':\n    \n', ':\n'))
-    lines = [l for l in source.split('\n') if (not l or l.startswith(' '))]
+    lines = [line for line in source.split('\n') if (not line or line.startswith(' '))]
     return dedent('\n'.join(lines))
 
 
