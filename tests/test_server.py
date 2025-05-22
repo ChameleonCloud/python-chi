@@ -1,9 +1,6 @@
 from datetime import datetime
 import pytest
 
-from chi.server import DEFAULT_IMAGE, DEFAULT_NETWORK
-from collections import namedtuple
-from contextlib import nullcontext
 
 
 @pytest.fixture()
