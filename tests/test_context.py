@@ -1,5 +1,6 @@
 import os
 
+from chi.exception import CHIValueError
 from oslo_config import cfg
 import pytest
 import requests_mock
@@ -107,7 +108,12 @@ def test_use_site():
             "https://api.chameleoncloud.org/sites.json",
             json={
                 "items": [
-                    {"name": "foo", "web": "http://web", "user_support_contact": "help"}
+                    {
+                        "name": "foo",
+                        "web": "http://web",
+                        "user_support_contact": "help",
+                        "site_class": "baremetal",
+                    }
                 ]
             },
         )
@@ -122,7 +128,12 @@ def test_use_site_missing_site():
             "https://api.chameleoncloud.org/sites.json",
             json={
                 "items": [
-                    {"name": "foo", "web": "http://web", "user_support_contact": "help"}
+                    {
+                        "name": "foo",
+                        "web": "http://web",
+                        "user_support_contact": "help",
+                        "site_class": "baremetal",
+                    }
                 ]
             },
         )
@@ -146,7 +157,8 @@ def test_use_site_http_error():
 
 
 def test_use_site_empty_list():
-    _test_use_site_error_case(json={"items": []})
+    with pytest.raises(CHIValueError):
+        _test_use_site_error_case(json={"items": []})
 
 
 def test_use_site_malformed():

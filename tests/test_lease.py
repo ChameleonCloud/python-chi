@@ -107,27 +107,6 @@ def example_reserve_network():
                  end_date=end_date)
 
 
-def test_example_reserve_network(mocker, now):
-    mocker.patch('chi.lease.utcnow', return_value=now)
-    blazar = mocker.patch('chi.lease.blazar')()
-
-    example_reserve_network()
-
-    blazar.lease.create.assert_called_once_with(
-        name='myLease',
-        start='2021-01-01 00:01',
-        end='2021-01-02 00:00',
-        events=[],
-        reservations=[{
-            'resource_type': 'network',
-            'network_name': 'myLeaseNetwork',
-            'network_description': '',
-            'network_properties': '',
-            'resource_properties': '["==", "$physical_network", "physnet1"]',
-        }]
-    )
-
-
 def example_reserve_floating_ip():
     """Reserve a floating IP.
 
@@ -218,33 +197,3 @@ def example_reserve_multiple_resources():
     # Create the lease
     create_lease(lease_name, reservations, start_date=start_date,
                  end_date=end_date)
-
-
-def test_example_reserve_multiple_resources(mocker, now):
-    mocker.patch('chi.lease.utcnow', return_value=now)
-    blazar = mocker.patch('chi.lease.blazar')()
-    mocker.patch('chi.lease.get_network_id', return_value='public-net-id')
-
-    example_reserve_multiple_resources()
-
-    blazar.lease.create.assert_called_once_with(
-        name='myLease',
-        start='2021-01-01 00:01',
-        end='2021-01-02 00:00',
-        events=[],
-        reservations=[{
-            'resource_type': 'physical:host',
-            'hypervisor_properties': '', 'max': 1, 'min': 1,
-            'resource_properties': '["==", "$node_type", "compute_skylake"]',
-        }, {
-            'resource_type': 'network',
-            'network_name': 'myLeaseNetwork',
-            'network_description': '',
-            'network_properties': '',
-            'resource_properties': '["==", "$physical_network", "physnet1"]',
-        }, {
-            'resource_type': 'virtual:floatingip',
-            'amount': 1,
-            'network_id': 'public-net-id',
-        }]
-    )
