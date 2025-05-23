@@ -1,11 +1,11 @@
 import os
 
-from chi.exception import CHIValueError
-from oslo_config import cfg
 import pytest
 import requests_mock
+from oslo_config import cfg
 
 import chi
+from chi.exception import CHIValueError
 
 
 def setup_function():

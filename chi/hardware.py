@@ -1,17 +1,16 @@
+import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
 
+import requests
+
 from chi import exception
 
 from .clients import blazar, connection
-from .context import get, RESOURCE_API_URL, EDGE_RESOURCE_API_URL, session
-
-
-import requests
-import logging
+from .context import EDGE_RESOURCE_API_URL, RESOURCE_API_URL, get, session
 
 LOG = logging.getLogger(__name__)
 

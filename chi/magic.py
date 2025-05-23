@@ -1,19 +1,19 @@
-from typing import Optional, List
 from datetime import timedelta
+from typing import List, Optional
 
-from .server import Server
+import matplotlib.pyplot as plt
+import networkx as nx
+
 from .container import Container
-from .exception import ResourceError
-from .lease import Lease, delete_lease
-from .image import list_images
-from .hardware import get_node_types
 from .context import (
     DEFAULT_NETWORK,
     get,
 )
-
-import networkx as nx
-import matplotlib.pyplot as plt
+from .exception import ResourceError
+from .hardware import get_node_types
+from .image import list_images
+from .lease import Lease, delete_lease
+from .server import Server
 
 
 def visualize_resources(leases: List[Lease]):

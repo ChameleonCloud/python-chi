@@ -1,8 +1,7 @@
-from .clients import neutron
-from .exception import CHIValueError, ResourceError
-
 from neutronclient.common.exceptions import NotFound
 
+from .clients import neutron
+from .exception import CHIValueError, ResourceError
 
 __all__ = [
     "get_network",

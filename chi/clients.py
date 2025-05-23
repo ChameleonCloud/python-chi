@@ -1,20 +1,20 @@
-from .context import session
-
 # Import all of the client classes for type annotations.
 # We have to do this because we lazy-import the client definitions
 # inside each function to reduce runtime dependencies.
 from typing import TYPE_CHECKING
 
+from .context import session
+
 if TYPE_CHECKING:
-    from openstack.connection import Connection
     from blazarclient.client import Client as BlazarClient
     from cinderclient.client import Client as CinderClient
     from glanceclient.client import Client as GlanceClient
+    from ironicclient import client as IronicClient
+    from keystoneclient.v3.client import Client as KeystoneClient
     from manilaclient.client import Client as ManilaClient
     from neutronclient.v2_0.client import Client as NeutronClient
     from novaclient.client import Client as NovaClient
-    from ironicclient import client as IronicClient
-    from keystoneclient.v3.client import Client as KeystoneClient
+    from openstack.connection import Connection
     from zunclient.client import Client as ZunClient
 
 
