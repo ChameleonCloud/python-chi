@@ -19,7 +19,7 @@ from datetime import datetime
 
 import pytest
 
-from chi.container import upload
+from chi.container import Container, download, upload
 
 
 @pytest.fixture()
@@ -27,39 +27,86 @@ def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
 
 
-def _tar_data(source):
-    fd = io.BytesIO()
-    with tarfile.open(fileobj=fd, mode="w") as tar:
-        tar.add(source, arcname=os.path.basename(source))
-    fd.seek(0)
-    data = fd.read()
-    fd.close()
-    return data
-
-
-def test_container_upload(mocker):
-    zun = mocker.patch("chi.container.zun")()
-
-    fake_data = b"fake_infile_data"
-
-    with tempfile.NamedTemporaryFile() as sourcefp:
-        # populate tmpfile with fake data
-        sourcefp.write(fake_data)
-
-        tarred_data = _tar_data(sourcefp.name)
-        upload(
-            "fake_uuid",
-            source=sourcefp.name,
-            dest="fake_path",
-        )
-
-    # ensure the data we sent to zun is the expected format
-    zun.containers.put_archive.assert_called_once_with(
-        "fake_uuid", "fake_path", tarred_data
+def test_container_upload_method(mocker):
+    # Arrange
+    mock_upload = mocker.patch("chi.container.upload")
+    container = Container(
+        name="test",
+        image_ref="image",
+        exposed_ports=[],
     )
+    container.id = "fake_id"
+    source = "/tmp/sourcefile"
+    remote_dest = "/container/path"
 
-    newfd = io.BytesIO(tarred_data)
-    with tempfile.TemporaryDirectory() as dest:
-        with tarfile.open(fileobj=newfd, mode="r") as tar:
-            tar.extraction_filter = lambda member, path: member
-            tar.extractall(dest)
+    # Act
+    container.upload(source, remote_dest)
+
+    # Assert
+    mock_upload.assert_called_once_with("fake_id", source, remote_dest)
+
+
+def test_container_download_method(mocker):
+    # Arrange
+    mock_download = mocker.patch("chi.container.download")
+    container = Container(
+        name="test",
+        image_ref="image",
+        exposed_ports=[],
+    )
+    container.id = "fake_id"
+    remote_source = "/container/path"
+    dest = "/tmp/destfile"
+
+    # Act
+    container.download(remote_source, dest)
+
+    # Assert
+    mock_download.assert_called_once_with("fake_id", remote_source, dest)
+
+
+def test_upload_creates_tar_and_calls_put_archive(mocker):
+    # Patch zun client
+    zun_mock = mocker.patch("chi.container.zun")()
+    # Create a temporary file to upload
+    with tempfile.NamedTemporaryFile() as tmpfile:
+        tmpfile.write(b"hello world")
+        tmpfile.flush()
+
+        upload("container_id", tmpfile.name, "/remote/path")
+        # Check that put_archive was called
+        assert zun_mock.containers.put_archive.call_count == 1
+        args = zun_mock.containers.put_archive.call_args[0]
+        assert args[0] == "container_id"
+        assert args[1] == "/remote/path"
+        # The third argument should be a tar archive containing the file
+        tar_bytes = args[2]
+        tarfileobj = io.BytesIO(tar_bytes)
+        with tarfile.open(fileobj=tarfileobj, mode="r") as tar:
+            names = tar.getnames()
+            assert os.path.basename(tmpfile.name) in names
+
+
+def test_download_extracts_tar_and_writes_file(mocker):
+    # Patch zun client
+    zun_mock = mocker.patch("chi.container.zun")()
+    # Create a tar archive in memory with a test file
+    file_content = b"test content"
+    file_name = "testfile.txt"
+    tar_bytes_io = io.BytesIO()
+    with tarfile.open(fileobj=tar_bytes_io, mode="w") as tar:
+        info = tarfile.TarInfo(name=file_name)
+        info.size = len(file_content)
+        tar.addfile(info, io.BytesIO(file_content))
+    tar_bytes = tar_bytes_io.getvalue()
+    zun_mock.containers.get_archive.return_value = {"data": tar_bytes}
+
+    # Use a temporary directory for extraction
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest_path = os.path.join(tmpdir, file_name)
+
+        download("container_id", file_name, tmpdir)
+        # Check that the file was extracted
+        assert os.path.exists(dest_path)
+        with open(dest_path, "rb") as f:
+            assert f.read() == file_content
