@@ -16,7 +16,6 @@ from datetime import datetime
 import pytest
 
 
-
 @pytest.fixture()
 def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)

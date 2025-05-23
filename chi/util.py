@@ -1,12 +1,14 @@
 import base64
-from datetime import datetime, timedelta
-import time
-from dateutil import tz
-from hashlib import md5
 import os
-from chi.exception import ResourceError
+import time
+from datetime import datetime, timedelta
+from hashlib import md5
+
 import ipywidgets as widgets
+from dateutil import tz
 from IPython.display import display
+
+from chi.exception import ResourceError
 
 
 def random_base32(n_bytes):

@@ -15,18 +15,16 @@ from packaging.version import Version
 from paramiko.client import WarningPolicy
 
 import chi
-from chi import context, util
+from chi import context, exception, util
+from chi import network as chi_network
 
 from .clients import connection, nova
-from .context import DEFAULT_IMAGE_NAME, _is_ipynb
+from .context import DEFAULT_IMAGE_NAME, _is_ipynb, session
 from .context import get as get_from_context
-from .context import session
 from .exception import CHIValueError, ResourceError, ServiceError
 from .image import Image, get_image_id, get_image_name
 from .keypair import Keypair
-from chi import network as chi_network
 from .util import random_base32, retry_create, sshkey_fingerprint
-from chi import exception
 
 DEFAULT_IMAGE = DEFAULT_IMAGE_NAME
 DEFAULT_NETWORK = "sharednet1"

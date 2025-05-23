@@ -1,4 +1,7 @@
-black
+# linting
+ruff
+
+# testing
 pytest
 pytest-mock
 pytest-watch

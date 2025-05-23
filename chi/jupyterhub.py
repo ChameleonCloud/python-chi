@@ -1,4 +1,5 @@
 import os
+
 import requests
 
 ACCESS_TOKEN_ENDPOINT = "tokens"

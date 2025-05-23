@@ -27,7 +27,7 @@ def example_reserve_node():
     </div>
 
     """
-    from chi.lease import lease_duration, add_node_reservation, create_lease
+    from chi.lease import add_node_reservation, create_lease, lease_duration
 
     lease_name = "myLease"
     node_type = "compute_skylake"
@@ -83,7 +83,7 @@ def example_reserve_network():
     </div>
 
     """
-    from chi.lease import lease_duration, add_network_reservation, create_lease
+    from chi.lease import add_network_reservation, create_lease, lease_duration
 
     lease_name = "myLease"
     network_name = f"{lease_name}Network"
@@ -131,7 +131,7 @@ def example_reserve_floating_ip():
     </div>
 
     """
-    from chi.lease import lease_duration, add_fip_reservation, create_lease
+    from chi.lease import add_fip_reservation, create_lease, lease_duration
 
     lease_name = "myLease"
     start_date, end_date = lease_duration(days=1)
@@ -182,8 +182,12 @@ def example_reserve_multiple_resources():
 
     """
     from chi.lease import (
-        lease_duration, add_node_reservation, add_network_reservation,
-        add_fip_reservation, create_lease)
+        add_fip_reservation,
+        add_network_reservation,
+        add_node_reservation,
+        create_lease,
+        lease_duration,
+    )
 
     lease_name = "myLease"
     start_date, end_date = lease_duration(days=1)

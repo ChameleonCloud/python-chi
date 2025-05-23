@@ -1,7 +1,7 @@
 from .clients import (
-    connection,
     blazar,
     cinder,
+    connection,
     glance,
     ironic,
     keystone,
@@ -10,8 +10,7 @@ from .clients import (
     nova,
     zun,
 )
-from .context import reset, set, get, params, session, use_site
-
+from .context import get, params, reset, session, set, use_site
 
 __all__ = [
     "get",

@@ -7,7 +7,6 @@ from textwrap import dedent
 import click
 import nbformat.v4 as nbf
 
-
 INTRO_CELLS = [
     nbf.new_markdown_cell(dedent("""
     First, select which project and site you wish to authenticate against.
