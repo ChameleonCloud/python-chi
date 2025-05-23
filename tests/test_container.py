@@ -11,10 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import io
+import os
+import tarfile
+import tempfile
 from datetime import datetime
 
 import pytest
 
+from chi.container import upload
 
 
 @pytest.fixture()
@@ -22,49 +27,39 @@ def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
 
 
-def example_create_container():
-    """Launch a container.
+def _tar_data(source):
+    fd = io.BytesIO()
+    with tarfile.open(fileobj=fd, mode="w") as tar:
+        tar.add(source, arcname=os.path.basename(source))
+    fd.seek(0)
+    data = fd.read()
+    fd.close()
+    return data
 
-    <div class="alert alert-info">
 
-    **Functions used in this example:**
+def test_container_upload(mocker):
+    zun = mocker.patch("chi.container.zun")()
 
-    * [create_container](../modules/container.html#chi.container.create_container)
-    * [get_device_reservation](../modules/lease.html#chi.lease.get_device_reservation)
+    fake_data = b"fake_infile_data"
 
-    </div>
+    with tempfile.NamedTemporaryFile() as sourcefp:
+        # populate tmpfile with fake data
+        sourcefp.write(fake_data)
 
-    """
-    from chi.container import create_container
-    from chi.lease import get_device_reservation
+        tarred_data = _tar_data(sourcefp.name)
+        upload(
+            "fake_uuid",
+            source=sourcefp.name,
+            dest="fake_path",
+        )
 
-    # We assume a lease has already been created, for example with
-    # ``chi.lease.create_lease```
-    lease_name = "my_lease"
-    container_name = "my_container"
-    reservation_id = get_device_reservation(lease_name)
-    create_container(
-        container_name,
-        image="centos:8",
-        reservation_id=reservation_id,
+    # ensure the data we sent to zun is the expected format
+    zun.containers.put_archive.assert_called_once_with(
+        "fake_uuid", "fake_path", tarred_data
     )
 
-
-# def test_example_create_container(mocker):
-#     zun = mocker.patch("chi.container.zun")()
-
-#     mocker.patch("chi.lease.get_device_reservation", return_value="reservation-id")
-#     Container = namedtuple("Container", ["uuid", "name", "status"])
-#     mocker.patch(
-#         # Fake that the container is already created
-#         "chi.container.get_container",
-#         return_value=Container("fake-uuid", "my-container", "Running"),
-#     )
-
-#     example_create_container()
-
-#     zun.containers.create.assert_called_once_with(
-#         name="my_container",
-#         image="centos:8",
-#         hints={"reservation": "reservation-id", "platform_version": 2},
-#     )
+    newfd = io.BytesIO(tarred_data)
+    with tempfile.TemporaryDirectory() as dest:
+        with tarfile.open(fileobj=newfd, mode="r") as tar:
+            tar.extraction_filter = lambda member, path: member
+            tar.extractall(dest)
