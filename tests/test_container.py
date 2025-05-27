@@ -21,6 +21,7 @@ import pytest
 
 from chi.container import Container, download, upload
 
+
 @pytest.fixture()
 def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
