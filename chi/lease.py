@@ -505,12 +505,12 @@ class Lease:
         <h2>Lease Details</h2>
         <table>
             <tr><th>Name</th><td>{self.name}</td></tr>
-            <tr><th>ID</th><td>{self.id or 'N/A'}</td></tr>
-            <tr><th>Status</th><td>{self.status or 'N/A'}</td></tr>
-            <tr><th>Start Date</th><td>{self.start_date or 'N/A'}</td></tr>
-            <tr><th>End Date</th><td>{self.end_date or 'N/A'}</td></tr>
-            <tr><th>User ID</th><td>{self.user_id or 'N/A'}</td></tr>
-            <tr><th>Project ID</th><td>{self.project_id or 'N/A'}</td></tr>
+            <tr><th>ID</th><td>{self.id or "N/A"}</td></tr>
+            <tr><th>Status</th><td>{self.status or "N/A"}</td></tr>
+            <tr><th>Start Date</th><td>{self.start_date or "N/A"}</td></tr>
+            <tr><th>End Date</th><td>{self.end_date or "N/A"}</td></tr>
+            <tr><th>User ID</th><td>{self.user_id or "N/A"}</td></tr>
+            <tr><th>Project ID</th><td>{self.project_id or "N/A"}</td></tr>
         </table>
 
 

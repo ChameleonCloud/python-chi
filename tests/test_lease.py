@@ -37,26 +37,29 @@ def example_reserve_node():
     reservations = []
     add_node_reservation(reservations, count=1, node_type=node_type)
     # Create the lease
-    create_lease(lease_name, reservations, start_date=start_date,
-                 end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date, end_date=end_date)
 
 
 def test_example_reserve_node(mocker, now):
-    mocker.patch('chi.lease.utcnow', return_value=now)
-    blazar = mocker.patch('chi.lease.blazar')()
+    mocker.patch("chi.lease.utcnow", return_value=now)
+    blazar = mocker.patch("chi.lease.blazar")()
 
     example_reserve_node()
 
     blazar.lease.create.assert_called_once_with(
-        name='myLease',
-        start='2021-01-01 00:01',
-        end='2021-01-02 00:00',
+        name="myLease",
+        start="2021-01-01 00:01",
+        end="2021-01-02 00:00",
         events=[],
-        reservations=[{
-            'resource_type': 'physical:host',
-            'hypervisor_properties': '', 'max': 1, 'min': 1,
-            'resource_properties': '["==", "$node_type", "compute_skylake"]',
-        }]
+        reservations=[
+            {
+                "resource_type": "physical:host",
+                "hypervisor_properties": "",
+                "max": 1,
+                "min": 1,
+                "resource_properties": '["==", "$node_type", "compute_skylake"]',
+            }
+        ],
     )
 
 
@@ -95,16 +98,17 @@ def example_reserve_network():
 
     # Build list of reservations (in this case there is only one reservation)
     reservations = []
-    add_network_reservation(reservations,
-                            network_name=network_name,
-                            of_controller_ip=of_controller_ip,
-                            of_controller_port=of_controller_port,
-                            vswitch_name=vswitch_name,
-                            physical_network=physical_network)
+    add_network_reservation(
+        reservations,
+        network_name=network_name,
+        of_controller_ip=of_controller_ip,
+        of_controller_port=of_controller_port,
+        vswitch_name=vswitch_name,
+        physical_network=physical_network,
+    )
 
     # Create the lease
-    create_lease(lease_name, reservations, start_date=start_date,
-                 end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date, end_date=end_date)
 
 
 def example_reserve_floating_ip():
@@ -141,27 +145,28 @@ def example_reserve_floating_ip():
     add_fip_reservation(reservation_list, count=1)
 
     # Create the lease
-    create_lease(lease_name, reservation_list, start_date=start_date,
-                 end_date=end_date)
+    create_lease(lease_name, reservation_list, start_date=start_date, end_date=end_date)
 
 
 def test_example_reserve_floating_ip(mocker, now):
-    mocker.patch('chi.lease.utcnow', return_value=now)
-    blazar = mocker.patch('chi.lease.blazar')()
-    mocker.patch('chi.lease.get_network_id', return_value='public-net-id')
+    mocker.patch("chi.lease.utcnow", return_value=now)
+    blazar = mocker.patch("chi.lease.blazar")()
+    mocker.patch("chi.lease.get_network_id", return_value="public-net-id")
 
     example_reserve_floating_ip()
 
     blazar.lease.create.assert_called_once_with(
-        name='myLease',
-        start='2021-01-01 00:01',
-        end='2021-01-02 00:00',
+        name="myLease",
+        start="2021-01-01 00:01",
+        end="2021-01-02 00:00",
         events=[],
-        reservations=[{
-            'resource_type': 'virtual:floatingip',
-            'amount': 1,
-            'network_id': 'public-net-id',
-        }]
+        reservations=[
+            {
+                "resource_type": "virtual:floatingip",
+                "amount": 1,
+                "network_id": "public-net-id",
+            }
+        ],
     )
 
 
@@ -199,5 +204,4 @@ def example_reserve_multiple_resources():
     add_fip_reservation(reservations, count=1)
 
     # Create the lease
-    create_lease(lease_name, reservations, start_date=start_date,
-                 end_date=end_date)
+    create_lease(lease_name, reservations, start_date=start_date, end_date=end_date)
