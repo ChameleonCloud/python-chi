@@ -144,7 +144,7 @@ def _default_from_env(opts, group=None):
             getattr(opt, "deprecated_opts", getattr(opt, "deprecated", None)) or []
         )
         for o in all_opts:
-            v = os.environ.get(f'OS_{o.name.replace("-", "_").upper()}')
+            v = os.environ.get(f"OS_{o.name.replace('-', '_').upper()}")
             if v:
                 return v
 
@@ -384,19 +384,20 @@ def use_site(site_name: str) -> None:
     if not site:
         raise CHIValueError(
             (
-                f'No site named "{site_name}" exists! Possible values: '
-                ", ".join(_sites.keys())
+                f'No site named "{site_name}" exists! Possible values: , '.join(
+                    _sites.keys()
+                )
             )
         )
 
-    set("auth_url", f'{site["web"]}:5000/v3')
+    set("auth_url", f"{site['web']}:5000/v3")
     set("region_name", site["name"])
 
     output = [
         f"Now using {site_name}:",
-        f'URL: {site.get("web")}',
-        f'Location: {site.get("location")}',
-        f'Support contact: {site.get("user_support_contact")}',
+        f"URL: {site.get('web')}",
+        f"Location: {site.get('location')}",
+        f"Support contact: {site.get('user_support_contact')}",
     ]
     print("\n".join(output))
 

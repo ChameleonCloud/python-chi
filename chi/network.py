@@ -187,9 +187,7 @@ def list_networks() -> "list[dict]":
 
 def set_network_tag(network_id, value):
     _neutron = neutron()
-    _neutron.replace_tag('networks', network_id, {
-        'tags': [value]
-    })
+    _neutron.replace_tag("networks", network_id, {"tags": [value]})
 
 
 ##########
@@ -643,19 +641,16 @@ def remove_subnet_from_router(router_id, subnet_id):
 # Floating IPs
 ###############
 
+
 def set_floating_ip_tag(address, value):
     ip_addr = get_floating_ip(address)
     _neutron = neutron()
-    _neutron.replace_tag('floatingips', ip_addr['id'], {
-        'tags': [value]
-    })
+    _neutron.replace_tag("floatingips", ip_addr["id"], {"tags": [value]})
 
 
 def deallocate_floating_ip(address):
     _neutron = neutron()
-    _neutron.delete_floatingip(
-        get_floating_ip(address)["id"]
-    )
+    _neutron.delete_floatingip(get_floating_ip(address)["id"])
 
 
 def get_free_floating_ip(allocate=True) -> dict:
@@ -709,7 +704,7 @@ def get_or_create_floating_ip() -> "tuple[dict,bool]":
             {"floatingip": {"floating_network_id": network_id}}
         )["floatingip"]
         created = True
-        print(f'Allocated new floating IP {fip["floating_ip_address"]}')
+        print(f"Allocated new floating IP {fip['floating_ip_address']}")
     return fip, created
 
 

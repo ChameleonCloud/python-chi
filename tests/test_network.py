@@ -36,11 +36,14 @@ def fake_floating_ip():
     }
 
 
-@pytest.mark.parametrize("test_fn,neutron_resource,expected", [
-    pytest.param(get_network, "network", fake_network(), id="network"),
-    pytest.param(get_subnet, "subnet", fake_subnet(), id="subnet"),
-    pytest.param(get_router, "router", fake_router(), id="router"),
-])
+@pytest.mark.parametrize(
+    "test_fn,neutron_resource,expected",
+    [
+        pytest.param(get_network, "network", fake_network(), id="network"),
+        pytest.param(get_subnet, "subnet", fake_subnet(), id="subnet"),
+        pytest.param(get_router, "router", fake_router(), id="router"),
+    ],
+)
 def test_get_resource_by_id(mocker, test_fn, neutron_resource, expected):
     neutron = mocker.patch("chi.network.neutron")()
 
@@ -52,11 +55,14 @@ def test_get_resource_by_id(mocker, test_fn, neutron_resource, expected):
     neutron_show.assert_called_once_with(search_id)
 
 
-@pytest.mark.parametrize("test_fn,neutron_resource,expected", [
-    pytest.param(get_network, "network", fake_network(), id="network"),
-    pytest.param(get_subnet, "subnet", fake_subnet(), id="subnet"),
-    pytest.param(get_router, "router", fake_router(), id="router"),
-])
+@pytest.mark.parametrize(
+    "test_fn,neutron_resource,expected",
+    [
+        pytest.param(get_network, "network", fake_network(), id="network"),
+        pytest.param(get_subnet, "subnet", fake_subnet(), id="subnet"),
+        pytest.param(get_router, "router", fake_router(), id="router"),
+    ],
+)
 def test_get_resource_by_name(mocker, test_fn, neutron_resource, expected):
     neutron = mocker.patch("chi.network.neutron")()
 
