@@ -24,13 +24,12 @@ from packaging.version import Version
 from zunclient.exceptions import NotFound
 
 from chi import context, util
+from chi import network as chi_network
 
 from .clients import connection, zun
 from .context import session
 from .exception import ResourceError, ServiceError
 from .network import bind_floating_ip, get_free_floating_ip
-from chi import network as chi_network
-
 
 DEFAULT_IMAGE_DRIVER = "docker"
 DEFAULT_NETWORK = "containernet1"

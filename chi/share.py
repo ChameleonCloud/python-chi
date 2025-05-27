@@ -1,8 +1,7 @@
-from .clients import manila
-from .exception import CHIValueError, ResourceError
-
 from manilaclient.exceptions import NotFound
 
+from .clients import manila
+from .exception import CHIValueError, ResourceError
 
 __all__ = [
     "create_share",
