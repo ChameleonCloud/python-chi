@@ -23,4 +23,3 @@ jobs:
         # pas-fail test if any formatting would be applied, and output diff
       - name: Check code formatting with Ruff
         run: ruff format --diff
-        continue-on-error: true

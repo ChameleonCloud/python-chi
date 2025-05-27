@@ -37,17 +37,18 @@ def test_example_create_share(mocker):
     def _get_default_share_type_id():
         return "fakesharetypeid"
 
-    mocker.patch("chi.share._get_default_share_type_id",
-                 side_effect=_get_default_share_type_id)
+    mocker.patch(
+        "chi.share._get_default_share_type_id", side_effect=_get_default_share_type_id
+    )
 
     example_create_share()
 
     manila.shares.create.assert_called_once_with(
-        share_proto='NFS',
+        share_proto="NFS",
         size=1,
         name="my_share",
         description=None,
         metadata=None,
         share_type=_get_default_share_type_id(),
-        is_public=False
+        is_public=False,
     )
