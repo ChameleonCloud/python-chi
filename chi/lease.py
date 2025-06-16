@@ -11,7 +11,7 @@ from IPython.display import display
 from ipywidgets import HTML
 from packaging.version import Version
 
-from chi import context, util
+from chi import context, server, util
 
 from .clients import blazar
 from .context import _is_ipynb
@@ -172,6 +172,7 @@ class Lease:
         node_reservations (list): List of node reservations associated with the lease.
         fip_reservations (list): List of floating IP reservations associated with the lease.
         network_reservations (list): List of network reservations associated with the lease.
+        flavor_reservations (list): List of flavor reservations associated with the lease.
         events (list): List of events associated with the lease.
     """
 
@@ -192,6 +193,7 @@ class Lease:
         self.device_reservations = []
         self.node_reservations = []
         self.fip_reservations = []
+        self.flavor_reservations = []
         self.network_reservations = []
         self._events = []
 
@@ -239,6 +241,7 @@ class Lease:
         self.device_reservations.clear()
         self.node_reservations.clear()
         self.fip_reservations.clear()
+        self.flavor_reservations.clear()
         self.network_reservations.clear()
 
         for reservation in lease_json.get("reservations", []):
@@ -249,6 +252,8 @@ class Lease:
                 self.node_reservations.append(reservation)
             elif resource_type == "virtual:floatingip":
                 self.fip_reservations.append(reservation)
+            elif resource_type == "flavor:instance":
+                self.flavor_reservations.append(reservation)
             elif resource_type == "network":
                 self.network_reservations.append(reservation)
 
@@ -347,6 +352,23 @@ class Lease:
         """
         add_fip_reservation(reservation_list=self.fip_reservations, count=amount)
 
+    def add_flavor_reservation(self, id, amount=1):
+        """
+        Add a reservation for a KVM flavor to the list of reservations.
+
+        Args:
+            id (str): The ID of the flavor to reserve
+            count (int): The number of floating IPs to reserve.
+        """
+        self.flavor_reservations.append(
+            {
+                "resource_type": "flavor:instance",
+                "flavor_id": id,
+                "amount": amount,
+                "affinity": None,
+            }
+        )
+
     def add_network_reservation(
         self, network_name: str, usage_type: str = None, stitch_provider: str = None
     ):
@@ -404,6 +426,7 @@ class Lease:
             self.device_reservations
             + self.node_reservations
             + self.fip_reservations
+            + self.flavor_reservations
             + self.network_reservations
         )
 
@@ -414,7 +437,6 @@ class Lease:
                 start_date=self.start_date,
                 end_date=self.end_date,
             )
-
             if response:
                 self._populate_from_json(response)
             else:
@@ -534,6 +556,11 @@ class Lease:
         {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}</li>" for r in self.network_reservations)}
         </ul>
 
+        <h3>Flavor Reservations</h3>
+        <ul>
+        {"".join(f"<li>ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Resource type: {r.get('resource_type', 'N/A')}, Flavor: {r.get('flavor_id', 'N/A')}, Amount: {r.get('amount', 'N/A')}</li>" for r in self.flavor_reservations)}
+        </ul>
+
         <h3>Events</h3>
         <ul>
         {"".join(f"<li>Type: {e.get('event_type', 'N/A')}, Time: {e.get('time', 'N/A')}, Status: {e.get('status', 'N/A')}</li>" for e in self.events)}
@@ -569,6 +596,12 @@ class Lease:
         for r in self.network_reservations:
             print(
                 f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Network Name: {r.get('network_name', 'N/A')}"
+            )
+
+        print("\nFlavor Reservations:")
+        for r in self.flavor_reservations:
+            print(
+                f"ID: {r.get('id', 'N/A')}, Status: {r.get('status', 'N/A')}, Flavor: {r.get('flavor_id', 'N/A')}, Amount: {r.get('amount', 'N/A')}"
             )
 
         print("\nEvents:")
@@ -608,6 +641,18 @@ class Lease:
                 f"reservation:{r['id']}" in fip["tags"] for r in self.fip_reservations
             )
         ]
+
+    def get_reserved_flavors(self):
+        """Get flavors from flavor reservations in this lease. There will be one
+        flavor per flavor reservation.
+
+        Returns:
+            List[chi.server.Flavor] of flavor
+        """
+        flavors = []
+        for res in self.flavor_reservations:
+            flavors.extend(server.list_flavors(reservable=True, reservation_id=res.get("id")))
+        return flavors
 
 
 def _format_resource_properties(user_constraints, extra_constraints):
