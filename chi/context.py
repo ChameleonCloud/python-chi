@@ -11,8 +11,8 @@ from IPython.display import display
 from keystoneauth1 import loading, session
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
-from keystoneclient.v3.client import Client as KeystoneClient
 from keystoneclient import exceptions as keystone_exceptions
+from keystoneclient.v3.client import Client as KeystoneClient
 from oslo_config import cfg
 
 from . import jupyterhub
