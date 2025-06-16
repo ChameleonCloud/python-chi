@@ -221,10 +221,7 @@ class Server:
         except Exception:
             image_id = nova_server.image_id
 
-        try:
-            flavor_id = nova_server.flavor["id"]
-        except Exception:
-            flavor_id = nova_server.flavor_id
+        flavor_name = nova_server.flavor["original_name"]
 
         try:
             network_id = (
@@ -243,7 +240,7 @@ class Server:
             name=nova_server.name,
             reservation_id=None,
             image_name=get_image_name(image_id),
-            flavor_name=get_flavor(flavor_id).name,
+            flavor_name=flavor_name,
             key_name=nova_server.key_name,
             network_name=(
                 chi_network.get_network(network_id)["name"]
@@ -347,7 +344,7 @@ class Server:
             None
         """
         print(
-            f"Waiting for server {self.name}'s status to become {status}. This typically takes 10 minutes, but can take up to 20 minutes."
+            f"Waiting for server {self.name}'s status to become {status}. This typically takes 10 minutes for baremetal, but can take up to 20 minutes."
         )
 
         pb = util.TimerProgressBar()
@@ -468,8 +465,9 @@ class Server:
         Returns:
             None
         """
-        associate_floating_ip(self.id, fip, port_id)
+        fip = associate_floating_ip(self.id, fip, port_id)
         self.refresh()
+        return fip
 
     def detach_floating_ip(self, fip: str, delete: Optional[bool] = True) -> None:
         """
@@ -623,6 +621,16 @@ class Server:
     def set_metadata_item(self, key, value):
         return nova().servers.set_meta_item(self.id, key, value)
 
+    def add_security_group(self, security_group_name: str):
+        """Add a security group to the server.
+        """
+        return nova().servers.add_security_group(self.id, security_group_name)
+    
+    def remove_security_group(self, security_group_name: str):
+        """Removes a security group to the server.
+        """
+        return nova().servers.remove_security_group(self.id, security_group_name)
+
 
 ##########
 # Flavors
@@ -635,33 +643,61 @@ class Flavor:
 
     Attributes:
         name (str): The name of the flavor.
+        description (str): The description of the flavor.
         disk (int): The disk size in GB.
         ram (int): The RAM size in MB.
         vcpus (int): The number of virtual CPUs.
+        extras (dict): Extra traits associated with this flavor.
     """
 
-    def __init__(self, name: str, disk: int, ram: int, vcpus: int):
+    def __init__(self, id: str, name: str, description: str, disk: int, ram: int, vcpus: int, extras: dict):
+        self.id = id
         self.name = name
+        self.description = description
         self.disk = disk
         self.ram = ram
         self.vcpus = vcpus
+        self.extras = extras
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} '{self.name}' (disk={self.disk}) (ram={self.ram}) (vcpus={self.vcpus})>"
+        return f"<{self.__class__.__name__} '{self.name}' {self.description} (disk={self.disk}) (ram={self.ram}) (vcpus={self.vcpus})>"
 
 
-def list_flavors() -> List[Flavor]:
+def list_flavors(reservable=None, reservation_id=None) -> List[Flavor]:
     """Get a list of all available flavors.
+
+    Args:
+        reservable (bool): Whether to filter by reservable flavors. Defaults to True.
+        reservation_id (str, optional): The reservation ID to filter by. Defaults to None.
 
     Returns:
         A list of all flavors.
     """
     if Version(context.version) >= Version("1.0"):
         nova_client = nova()
-        flavors = nova_client.flavors.list()
-        return [
-            Flavor(name=f.name, disk=f.disk, ram=f.ram, vcpus=f.vcpus) for f in flavors
-        ]
+        flavors = nova_client.flavors.list(detailed=True)
+        chi_flavors = []
+        for f in flavors:
+            extras = f.get_keys()
+            # include a flavor if:
+            # - not filtering by reservable
+            # - is reservable in blazar & not an active reservation flavor
+            if not reservable or (
+                extras.get("aggregate_instance_extra_specs:reservation") == reservation_id and
+                extras.get("trait:CUSTOM_BLAZAR_FLAVOR_RESERVATION") == "required"
+            ):
+                chi_flavors.append(
+                    Flavor(
+                        id=f.id,
+                        name=f.name,
+                        description=f.description,
+                        disk=f.disk,
+                        ram=f.ram,
+                        vcpus=f.vcpus,
+                        extras=extras,
+                    )
+                )
+        return chi_flavors
     return nova().flavors.list()
 
 
