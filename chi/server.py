@@ -615,21 +615,52 @@ class Server:
         with self.ssh_connection(**kwargs) as conn:
             return conn.run(command)
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, str]:
+        """Get the metadata dictionary of this server
+
+        Returns:
+            Dict[str, str]: The metadata dictionary of the server.
+        """
         return nova().servers.list_meta(self.id)["metadata"]
 
     def set_metadata_item(self, key, value):
+        """Set a metadata item for the server.
+
+        Args:
+            key (str): The metadata key
+            value (str): The metadata value
+        """
         return nova().servers.set_meta_item(self.id, key, value)
 
     def add_security_group(self, security_group_name: str):
         """Add a security group to the server.
         """
         return nova().servers.add_security_group(self.id, security_group_name)
-    
+
     def remove_security_group(self, security_group_name: str):
         """Removes a security group to the server.
         """
         return nova().servers.remove_security_group(self.id, security_group_name)
+
+    def attach_volume(self, volume_id: str) -> None:
+        """Attach a Cinder volume to the server. Only supported at KVM@TACC.
+
+        Args:
+            volume_id (str): The volume to attach.
+            mount_location (str, optional): The mount location of the volume. Defaults to "/mnt/volume".
+        """
+        nova().volumes.create_server_volume(self.id, volume_id)
+
+    def detach_volume(self, volume_id: str) -> None:
+        """Detach a Cinder volume from the server. Only supported at KVM@TACC.
+
+        Args:
+            volume_id (str): The volume to detach.
+        """
+        nova().volumes.delete_server_volume(self.id, volume_id)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} '{self.name}'>"
 
 
 ##########
@@ -1042,8 +1073,11 @@ def get_keypair(name=None) -> Keypair:
         name = get_from_context("keypair_name")
 
     nova_client = nova()
-    keypair = nova_client.keypairs.get(name)
-    return Keypair(name=keypair.name, public_key=keypair.public_key)
+    try:
+        keypair = nova_client.keypairs.get(name)
+        return Keypair(name=keypair.name, public_key=keypair.public_key)
+    except NotFound:
+        return Keypair(name=name, public_key=None)
 
 
 def list_keypair() -> List[Keypair]:
