@@ -213,6 +213,7 @@ class Volume:
         id (str): id of the volume
         status (str): status of the volume
     """
+
     def __init__(
         self,
         name: str,
@@ -230,7 +231,11 @@ class Volume:
     @classmethod
     def _from_cinder_volume(cls, volume):
         v = cls(
-            volume.name, volume.size, volume.description, volume.metadata, volume.volume_type
+            volume.name,
+            volume.size,
+            volume.description,
+            volume.metadata,
+            volume.volume_type,
         )
         v.id = volume.id
         v.status = volume.status
