@@ -841,7 +841,7 @@ class SecurityGroup:
                         "port_range_min": rule.get("port_range_min"),
                         "port_range_max": rule.get("port_range_max"),
                         "protocol": rule["protocol"],
-                        "security_group_id": self.id
+                        "security_group_id": self.id,
                     }
                 }
             )
@@ -861,7 +861,7 @@ class SecurityGroup:
 
 def list_security_groups(name_filter=None) -> "list[SecurityGroup]":
     """List all security groups.
-    
+
     Args:
         name_filter (str, optional): Filter security groups containing name.
 
@@ -870,7 +870,8 @@ def list_security_groups(name_filter=None) -> "list[SecurityGroup]":
     """
     security_groups = neutron().list_security_groups()["security_groups"]
     return [
-        SecurityGroup(sg) for sg in security_groups
+        SecurityGroup(sg)
+        for sg in security_groups
         if not name_filter or name_filter.lower() in sg["name"].lower()
     ]
 

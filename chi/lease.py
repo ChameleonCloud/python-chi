@@ -651,7 +651,9 @@ class Lease:
         """
         flavors = []
         for res in self.flavor_reservations:
-            flavors.extend(server.list_flavors(reservable=True, reservation_id=res.get("id")))
+            flavors.extend(
+                server.list_flavors(reservable=True, reservation_id=res.get("id"))
+            )
         return flavors
 
 

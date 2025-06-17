@@ -633,13 +633,11 @@ class Server:
         return nova().servers.set_meta_item(self.id, key, value)
 
     def add_security_group(self, security_group_name: str):
-        """Add a security group to the server.
-        """
+        """Add a security group to the server."""
         return nova().servers.add_security_group(self.id, security_group_name)
 
     def remove_security_group(self, security_group_name: str):
-        """Removes a security group to the server.
-        """
+        """Removes a security group to the server."""
         return nova().servers.remove_security_group(self.id, security_group_name)
 
     def attach_volume(self, volume_id: str) -> None:
@@ -681,7 +679,16 @@ class Flavor:
         extras (dict): Extra traits associated with this flavor.
     """
 
-    def __init__(self, id: str, name: str, description: str, disk: int, ram: int, vcpus: int, extras: dict):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        description: str,
+        disk: int,
+        ram: int,
+        vcpus: int,
+        extras: dict
+    ):
         self.id = id
         self.name = name
         self.description = description
@@ -714,8 +721,9 @@ def list_flavors(reservable=None, reservation_id=None) -> List[Flavor]:
             # - not filtering by reservable
             # - is reservable in blazar & not an active reservation flavor
             if not reservable or (
-                extras.get("aggregate_instance_extra_specs:reservation") == reservation_id and
-                extras.get("trait:CUSTOM_BLAZAR_FLAVOR_RESERVATION") == "required"
+                extras.get("aggregate_instance_extra_specs:reservation")
+                == reservation_id
+                and extras.get("trait:CUSTOM_BLAZAR_FLAVOR_RESERVATION") == "required"
             ):
                 chi_flavors.append(
                     Flavor(
