@@ -687,7 +687,7 @@ class Flavor:
         disk: int,
         ram: int,
         vcpus: int,
-        extras: dict
+        extras: dict,
     ):
         self.id = id
         self.name = name
