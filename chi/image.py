@@ -79,12 +79,15 @@ def get_image(name: str) -> Image:
         ResourceError: If multiple images are found with the same name.
     """
     if Version(context.version) >= Version("1.0"):
-        glance_images = list(glance().images.list(filters={"name": name}))
-        if not glance_images:
-            raise CHIValueError(f'No images found matching name "{name}"')
-        elif len(glance_images) > 1:
-            raise ResourceError(f'Multiple images found matching name "{name}"')
-        return Image.from_glance_image(glance_images[0])
+        try:
+            glance_images = list(glance().images.list(filters={"name": name}))
+            if not glance_images:
+                raise CHIValueError(f'No images found matching name "{name}"')
+            elif len(glance_images) > 1:
+                raise ResourceError(f'Multiple images found matching name "{name}"')
+            return Image.from_glance_image(glance_images[0])
+        except Exception:
+            return Image(None, None, False, name)
     try:
         return glance().images.get(name)
     except NotFound:
