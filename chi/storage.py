@@ -4,10 +4,10 @@ from typing import List
 import manilaclient
 import swiftclient
 
-from chi.clients import manila, cinder
+from chi import storage
+from chi.clients import cinder, manila
 from chi.context import session
 from chi.exception import CHIValueError, ResourceError
-from chi import storage
 
 
 def _get_default_share_type_id():
