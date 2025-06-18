@@ -220,8 +220,7 @@ class Server:
             image_id = nova_server.image["id"]
         except Exception:
             image_id = nova_server.image_id
-
-        flavor_name = nova_server.flavor["original_name"]
+        flavor_name = nova_server.flavor.get("original_name", "")
 
         try:
             network_id = (
