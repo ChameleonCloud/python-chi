@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 session_factory = session
 
-NOVA_API_VERSION = "2.61"
+NOVA_API_VERSION = "2.10"
 ZUN_API_VERSION = "1.41"
 
 
@@ -55,7 +55,7 @@ def connection(session=None) -> "Connection":
     cloud_config = cloud_region.from_session(sess)
     return Connection(
         config=cloud_config,
-        compute_api_version=NOVA_API_VERSION,
+        compute_api_version="2.61",
     )
 
 

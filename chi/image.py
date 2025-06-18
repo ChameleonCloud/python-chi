@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 
-from glanceclient.exc import NotFound
+from glanceclient.exc import NotFound, HTTPBadRequest
 from packaging.version import Version
 
 from chi import context
@@ -86,7 +86,7 @@ def get_image(name: str) -> Image:
             elif len(glance_images) > 1:
                 raise ResourceError(f'Multiple images found matching name "{name}"')
             return Image.from_glance_image(glance_images[0])
-        except Exception:
+        except HTTPBadRequest:
             return Image(None, None, False, name)
     try:
         return glance().images.get(name)
