@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 
-from glanceclient.exc import NotFound, HTTPBadRequest
+from glanceclient.exc import HTTPBadRequest, NotFound
 from packaging.version import Version
 
 from chi import context
