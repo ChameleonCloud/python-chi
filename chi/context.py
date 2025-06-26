@@ -11,6 +11,7 @@ from IPython.display import display
 from keystoneauth1 import loading, session
 from keystoneauth1.identity.v3 import OidcAccessToken
 from keystoneauth1.loading.conf import _AUTH_SECTION_OPT, _AUTH_TYPE_OPT
+from keystoneclient import exceptions as keystone_exceptions
 from keystoneclient.v3.client import Client as KeystoneClient
 from oslo_config import cfg
 
@@ -72,8 +73,7 @@ _auth_plugin = None
 _session = None
 _sites = {}
 
-# You must manually opt into our 1.0 features.
-version = "0.17.12"
+version = "1.1"
 
 
 def printerr(msg):
@@ -466,7 +466,10 @@ def list_projects(show: str = None) -> List[str]:
         region_name=getattr(keystone_session, "region_name", None),
     )
 
-    projects = keystone_client.projects.list(user=keystone_session.get_user_id())
+    try:
+        projects = keystone_client.projects.list(user=keystone_session.get_user_id())
+    except keystone_exceptions.Unauthorized:
+        raise ResourceError("Failed to retrieve projects. Check your credentials.")
     project_names = [project.name for project in projects]
 
     if show == "widget":
