@@ -4,12 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
-from ipydatagrid import DataGrid, TextRenderer, Expr 
-from ipywidgets import Box, HTML, Layout
-from IPython.display import display
-import pandas as pd
 
+import pandas as pd
 import requests
+from ipydatagrid import DataGrid, Expr, TextRenderer
+from IPython.display import display
+from ipywidgets import HTML, Box, Layout
 
 from chi import exception
 
@@ -138,11 +138,11 @@ class Node:
             if 'gpu_count' in self.gpu:
                 children.append(HTML(f"<b>GPU Count:</b> {self.gpu['gpu_count']}", style=style, layout=layout))
             else:
-                children.append(HTML(f"<b>GPU:</b> True", style=style, layout=layout))
+                children.append(HTML("<b>GPU:</b> True", style=style, layout=layout))
             if 'gpu_model' in self.gpu:
                 children.append(HTML(f"<b>GPU Model:</b> {self.gpu['gpu_model']}", style=style, layout=layout))
         else:
-            children.append(HTML(f"<b>GPU Count:</b> 0", style=style, layout=layout))
+            children.append(HTML("<b>GPU Count:</b> 0", style=style, layout=layout))
         
         if getattr(self, 'storage_devices', False) and len(self.storage_devices) > 0 and 'humanized_size' in self.storage_devices[0]:
             children.append(HTML(f"<b>Storage Size:</b> {self.storage_devices[0]['humanized_size']}", style=style, layout=layout))
