@@ -12,6 +12,9 @@ python-novaclient
 python-swiftclient
 python-zunclient
 ipython
+ipydatagrid
 ipywidgets
 networkx
 matplotlib
+pandas
+
