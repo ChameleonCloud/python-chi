@@ -4,8 +4,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
+from ipydatagrid import DataGrid, TextRenderer, Expr 
 from ipywidgets import Box, HTML, Layout
 from IPython.display import display
+import pandas as pd
 
 import requests
 
@@ -291,6 +293,9 @@ def get_nodes(
     return nodes
 
 
+
+
+
 def _parse_blazar_dt(datetime_string):
     d = datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M:%S.%f")
     return d.replace(tzinfo=timezone.utc)
@@ -313,6 +318,85 @@ def get_node_types() -> List[str]:
         get_nodes()
     return list(set(node_types))
 
+def _reservable_color(cell):
+    return "#a2d9fe" if cell.value else "#f69084"
+
+def _gpu_background_color(cell):
+    return "#d3d3d3" if not cell.value else None
+
+def show_nodes(
+    nodes: Optional[List[Node]] = None
+) -> None:
+    """
+    Display a sortable, filterable table of available nodes.
+
+    Args:
+        nodes (Optional[List[Node]], optional): A list of Node objects to display.
+            If not provided, defaults to the output of hardware.get_nodes().
+
+    Returns:
+        None
+    """
+
+    def estimate_column_width(df, column, char_px=7, padding=0):
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        max_chars = df[column].astype(str).map(len).max()
+        return max(max_chars * char_px + padding, 80)
+
+    if not nodes:
+        nodes = get_nodes()
+        
+    rows = []
+    for n in nodes:
+        rows.append({
+            "Node Name": n.name,
+            "Type": n.type,
+            "Clock Speed (GHz)": round(n.cpu.get('clock_speed', 0) / 1e9, 2),
+            "RAM": n.main_memory.get('humanized_ram_size', 'N/A'),
+            "GPU Model": (n.gpu or {}).get('gpu_model') or "",
+            "GPU Count": (n.gpu or {}).get('gpu_count') or "",
+            "Storage Size": n.storage_devices[0].get('humanized_size', 'N/A') if n.storage_devices else 'N/A',
+            "Site": n.site,
+            "Reservable": bool(n.reservable),
+        })
+
+    df = pd.DataFrame(rows)
+    renderers = {
+        "Reservable": TextRenderer(
+            text_color="black",
+            background_color=Expr(_reservable_color),
+        ),
+        "GPU Model": TextRenderer(
+            background_color=Expr(_gpu_background_color),
+        ),
+        "GPU Count": TextRenderer(
+            background_color=Expr(_gpu_background_color),
+        )
+    }
+
+    grid = DataGrid(
+        df, 
+        layout=Layout(height="400px"), 
+        selection_mode="row", 
+        renderers=renderers,
+        column_widths={
+            "Node Name": int(estimate_column_width(df, "Node Name")),
+            "Site": int(estimate_column_width(df, "Site")),
+            "Type": int(estimate_column_width(df, "Type")),
+            "RAM": int(estimate_column_width(df, "RAM")),
+            "Storage Size": int(estimate_column_width(df, "Storage Size")),
+            "Clock Speed (GHz)": 55,
+            "GPU Model": 90,
+            "GPU Count": 30,
+            "key": 30,
+            "Reservable": 55
+        },
+        
+        df = pd.DataFrame(rows)
+    )
+
+    display(grid)
 
 @dataclass
 class Device:
