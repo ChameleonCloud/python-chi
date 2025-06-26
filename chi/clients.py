@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 session_factory = session
 
-NOVA_API_VERSION = "2.10"
+NOVA_API_VERSION = "2.61"
 ZUN_API_VERSION = "1.41"
 
 

@@ -812,6 +812,70 @@ def nuke_network(network_ref: str):
     delete_network(network_id)
 
 
+class SecurityGroup:
+    """A wrapper class for Neutron security groups. Only supports creating."""
+
+    def __init__(self, security_group_data):
+        self.id = security_group_data.get("id")
+        self.name = security_group_data.get("name")
+        self.description = security_group_data.get("description")
+        self.rules = security_group_data.get("security_group_rules", [])
+
+    def submit(self, idempotent=False):
+        """Create a new security group."""
+        if idempotent:
+            existing_groups = neutron().list_security_groups()["security_groups"]
+            for sg in existing_groups:
+                if sg["name"] == self.name:
+                    self.id = sg["id"]
+                    return
+        security_group = neutron().create_security_group(
+            {"security_group": {"name": self.name, "description": self.description}}
+        )["security_group"]
+        self.id = security_group["id"]
+        for rule in self.rules:
+            neutron().create_security_group_rule(
+                {
+                    "security_group_rule": {
+                        "direction": rule["direction"],
+                        "port_range_min": rule.get("port_range_min"),
+                        "port_range_max": rule.get("port_range_max"),
+                        "protocol": rule["protocol"],
+                        "security_group_id": self.id,
+                    }
+                }
+            )
+
+    def add_rule(self, direction, protocol, port):
+        """Add a rule to the security group."""
+        self.rules.append(
+            {
+                "direction": direction,
+                "protocol": protocol,
+                "port_range_min": port,
+                "port_range_max": port,
+                "security_group_id": self.id,
+            }
+        )
+
+
+def list_security_groups(name_filter=None) -> "list[SecurityGroup]":
+    """List all security groups.
+
+    Args:
+        name_filter (str, optional): Filter security groups containing name.
+
+    Returns:
+        list[SecurityGroup]: A list of SecurityGroup instances.
+    """
+    security_groups = neutron().list_security_groups()["security_groups"]
+    return [
+        SecurityGroup(sg)
+        for sg in security_groups
+        if not name_filter or name_filter.lower() in sg["name"].lower()
+    ]
+
+
 ###################
 # Wizard functions
 ###################

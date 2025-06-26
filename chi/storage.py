@@ -4,7 +4,8 @@ from typing import List
 import manilaclient
 import swiftclient
 
-from chi.clients import manila
+from chi import storage
+from chi.clients import cinder, manila
 from chi.context import session
 from chi.exception import CHIValueError, ResourceError
 
@@ -196,3 +197,109 @@ def list_buckets() -> List[ObjectBucket]:
     for container in containers:
         buckets.append(ObjectBucket(container["name"]))
     return buckets
+
+
+class Volume:
+    """Represents an OpenStack Cinder volume
+
+    Args:
+        name (str): name of the new volume.
+        size (int): size in GiB.
+        description (str): description of the volume.
+        metadata (str): metadata for the volume.
+        volume_type (str): type of the volume.
+
+    Fields:
+        id (str): id of the volume
+        status (str): status of the volume
+    """
+
+    def __init__(
+        self,
+        name: str,
+        size: int,
+        description: str = None,
+        metadata: str = None,
+        volume_type: str = "ceph-ssd",
+    ):
+        self.name = name
+        self.size = size
+        self.description = description
+        self.metadata = metadata
+        self.volume_type = volume_type
+
+    @classmethod
+    def _from_cinder_volume(cls, volume):
+        v = cls(
+            volume.name,
+            volume.size,
+            volume.description,
+            volume.metadata,
+            volume.volume_type,
+        )
+        v.id = volume.id
+        v.status = volume.status
+        return v
+
+    def submit(self, idempotent: bool = False):
+        """Create the volume."""
+        volume = None
+        if idempotent:
+            for v in storage.list_volumes():
+                if v.name == self.name:
+                    volume = v
+                    break
+        if not volume:
+            volume = cinder().volumes.create(
+                size=self.size,
+                name=self.name,
+                description=self.description,
+                metadata=self.metadata,
+                volume_type=self.volume_type,
+            )
+        self.id = volume.id
+        self.status = volume.status
+        return volume
+
+    def delete(self):
+        """Delete the volume."""
+        cinder().volumes.delete(self.id)
+
+    def get(self):
+        """Retrieve the volume details."""
+        volume = cinder().volumes.get(self.id)
+        return self._from_cinder_volume(volume)
+
+
+def list_volumes() -> List[Volume]:
+    """Get a list of all available volumes.
+
+    Returns:
+        A list of all volumes.
+    """
+    return [Volume._from_cinder_volume(v) for v in cinder().volumes.list()]
+
+
+def get_volume(ref) -> Volume:
+    """Get a volume by its ID or name.
+
+    Args:
+        ref (str): The ID or name of the volume.
+
+    Returns:
+        The volume matching the ID or name.
+
+    Raises:
+        CHIValueError: If no volumes are found matching the name.
+        ResourceError: If multiple volumes are found matching the name.
+    """
+    try:
+        volume = cinder().volumes.get(ref)
+    except cinder.exceptions.NotFound:
+        volumes = list(cinder().volumes.list(search_opts={"name": ref}))
+        if not volumes:
+            raise CHIValueError(f'No volumes found matching name "{ref}"')
+        elif len(volumes) > 1:
+            raise ResourceError(f'Multiple volumes found matching name "{ref}"')
+        volume = volumes[0]
+    return Volume._from_cinder_volume(volume)
