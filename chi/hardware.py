@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
 from ipydatagrid import DataGrid, TextRenderer, Expr 
-from ipywidgets import Layout 
+from ipywidgets import Box, HTML, Layout
+from IPython.display import display
 import pandas as pd
 
 import requests
@@ -100,6 +101,58 @@ class Node:
         return _get_next_free_timeslot(
             blazarclient.host.get_allocation(host_id), minimum_hours
         )
+
+    def _ipython_display_(self):
+        """
+        Displays information about the node. This function is called passively by the Jupyter display system.
+        """
+
+        layout=Layout(padding="4px 10px")
+        style = {
+            'description_width': 'initial',
+            'background': '#d3d3d3',
+            'white_space': 'nowrap'
+        }
+
+        reservable_style = {
+            'description_width': 'initial',
+            'background': ' #a2d9fe',
+            'white_space': 'nowrap'
+        }
+        
+        if not self.reservable:
+            reservable_style['background'] = '#f69084'
+
+        children=[
+            HTML(f"<b>Node Name:</b> {self.name}", style=style, layout=layout),
+            HTML(f"<b>Site:</b> {self.site}", style=style, layout=layout),
+            HTML(f"<b>Type:</b> {self.type}", style=style, layout=layout)
+        ]
+        if getattr(self, 'cpu', False) and 'clock_speed' in self.cpu:
+            children.append(HTML(f"<b>Clock Speed:</b> {self.cpu['clock_speed'] / 1e9:.2f} GHz", style=style, layout=layout))
+        
+        if getattr(self, 'main_memory', False) and 'humanized_ram_size' in self.main_memory:
+            children.append(HTML(f"<b>RAM:</b> {self.main_memory['humanized_ram_size']}", style=style, layout=layout))
+        
+        if getattr(self, 'gpu', False) and 'gpu' in self.gpu and self.gpu['gpu']:
+            if 'gpu_count' in self.gpu:
+                children.append(HTML(f"<b>GPU Count:</b> {self.gpu['gpu_count']}", style=style, layout=layout))
+            else:
+                children.append(HTML(f"<b>GPU:</b> True", style=style, layout=layout))
+            if 'gpu_model' in self.gpu:
+                children.append(HTML(f"<b>GPU Model:</b> {self.gpu['gpu_model']}", style=style, layout=layout))
+        else:
+            children.append(HTML(f"<b>GPU Count:</b> 0", style=style, layout=layout))
+        
+        if getattr(self, 'storage_devices', False) and len(self.storage_devices) > 0 and 'humanized_size' in self.storage_devices[0]:
+            children.append(HTML(f"<b>Storage Size:</b> {self.storage_devices[0]['humanized_size']}", style=style, layout=layout))
+
+        if getattr(self, 'reservable', False):
+            children.append(HTML(f"<b>Reservable:</b> {'Yes' if self.reservable else 'No'}", style=reservable_style, layout=layout))
+    
+        box = Box(children=children)
+        box.layout=Layout(flex_flow='row wrap')
+        display(box)
 
 
 def _call_api(endpoint):
