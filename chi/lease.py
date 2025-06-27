@@ -3,8 +3,11 @@ import logging
 import numbers
 import re
 import time
+import os
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, List, Optional, Union
+from ipywidgets import Box, HTML, Layout
+
 
 from blazarclient.exception import BlazarClientException
 from IPython.display import display
@@ -258,6 +261,76 @@ class Lease:
                 self.network_reservations.append(reservation)
 
         # self.events = lease_json.get('events', [])
+
+    def _ipython_display_(self):
+        """
+        Displays a styled summary of the lease when run in a Jupyter notebook.
+    
+        This method is called automatically by the Jupyter display system when
+        an instance of the Lease object is the final expression in a cell.
+        It presents key lease attributes using ipywidgets for readability.
+        """
+        layout = Layout(padding="4px 10px")
+        style = {
+            'description_width': 'initial',
+            'background': '#d3d3d3',
+            'white_space': 'nowrap'
+        }
+    
+        status_style = style.copy()
+        status_colors = {
+            "ACTIVE": "#a2d9fe",
+            "PENDING": "#ffe599",
+            "TERMINATED": "#f69084"
+        }
+        if self.status:
+            status_style['background'] = status_colors.get(self.status, "#d3d3d3")
+    
+        children = [
+            #HTML(f"<b>Lease ID:</b> {self.id}", style=style, layout=layout),
+            HTML(f"<b>Status:</b> {self.status}", style=status_style, layout=layout),
+            HTML(f"<b>Name:</b> {self.name}", style=style, layout=layout),
+        ]
+    
+        if self.start_date:
+            children.append(HTML(f"<b>Start:</b> {self.start_date.strftime('%Y-%m-%d %H:%M')}", style=style, layout=layout))
+        if self.end_date:
+            children.append(HTML(f"<b>End:</b> {self.end_date.strftime('%Y-%m-%d %H:%M')}", style=style, layout=layout))
+    
+        remaining = None
+        if self.end_date and datetime.now() < self.end_date:
+            remaining = self.end_date - datetime.now()
+    
+        if remaining:
+            days = remaining.days
+            hours = remaining.seconds // 3600
+            minutes = (remaining.seconds % 3600) // 60
+            children.append(HTML(f"<b>Remaining:</b> {days:02d}d {hours:02d}h {minutes:02d}m", style=style, layout=layout))
+    
+        # Reservations
+        children.append(HTML(f"<b>Node Reservations:</b> {len(self.node_reservations)}", style=style, layout=layout))
+        children.append(HTML(f"<b>FIP Reservations:</b> {len(self.fip_reservations)}", style=style, layout=layout))
+        children.append(HTML(f"<b>Device Reservations:</b> {len(self.device_reservations)}", style=style, layout=layout))
+    
+        if self.project_id:
+            try:
+                project_name = context.get_project_name(self.project_id)
+                children.append(HTML(f"<b>Project Name:</b> {project_name}", style=style, layout=layout))
+            except:
+                children.append(HTML(f"<b>Project ID:</b> {self.project_id}", style=style, layout=layout))
+        if self.user_id:
+            user_id = os.getenv("OS_USER_ID")  # or "OS_USERNAME" if set
+            if self.user_id == user_id:
+                label = os.getenv('OS_USERNAME')
+            else:
+                label = self.user_id #[:8]  # or just show a truncated ID
+            children.append(HTML(f"<b>User ID:</b> {self.user_id}", style=style, layout=layout))
+        if self.created_at:
+            children.append(HTML(f"<b>Created At:</b> {self.created_at.strftime('%Y-%m-%d %H:%M')}", style=style, layout=layout))
+    
+        box = Box(children=children)
+        box.layout = Layout(flex_flow='row wrap')
+        display(box)
 
     def add_device_reservation(
         self,
