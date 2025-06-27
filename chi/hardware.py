@@ -107,51 +107,94 @@ class Node:
         Displays information about the node. This function is called passively by the Jupyter display system.
         """
 
-        layout=Layout(padding="4px 10px")
+        layout = Layout(padding="4px 10px")
         style = {
-            'description_width': 'initial',
-            'background': '#d3d3d3',
-            'white_space': 'nowrap'
+            "description_width": "initial",
+            "background": "#d3d3d3",
+            "white_space": "nowrap",
         }
 
         reservable_style = {
-            'description_width': 'initial',
-            'background': ' #a2d9fe',
-            'white_space': 'nowrap'
+            "description_width": "initial",
+            "background": " #a2d9fe",
+            "white_space": "nowrap",
         }
-        
-        if not self.reservable:
-            reservable_style['background'] = '#f69084'
 
-        children=[
+        if not self.reservable:
+            reservable_style["background"] = "#f69084"
+
+        children = [
             HTML(f"<b>Node Name:</b> {self.name}", style=style, layout=layout),
             HTML(f"<b>Site:</b> {self.site}", style=style, layout=layout),
-            HTML(f"<b>Type:</b> {self.type}", style=style, layout=layout)
+            HTML(f"<b>Type:</b> {self.type}", style=style, layout=layout),
         ]
-        if getattr(self, 'cpu', False) and 'clock_speed' in self.cpu:
-            children.append(HTML(f"<b>Clock Speed:</b> {self.cpu['clock_speed'] / 1e9:.2f} GHz", style=style, layout=layout))
-        
-        if getattr(self, 'main_memory', False) and 'humanized_ram_size' in self.main_memory:
-            children.append(HTML(f"<b>RAM:</b> {self.main_memory['humanized_ram_size']}", style=style, layout=layout))
-        
-        if getattr(self, 'gpu', False) and 'gpu' in self.gpu and self.gpu['gpu']:
-            if 'gpu_count' in self.gpu:
-                children.append(HTML(f"<b>GPU Count:</b> {self.gpu['gpu_count']}", style=style, layout=layout))
+        if getattr(self, "cpu", False) and "clock_speed" in self.cpu:
+            children.append(
+                HTML(
+                    f"<b>Clock Speed:</b> {self.cpu['clock_speed'] / 1e9:.2f} GHz",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if (
+            getattr(self, "main_memory", False)
+            and "humanized_ram_size" in self.main_memory
+        ):
+            children.append(
+                HTML(
+                    f"<b>RAM:</b> {self.main_memory['humanized_ram_size']}",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if getattr(self, "gpu", False) and "gpu" in self.gpu and self.gpu["gpu"]:
+            if "gpu_count" in self.gpu:
+                children.append(
+                    HTML(
+                        f"<b>GPU Count:</b> {self.gpu['gpu_count']}",
+                        style=style,
+                        layout=layout,
+                    )
+                )
             else:
                 children.append(HTML("<b>GPU:</b> True", style=style, layout=layout))
-            if 'gpu_model' in self.gpu:
-                children.append(HTML(f"<b>GPU Model:</b> {self.gpu['gpu_model']}", style=style, layout=layout))
+            if "gpu_model" in self.gpu:
+                children.append(
+                    HTML(
+                        f"<b>GPU Model:</b> {self.gpu['gpu_model']}",
+                        style=style,
+                        layout=layout,
+                    )
+                )
         else:
             children.append(HTML("<b>GPU Count:</b> 0", style=style, layout=layout))
-        
-        if getattr(self, 'storage_devices', False) and len(self.storage_devices) > 0 and 'humanized_size' in self.storage_devices[0]:
-            children.append(HTML(f"<b>Storage Size:</b> {self.storage_devices[0]['humanized_size']}", style=style, layout=layout))
 
-        if getattr(self, 'reservable', False):
-            children.append(HTML(f"<b>Reservable:</b> {'Yes' if self.reservable else 'No'}", style=reservable_style, layout=layout))
-    
+        if (
+            getattr(self, "storage_devices", False)
+            and len(self.storage_devices) > 0
+            and "humanized_size" in self.storage_devices[0]
+        ):
+            children.append(
+                HTML(
+                    f"<b>Storage Size:</b> {self.storage_devices[0]['humanized_size']}",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if getattr(self, "reservable", False):
+            children.append(
+                HTML(
+                    f"<b>Reservable:</b> {'Yes' if self.reservable else 'No'}",
+                    style=reservable_style,
+                    layout=layout,
+                )
+            )
+
         box = Box(children=children)
-        box.layout=Layout(flex_flow='row wrap')
+        box.layout = Layout(flex_flow="row wrap")
         display(box)
 
 
@@ -293,9 +336,6 @@ def get_nodes(
     return nodes
 
 
-
-
-
 def _parse_blazar_dt(datetime_string):
     d = datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M:%S.%f")
     return d.replace(tzinfo=timezone.utc)
@@ -318,15 +358,16 @@ def get_node_types() -> List[str]:
         get_nodes()
     return list(set(node_types))
 
+
 def _reservable_color(cell):
     return "#a2d9fe" if cell.value else "#f69084"
+
 
 def _gpu_background_color(cell):
     return "#d3d3d3" if not cell.value else None
 
-def show_nodes(
-    nodes: Optional[List[Node]] = None
-) -> None:
+
+def show_nodes(nodes: Optional[List[Node]] = None) -> None:
     """
     Display a sortable, filterable table of available nodes.
 
@@ -346,20 +387,24 @@ def show_nodes(
 
     if not nodes:
         nodes = get_nodes()
-        
+
     rows = []
     for n in nodes:
-        rows.append({
-            "Node Name": n.name,
-            "Type": n.type,
-            "Clock Speed (GHz)": round(n.cpu.get('clock_speed', 0) / 1e9, 2),
-            "RAM": n.main_memory.get('humanized_ram_size', 'N/A'),
-            "GPU Model": (n.gpu or {}).get('gpu_model') or "",
-            "GPU Count": (n.gpu or {}).get('gpu_count') or "",
-            "Storage Size": n.storage_devices[0].get('humanized_size', 'N/A') if n.storage_devices else 'N/A',
-            "Site": n.site,
-            "Reservable": bool(n.reservable),
-        })
+        rows.append(
+            {
+                "Node Name": n.name,
+                "Type": n.type,
+                "Clock Speed (GHz)": round(n.cpu.get("clock_speed", 0) / 1e9, 2),
+                "RAM": n.main_memory.get("humanized_ram_size", "N/A"),
+                "GPU Model": (n.gpu or {}).get("gpu_model") or "",
+                "GPU Count": (n.gpu or {}).get("gpu_count") or "",
+                "Storage Size": n.storage_devices[0].get("humanized_size", "N/A")
+                if n.storage_devices
+                else "N/A",
+                "Site": n.site,
+                "Reservable": bool(n.reservable),
+            }
+        )
 
     df = pd.DataFrame(rows)
     renderers = {
@@ -372,13 +417,13 @@ def show_nodes(
         ),
         "GPU Count": TextRenderer(
             background_color=Expr(_gpu_background_color),
-        )
+        ),
     }
 
     grid = DataGrid(
-        df, 
-        layout=Layout(height="400px"), 
-        selection_mode="row", 
+        df,
+        layout=Layout(height="400px"),
+        selection_mode="row",
         renderers=renderers,
         column_widths={
             "Node Name": int(estimate_column_width(df, "Node Name")),
@@ -390,13 +435,13 @@ def show_nodes(
             "GPU Model": 90,
             "GPU Count": 30,
             "key": 30,
-            "Reservable": 55
+            "Reservable": 55,
         },
-        
-        df = pd.DataFrame(rows)
+        df=pd.DataFrame(rows),
     )
 
     display(grid)
+
 
 @dataclass
 class Device:
