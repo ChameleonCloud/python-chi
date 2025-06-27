@@ -72,6 +72,7 @@ deprecated_extra_opts = {
 _auth_plugin = None
 _session = None
 _sites = {}
+_lease = None
 
 version = "1.1"
 
@@ -439,6 +440,40 @@ def choose_site(default: str = None) -> None:
         display(widgets.VBox([site_dropdown, output]))
     else:
         print("Choose site feature is only available in an ipynb environment.")
+
+
+def get_project_name(project_id: Optional[str] = None) -> str:
+    """
+    Returns the name of a project by ID, or the current project name if no ID is given.
+
+    Args:
+        project_id (str, optional): The ID of the project. If None, uses the current session project.
+
+    Returns:
+        str: The name of the project.
+
+    Raises:
+        ResourceError: If the project cannot be found or the request fails.
+    """
+    keystone_session = session()
+    keystone_client = KeystoneClient(
+        session=keystone_session,
+        interface=getattr(keystone_session, "interface", None),
+        region_name=getattr(keystone_session, "region_name", None),
+    )
+
+    try:
+        if project_id:
+            project = keystone_client.projects.get(project_id)
+        else:
+            current_id = keystone_session.get_project_id()
+            project = keystone_client.projects.get(current_id)
+    except keystone_exceptions.NotFound:
+        raise ResourceError("Project not found.")
+    except keystone_exceptions.Unauthorized:
+        raise ResourceError("Failed to retrieve project. Check your credentials.")
+
+    return project.name
 
 
 def list_projects(show: str = None) -> List[str]:
