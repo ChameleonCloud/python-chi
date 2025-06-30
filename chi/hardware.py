@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
 
+import pandas as pd
 import requests
+from ipydatagrid import DataGrid, Expr, TextRenderer
+from IPython.display import display
+from ipywidgets import HTML, Box, Layout
 
 from chi import exception
 
@@ -97,6 +101,101 @@ class Node:
         return _get_next_free_timeslot(
             blazarclient.host.get_allocation(host_id), minimum_hours
         )
+
+    def _ipython_display_(self):
+        """
+        Displays information about the node. This function is called passively by the Jupyter display system.
+        """
+
+        layout = Layout(padding="4px 10px")
+        style = {
+            "description_width": "initial",
+            "background": "#d3d3d3",
+            "white_space": "nowrap",
+        }
+
+        reservable_style = {
+            "description_width": "initial",
+            "background": " #a2d9fe",
+            "white_space": "nowrap",
+        }
+
+        if not self.reservable:
+            reservable_style["background"] = "#f69084"
+
+        children = [
+            HTML(f"<b>Node Name:</b> {self.name}", style=style, layout=layout),
+            HTML(f"<b>Site:</b> {self.site}", style=style, layout=layout),
+            HTML(f"<b>Type:</b> {self.type}", style=style, layout=layout),
+        ]
+        if getattr(self, "cpu", False) and "clock_speed" in self.cpu:
+            children.append(
+                HTML(
+                    f"<b>Clock Speed:</b> {self.cpu['clock_speed'] / 1e9:.2f} GHz",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if (
+            getattr(self, "main_memory", False)
+            and "humanized_ram_size" in self.main_memory
+        ):
+            children.append(
+                HTML(
+                    f"<b>RAM:</b> {self.main_memory['humanized_ram_size']}",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if getattr(self, "gpu", False) and "gpu" in self.gpu and self.gpu["gpu"]:
+            if "gpu_count" in self.gpu:
+                children.append(
+                    HTML(
+                        f"<b>GPU Count:</b> {self.gpu['gpu_count']}",
+                        style=style,
+                        layout=layout,
+                    )
+                )
+            else:
+                children.append(HTML("<b>GPU:</b> True", style=style, layout=layout))
+            if "gpu_model" in self.gpu:
+                children.append(
+                    HTML(
+                        f"<b>GPU Model:</b> {self.gpu['gpu_model']}",
+                        style=style,
+                        layout=layout,
+                    )
+                )
+        else:
+            children.append(HTML("<b>GPU Count:</b> 0", style=style, layout=layout))
+
+        if (
+            getattr(self, "storage_devices", False)
+            and len(self.storage_devices) > 0
+            and "humanized_size" in self.storage_devices[0]
+        ):
+            children.append(
+                HTML(
+                    f"<b>Storage Size:</b> {self.storage_devices[0]['humanized_size']}",
+                    style=style,
+                    layout=layout,
+                )
+            )
+
+        if getattr(self, "reservable", False):
+            children.append(
+                HTML(
+                    f"<b>Reservable:</b> {'Yes' if self.reservable else 'No'}",
+                    style=reservable_style,
+                    layout=layout,
+                )
+            )
+
+        box = Box(children=children)
+        box.layout = Layout(flex_flow="row wrap")
+        display(box)
 
 
 def _call_api(endpoint):
@@ -258,6 +357,90 @@ def get_node_types() -> List[str]:
     if len(node_types) < 1:
         get_nodes()
     return list(set(node_types))
+
+
+def _reservable_color(cell):
+    return "#a2d9fe" if cell.value else "#f69084"
+
+
+def _gpu_background_color(cell):
+    return "#d3d3d3" if not cell.value else None
+
+
+def show_nodes(nodes: Optional[List[Node]] = None) -> None:
+    """
+    Display a sortable, filterable table of available nodes.
+
+    Args:
+        nodes (Optional[List[Node]], optional): A list of Node objects to display.
+            If not provided, defaults to the output of hardware.get_nodes().
+
+    Returns:
+        None
+    """
+
+    def estimate_column_width(df, column, char_px=7, padding=0):
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        max_chars = df[column].astype(str).map(len).max()
+        return max(max_chars * char_px + padding, 80)
+
+    if not nodes:
+        nodes = get_nodes()
+
+    rows = []
+    for n in nodes:
+        rows.append(
+            {
+                "Node Name": n.name,
+                "Type": n.type,
+                "Clock Speed (GHz)": round(n.cpu.get("clock_speed", 0) / 1e9, 2),
+                "RAM": n.main_memory.get("humanized_ram_size", "N/A"),
+                "GPU Model": (n.gpu or {}).get("gpu_model") or "",
+                "GPU Count": (n.gpu or {}).get("gpu_count") or "",
+                "Storage Size": n.storage_devices[0].get("humanized_size", "N/A")
+                if n.storage_devices
+                else "N/A",
+                "Site": n.site,
+                "Reservable": bool(n.reservable),
+            }
+        )
+
+    df = pd.DataFrame(rows)
+    renderers = {
+        "Reservable": TextRenderer(
+            text_color="black",
+            background_color=Expr(_reservable_color),
+        ),
+        "GPU Model": TextRenderer(
+            background_color=Expr(_gpu_background_color),
+        ),
+        "GPU Count": TextRenderer(
+            background_color=Expr(_gpu_background_color),
+        ),
+    }
+
+    grid = DataGrid(
+        df,
+        layout=Layout(height="400px"),
+        selection_mode="row",
+        renderers=renderers,
+        column_widths={
+            "Node Name": int(estimate_column_width(df, "Node Name")),
+            "Site": int(estimate_column_width(df, "Site")),
+            "Type": int(estimate_column_width(df, "Type")),
+            "RAM": int(estimate_column_width(df, "RAM")),
+            "Storage Size": int(estimate_column_width(df, "Storage Size")),
+            "Clock Speed (GHz)": 55,
+            "GPU Model": 90,
+            "GPU Count": 30,
+            "key": 30,
+            "Reservable": 55,
+        },
+        df=pd.DataFrame(rows),
+    )
+
+    display(grid)
 
 
 @dataclass
