@@ -1,17 +1,15 @@
 import json
 import logging
 import numbers
+import os
 import re
 import time
-import os
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, List, Optional, Union
-from ipywidgets import Box, HTML, Layout
-
 
 from blazarclient.exception import BlazarClientException
 from IPython.display import display
-from ipywidgets import HTML
+from ipywidgets import HTML, Box, Layout
 from packaging.version import Version
 
 from chi import context, server, util
@@ -316,15 +314,16 @@ class Lease:
             try:
                 project_name = context.get_project_name(self.project_id)
                 children.append(HTML(f"<b>Project Name:</b> {project_name}", style=style, layout=layout))
-            except:
+            except ResourceError:
                 children.append(HTML(f"<b>Project ID:</b> {self.project_id}", style=style, layout=layout))
         if self.user_id:
             user_id = os.getenv("OS_USER_ID")  # or "OS_USERNAME" if set
             if self.user_id == user_id:
                 label = os.getenv('OS_USERNAME')
+                children.append(HTML(f"<b>User Name:</b> {label}", style=style, layout=layout))
             else:
                 label = self.user_id #[:8]  # or just show a truncated ID
-            children.append(HTML(f"<b>User ID:</b> {self.user_id}", style=style, layout=layout))
+                children.append(HTML(f"<b>User ID:</b> {label}", style=style, layout=layout))
         if self.created_at:
             children.append(HTML(f"<b>Created At:</b> {self.created_at.strftime('%Y-%m-%d %H:%M')}", style=style, layout=layout))
     
