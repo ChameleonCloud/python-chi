@@ -3,17 +3,6 @@ from manilaclient.exceptions import NotFound
 from .clients import manila
 from .exception import CHIValueError, ResourceError
 
-__all__ = [
-    "create_share",
-    "delete_share",
-    "extend_share",
-    "get_access_rules",
-    "get_share",
-    "get_share_id",
-    "list_shares",
-    "shrink_share",
-]
-
 
 def _get_default_share_type_id():
     # we only support one share type - cephfsnfstype

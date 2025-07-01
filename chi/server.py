@@ -644,7 +644,6 @@ class Server:
 
         Args:
             volume_id (str): The volume to attach.
-            mount_location (str, optional): The mount location of the volume. Defaults to "/mnt/volume".
         """
         nova().volumes.create_server_volume(self.id, volume_id)
 
