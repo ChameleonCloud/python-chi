@@ -7,15 +7,17 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, List, Optional, Union
 
+import pandas
 from blazarclient.exception import BlazarClientException
+from ipydatagrid import DataGrid, Expr, TextRenderer
 from IPython.display import display
 from ipywidgets import HTML, Box, Layout
 from packaging.version import Version
 
 from chi import context, server, util
 
-from .clients import blazar
-from .context import _is_ipynb
+from .clients import blazar, connection
+from .context import _is_ipynb, get_project_name
 from .exception import CHIValueError, ResourceError, ServiceError
 from .hardware import Device, Node
 from .network import PUBLIC_NETWORK, get_network_id, list_floating_ips
@@ -365,7 +367,7 @@ class Lease:
                     )
                 )
         if self.user_id:
-            user_id = os.getenv("OS_USER_ID")  # or "OS_USERNAME" if set
+            user_id = connection().get_user_id()
             if self.user_id == user_id:
                 label = os.getenv("OS_USERNAME")
                 children.append(
@@ -1207,6 +1209,119 @@ def list_leases() -> List[Lease]:
         leases.append(lease)
 
     return leases
+
+def _status_color(cell):
+    return "#a2d9fe" if cell.value == "2-ACTIVE" else (
+           "#ffe599" if cell.value == "1-PENDING" else (
+           "#f69084" if cell.value == "3-TERMINATED" else "#e0e0e0"))
+    
+def show_leases() -> DataGrid:
+    """
+    Displays a table of the user's leases in an interactive, sortable format.
+
+    Uses an ipydatagrid to present key lease attributes such as ID, name, status,
+    duration, and reservation counts. The grid supports sorting, filtering, and 
+    scrolling for easy exploration of lease state.
+
+    Returns:
+        DataGrid: An ipydatagrid widget displaying the leases.
+    """
+
+    def estimate_column_width(df, column, char_px=7, padding=0):
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        max_chars = df[column].astype(str).map(len).max()
+        return max(max_chars * char_px + padding, 80)
+
+
+    leases = list_leases()
+
+    rows = []
+    for lease in leases:
+
+        try:
+            project_name = get_project_name(lease.project_id)
+        except ResourceError:
+            project_name = lease.project_id[:8] if lease.project_id else "Unknown"
+    
+        if lease.user_id == connection().current_user_id:
+            user_label = os.getenv("OS_USERNAME")
+        else:
+            user_label = lease.user_id if lease.user_id else "Unknown"
+    
+        if lease.start_date and lease.end_date:
+            duration_hrs = round((lease.end_date - lease.start_date).total_seconds() / 3600, 1)
+        else:
+            duration_hrs = "N/A"
+    
+        # Inside your row-building loop:
+        if lease.end_date and lease.end_date > datetime.now():
+            remaining_td = lease.end_date - datetime.now()
+            remaining_str = f"{remaining_td.days:02d}d {(remaining_td.seconds // 3600):02d}h"
+        elif lease.end_date and lease.end_date <= datetime.now():
+            remaining_str = "Expired"
+        else:
+            remaining_str = "N/A"
+
+
+        # prepending status with numeric makes it possible to character sort
+        # since ipydatagrid does not allow custom sort functions
+        status_order = {
+            "PENDING": "1-PENDING",
+            "ACTIVE": "2-ACTIVE",
+            "TERMINATED": "3-TERMINATED"
+        }
+        
+        rows.append({
+            "Name": lease.name,
+            "Status": status_order.get(lease.status, f"4-{lease.status}"),
+            "User": user_label,
+            "Project": project_name,
+            "Start": lease.start_date.strftime("%Y-%m-%d %H:%M") if lease.start_date else "",
+            "End": lease.end_date.strftime("%Y-%m-%d %H:%M") if lease.end_date else "",
+            "Remaining": remaining_str,
+            "Total Hours": duration_hrs,
+            "# Nodes": len(lease.node_reservations),
+            "# FIPs": len(lease.fip_reservations),
+            "Created": lease.created_at.strftime("%Y-%m-%d %H:%M") if lease.created_at else "",
+            "Lease ID": lease.id,
+            "_is_user_lease": 0 if lease.user_id == connection().current_user_id else 1
+        })
+    
+    df = pandas.DataFrame(rows)
+    df = pandas.DataFrame(rows)
+    df = df.sort_values(by=["_is_user_lease", "Status", "Created"])
+    df = df.drop(columns=["_is_user_lease"])
+
+    renderers = {
+    "Status": TextRenderer(
+        background_color=Expr(_status_color),
+        text_color="black",
+    ),
+        
+    }
+
+    display(DataGrid(
+        df, 
+        layout={"height": "400px", "width": "100%"},
+        column_widths={
+            "key": 30,
+            "Name": int(estimate_column_width(df, "Name")),
+            "Status": 120, 
+            "Remaining": 80,
+            "Total Hours": 50,
+            "# Nodes": 30,
+            "# FIPs": 30,
+            "Project": 100,
+            "User": 75,
+            "Start": 95,
+            "End": 95,
+            "Created": 95,
+            "Lease ID": 30, 
+
+        },
+        renderers=renderers
+    ))
 
 
 def _get_lease_from_blazar(ref: str):
