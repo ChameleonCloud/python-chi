@@ -442,12 +442,13 @@ def choose_site(default: str = None) -> None:
     else:
         print("Choose site feature is only available in an ipynb environment.")
 
+
 def use_lease_id(lease_id: str) -> None:
     """
     Sets the current lease ID to use in the global context.
 
     This configures the lease so it can be stored for ease
-    of restoring suspended sessions. Further lease validation, 
+    of restoring suspended sessions. Further lease validation,
     visualizations, and selectors are available in the lease module.
 
     Args:
@@ -456,11 +457,14 @@ def use_lease_id(lease_id: str) -> None:
     global _lease_id
 
     if not re.fullmatch(r"[A-Za-z0-9\-]+", lease_id):
-        raise CHIValueError(f'Lease ID "{lease_id}" is invalid. It must contain only letters, numbers, and hyphens with no spaces or special characters.')
+        raise CHIValueError(
+            f'Lease ID "{lease_id}" is invalid. It must contain only letters, numbers, and hyphens with no spaces or special characters.'
+        )
 
     _lease_id = lease_id
 
     print(f"Now using lease with ID {lease_id}.")
+
 
 def get_lease_id():
     """
@@ -472,6 +476,7 @@ def get_lease_id():
     if _lease_id is None:
         print("No lease ID has been set. Use `use_lease_id()` to select one.")
     return _lease_id
+
 
 def get_project_name(project_id: Optional[str] = None) -> str:
     """

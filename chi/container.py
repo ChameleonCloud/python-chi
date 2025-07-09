@@ -17,7 +17,7 @@ import logging
 import os
 import tarfile
 import time
-from typing import Dictionary, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from IPython.display import HTML, display
 from packaging.version import Version
@@ -62,7 +62,7 @@ class Container:
         id (str): The ID of the container.
         created_at (str): The timestamp when the container was created.
         status (str): The current status of the container.
-        environment (Dictionary[str, str]): A dictionary of environment variables for the container.
+        environment (Dict[str, str]): A dictionary of environment variables for the container.
         device_profiles (List[str]): A list of device profiles to be configured on the container.
     """
 
@@ -77,7 +77,7 @@ class Container:
         runtime: str = None,
         command: List[str] = None,
         workdir: str = None,
-        environment: Dictionary[str, str] = {},
+        environment: Dict[str, str] = {},
         device_profiles: List[str] = [],
     ):
         self.name = name
