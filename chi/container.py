@@ -17,7 +17,7 @@ import logging
 import os
 import tarfile
 import time
-from typing import List, Optional, Tuple, Dictionary
+from typing import Dictionary, List, Optional, Tuple
 
 from IPython.display import HTML, display
 from packaging.version import Version
@@ -63,6 +63,7 @@ class Container:
         created_at (str): The timestamp when the container was created.
         status (str): The current status of the container.
         environment (Dictionary[str, str]): A dictionary of environment variables for the container.
+        device_profiles (List[str]): A list of device profiles to be configured on the container.
     """
 
     def __init__(
@@ -77,6 +78,7 @@ class Container:
         command: List[str] = None,
         workdir: str = None,
         environment: Dictionary[str, str] = {},
+        device_profiles: List[str] = [],
     ):
         self.name = name
         self.image_ref = image_ref
@@ -91,6 +93,7 @@ class Container:
         self.command = command
         self.workdir = workdir
         self.environment = environment
+        self.device_profiles = device_profiles
 
     @classmethod
     def from_zun_container(cls, zun_container):
@@ -156,6 +159,7 @@ class Container:
             start_timeout=self.start_timeout,
             runtime=self.runtime,
             environment=self.environment,
+            device_profiles=self.device_profiles,
             **kwargs,
         )
 
