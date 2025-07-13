@@ -1069,13 +1069,13 @@ def add_network_reservation(
 
     if physical_network:
         extra_constraints.append(["==", "$physical_network", physical_network])
-    if stitch_provider and stitch_provider != "fabric":
+    if stitch_provider == "fabric":
         extra_constraints.append(["==", "$stitch_provider", stitch_provider])
-    else:
+    elif stitch_provider is not None:
         raise CHIValueError("stitch_provider must be 'fabric' or None")
-    if usage_type and usage_type != "storage":
+    if usage_type == "storage":
         extra_constraints.append(["==", "$usage_type", usage_type])
-    else:
+    elif usage_type is not None:
         raise CHIValueError("usage_type must be 'storage' or None")
 
     resource_properties = _format_resource_properties(
