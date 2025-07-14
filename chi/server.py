@@ -191,7 +191,7 @@ class Server:
             image=self.image_name,
             flavor=self.flavor_name,
             key=self.keypair.name,
-            net_ids=[chi_network.get_network_id(DEFAULT_NETWORK)],
+            net_ids=[chi_network.get_network_id(self.network_name)],
             **kwargs,
         )
 
