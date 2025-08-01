@@ -70,7 +70,7 @@ class Container:
         self,
         name: str,
         image_ref: str,
-        exposed_ports: List[str],
+        exposed_ports: List[str] = None,
         reservation_id: str = None,
         start: bool = True,
         start_timeout: int = 0,
