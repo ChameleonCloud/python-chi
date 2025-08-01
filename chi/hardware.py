@@ -390,14 +390,15 @@ def show_nodes(nodes: Optional[List[Node]] = None) -> None:
 
     rows = []
     for n in nodes:
+        fixed_gpu = {} if not n.gpu or isinstance(n.gpu, list) else n.gpu
         rows.append(
             {
                 "Node Name": n.name,
                 "Type": n.type,
-                "Clock Speed (GHz)": round(n.cpu.get("clock_speed", 0) / 1e9, 2),
+                "Clock Speed (GHz)": round((n.cpu.get("clock_speed") or 0) / 1e9, 2),
                 "RAM": n.main_memory.get("humanized_ram_size", "N/A"),
-                "GPU Model": (n.gpu or {}).get("gpu_model") or "",
-                "GPU Count": (n.gpu or {}).get("gpu_count") or "",
+                "GPU Model": fixed_gpu.get("gpu_model") or "",
+                "GPU Count": fixed_gpu.get("gpu_count") or "",
                 "Storage Size": n.storage_devices[0].get("humanized_size", "N/A")
                 if n.storage_devices
                 else "N/A",
