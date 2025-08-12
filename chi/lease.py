@@ -495,9 +495,7 @@ class Lease:
         """
         # Do not permit both or neither name and id.
         if (name and id) or not (name or id):
-            raise CHIValueError(
-                "You must specify exactly one of id or name"
-            )
+            raise CHIValueError("You must specify exactly one of id or name")
 
         # Blazar API requires flavor ID, so we must convert from name
         if not id:
@@ -794,9 +792,7 @@ class Lease:
         """
         flavors = []
         for res in self.flavor_reservations:
-            flavors.extend(
-                server.list_flavors(reservation_id=res.get("id"))
-            )
+            flavors.extend(server.list_flavors(reservation_id=res.get("id")))
         return flavors
 
 

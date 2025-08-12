@@ -717,13 +717,13 @@ def list_flavors(reservable=None, gpu=None, reservation_id=None) -> List[Flavor]
         for f in flavors:
             extras = f.get_keys()
             is_reservable = not any(
-                e.startswith("resources:CUSTOM_RESERVATION_")
-                for e in extras
+                e.startswith("resources:CUSTOM_RESERVATION_") for e in extras
             )
             is_gpu = f.extra_specs.get("trait:CUSTOM_GPU") == "required"
             matching_reservation = (
-                reservation_id is None or
-                extras.get("aggregate_instance_extra_specs:reservation", None) == reservation_id
+                reservation_id is None
+                or extras.get("aggregate_instance_extra_specs:reservation", None)
+                == reservation_id
             )
             if (
                 (reservable is None or reservable == is_reservable)
