@@ -484,14 +484,25 @@ class Lease:
         """
         add_fip_reservation(reservation_list=self.fip_reservations, count=amount)
 
-    def add_flavor_reservation(self, id, amount=1):
+    def add_flavor_reservation(self, id=None, name=None, amount=1):
         """
-        Add a reservation for a KVM flavor to the list of reservations.
+        Add a reservation for a KVM flavor to the list of reservations by name or ID.
 
         Args:
             id (str): The ID of the flavor to reserve
-            count (int): The number of floating IPs to reserve.
+            name (str): The name of the flavor to reserve
+            amount (int): The number of instances of this flavor to reserve
         """
+        # Do not permit both or neither name and id.
+        if (name and id) or not (name or id):
+            raise CHIValueError(
+                "You must specify exactly one of id or name"
+            )
+
+        # Blazar API requires flavor ID, so we must convert from name
+        if not id:
+            id = server.get_flavor(name).id
+
         self.flavor_reservations.append(
             {
                 "resource_type": "flavor:instance",
@@ -784,7 +795,7 @@ class Lease:
         flavors = []
         for res in self.flavor_reservations:
             flavors.extend(
-                server.list_flavors(reservable=True, reservation_id=res.get("id"))
+                server.list_flavors(reservation_id=res.get("id"))
             )
         return flavors
 
