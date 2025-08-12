@@ -699,11 +699,12 @@ class Flavor:
         return f"<{self.__class__.__name__} '{self.name}' {self.description} (disk={self.disk}) (ram={self.ram}) (vcpus={self.vcpus})>"
 
 
-def list_flavors(reservable=None, reservation_id=None) -> List[Flavor]:
-    """Get a list of all available flavors.
+def list_flavors(reservable=None, gpu=None, reservation_id=None) -> List[Flavor]:
+    """Get a list of flavors
 
     Args:
-        reservable (bool): Whether to filter by reservable flavors. Defaults to True.
+        reservable (bool): If given, whether to filter by reservable flavors.
+        gpu (bool): If given, whether to filter by GPU flavors.
         reservation_id (str, optional): The reservation ID to filter by. Defaults to None.
 
     Returns:
@@ -715,13 +716,19 @@ def list_flavors(reservable=None, reservation_id=None) -> List[Flavor]:
         chi_flavors = []
         for f in flavors:
             extras = f.get_keys()
-            # include a flavor if:
-            # - not filtering by reservable
-            # - is reservable in blazar & not an active reservation flavor
-            if not reservable or (
-                extras.get("aggregate_instance_extra_specs:reservation")
+            is_reservable = not any(
+                e.startswith("resources:CUSTOM_RESERVATION_") for e in extras
+            )
+            is_gpu = f.extra_specs.get("trait:CUSTOM_GPU") == "required"
+            matching_reservation = (
+                reservation_id is None
+                or extras.get("aggregate_instance_extra_specs:reservation", None)
                 == reservation_id
-                and extras.get("trait:CUSTOM_BLAZAR_FLAVOR_RESERVATION") == "required"
+            )
+            if (
+                (reservable is None or reservable == is_reservable)
+                and (gpu is None or gpu == is_gpu)
+                and matching_reservation
             ):
                 chi_flavors.append(
                     Flavor(
