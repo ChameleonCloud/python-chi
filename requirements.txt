@@ -10,7 +10,7 @@ python-manilaclient
 python-neutronclient
 python-novaclient
 python-swiftclient
-python-zunclient
+git+https://github.com/chameleoncloud/python-zunclient
 ipython
 ipydatagrid
 ipywidgets
