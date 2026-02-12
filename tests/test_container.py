@@ -21,6 +21,7 @@ import pytest
 from zunclient.exceptions import Conflict
 
 from chi.container import Container, download, upload
+from chi.exception import ContainerCreateWaitError, ResourceError
 
 
 @pytest.fixture()
@@ -160,11 +161,16 @@ def test_submit_preserves_reference_on_create_wait_failure(mocker):
     chi_container = Container(name="test", image_ref="img")
     leaked_zun_container = mocker.Mock(uuid="leaked-uuid", status="Error")
 
-    mocker.patch("chi.container.create_container", side_effect=RuntimeError)
+    mocker.patch(
+        "chi.container.create_container",
+        side_effect=ContainerCreateWaitError(
+            zun_container=leaked_zun_container, cause=RuntimeError
+        ),
+    )
     zun_mock = mocker.patch("chi.container.zun")()
     zun_mock.containers.get.return_value = leaked_zun_container
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ResourceError):
         chi_container.submit(wait_for_active=False, show=None)
 
     assert chi_container.id == "leaked-uuid"
