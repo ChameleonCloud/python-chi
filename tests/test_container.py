@@ -18,6 +18,7 @@ import tempfile
 from datetime import datetime
 
 import pytest
+from zunclient.exceptions import Conflict
 
 from chi.container import Container, download, upload
 
@@ -110,3 +111,90 @@ def test_download_extracts_tar_and_writes_file(mocker):
         assert os.path.exists(dest_path)
         with open(dest_path, "rb") as f:
             assert f.read() == file_content
+
+
+def test_submit_idempotent_returns_existing_without_create(mocker):
+    # idempotent=true, wait=true
+    chi_container = Container(name="dup-name", image_ref="img")
+    existing_zun_container = mocker.Mock(uuid="existing-uuid", status="Running")
+
+    mocker.patch("chi.container.get_container", return_value=existing_zun_container)
+    create_mock = mocker.patch("chi.container.create_container")
+
+    submit_result = chi_container.submit(
+        idempotent=True, wait_for_active=True, wait_timeout=123, show="text"
+    )
+    create_mock.assert_not_called()
+    existing_zun_container.wait.assert_called_once_with(status="Running", timeout=123)
+    existing_zun_container.show.assert_called_once_with(
+        type="text", wait_for_active=True
+    )
+
+    # submit returns only on idempotent=true
+    assert submit_result is existing_zun_container
+
+
+def test_submit_idempotent_returns_existing_without_create_no_wait(mocker):
+    # idempotent=true, wait=false
+    chi_container = Container(name="dup-name", image_ref="img")
+    existing_zun_container = mocker.Mock(uuid="existing-uuid", status="Running")
+
+    mocker.patch("chi.container.get_container", return_value=existing_zun_container)
+    create_mock = mocker.patch("chi.container.create_container")
+
+    submit_result = chi_container.submit(idempotent=True, wait_for_active=False, show=None)
+    create_mock.assert_not_called()
+    existing_zun_container.wait.assert_not_called()
+    existing_zun_container.show.assert_not_called()
+
+    # submit returns only on idempotent=true
+    assert submit_result is existing_zun_container
+
+
+def test_submit_preserves_reference_on_create_wait_failure(mocker):
+    """Ensure that we keep the zun container id, even if create fails.
+
+    This case can arise because the container moves to an error state, or if
+    the wait times out for another reason.
+    """
+    chi_container = Container(name="test", image_ref="img")
+    leaked_zun_container = mocker.Mock(uuid="leaked-uuid", status="Error")
+
+    mocker.patch("chi.container.create_container", side_effect=RuntimeError)
+    zun_mock = mocker.patch("chi.container.zun")()
+    zun_mock.containers.get.return_value = leaked_zun_container
+
+    with pytest.raises(RuntimeError):
+        chi_container.submit(wait_for_active=False, show=None)
+
+    assert chi_container.id == "leaked-uuid"
+    assert chi_container._status == "Error"
+
+
+def test_submit_duplicate_name_tracks_created_uuid(mocker):
+    """Test the case where we re-run submit after a failure.
+
+    An "old" container alreday already exists, with name = "dup-name".
+    If idempotent=false, it should be possible to make a new container with the same name.
+    However, name-based lookups will fail with a 409.
+    """
+
+    chi_container = Container(name="dup-name", image_ref="img")
+    new_zun_container = mocker.Mock(uuid="new-uuid", status="Running")
+
+    def _get_side_effect(ref):
+        if ref == "dup-name":
+            raise Conflict(
+                "Multiple containers exist with same name. Please use the container uuid instead."
+            )
+        if ref == "new-uuid":
+            return new_zun_container
+        raise AssertionError(ref)
+
+    mocker.patch("chi.container.create_container", return_value=new_zun_container)
+    zun_mock = mocker.patch("chi.container.zun")()
+    zun_mock.containers.get.side_effect = _get_side_effect
+
+    # disable optional behavor from wait_for_active and show
+    chi_container.submit(wait_for_active=False, show=None)
+    assert chi_container.id == "new-uuid"
