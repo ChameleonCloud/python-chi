@@ -38,8 +38,8 @@ class ContainerCreateWaitError(ResourceError):
         self.cause = cause
         message = (
             "Container {} was created, but waiting for target status failed: {}".format(
-                self.zun_container.uuid, 
+                self.zun_container.uuid,
                 cause,
-                )
+            )
         )
         super().__init__(message)

@@ -143,7 +143,9 @@ def test_submit_idempotent_returns_existing_without_create_no_wait(mocker):
     mocker.patch("chi.container.get_container", return_value=existing_zun_container)
     create_mock = mocker.patch("chi.container.create_container")
 
-    submit_result = chi_container.submit(idempotent=True, wait_for_active=False, show=None)
+    submit_result = chi_container.submit(
+        idempotent=True, wait_for_active=False, show=None
+    )
     create_mock.assert_not_called()
     existing_zun_container.wait.assert_not_called()
     existing_zun_container.show.assert_not_called()
