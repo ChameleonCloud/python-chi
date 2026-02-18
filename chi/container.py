@@ -371,8 +371,6 @@ def create_container(
     image: "str" = None,
     exposed_ports: "list[str]" = None,
     reservation_id: "str" = None,
-    start: "bool" = True,
-    start_timeout: "int" = None,
     **kwargs,
 ):
     """
@@ -408,8 +406,6 @@ def create_container(
     hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
-    if platform_version:
-        hints["platform_version"] = platform_version
 
     # Support simpler syntax for exposed_ports
     if exposed_ports and isinstance(exposed_ports, list):
@@ -430,16 +426,6 @@ def create_container(
         **kwargs,
     )
 
-    # Wait for a while, the image may need to download. 30 minutes is
-    # _quite_ a long time, but the user can interrupt or choose a smaller
-    # timeout.
-    timeout = start_timeout or (60 * 30)
-    LOG.info(f"Waiting up to {timeout}s for container creation ...")
-
-    try:
-            container = _wait_for_status(container.uuid, "Running", timeout=timeout)
-    except (RuntimeError, TimeoutError) as exc:
-        raise ContainerCreateWaitError(zun_container=container, cause=exc) from exc
     return container
 
 
