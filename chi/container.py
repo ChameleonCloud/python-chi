@@ -28,7 +28,7 @@ from chi import network as chi_network
 
 from .clients import connection, zun
 from .context import session
-from .exception import ContainerCreateWaitError, ResourceError, ServiceError
+from .exception import ServiceError
 from .network import bind_floating_ip, get_free_floating_ip
 
 DEFAULT_IMAGE_DRIVER = "docker"
@@ -72,8 +72,6 @@ class Container:
         image_ref: str,
         exposed_ports: List[str] = None,
         reservation_id: str = None,
-        start: bool = True,
-        start_timeout: int = 0,
         runtime: str = None,
         command: List[str] = None,
         workdir: str = None,
@@ -84,8 +82,6 @@ class Container:
         self.image_ref = image_ref
         self.exposed_ports = exposed_ports
         self.reservation_id = reservation_id
-        self.start = start
-        self.start_timeout = start_timeout
         self.runtime = runtime
         self.id = None
         self.created_at = None
@@ -101,7 +97,6 @@ class Container:
             name=zun_container.name,
             image_ref=zun_container.image,
             exposed_ports=zun_container.ports if zun_container.ports else [],
-            start=True,  # Assuming the container is already created
         )
         container.id = zun_container.uuid
         container._status = zun_container.status
@@ -150,28 +145,20 @@ class Container:
         if self.workdir:
             kwargs["workdir"] = self.workdir
 
-        try:
-            container = create_container(
-                name=self.name,
-                image=self.image_ref,
-                exposed_ports=self.exposed_ports,
-                reservation_id=self.reservation_id,
-                start=self.start,
-                start_timeout=self.start_timeout,
-                runtime=self.runtime,
-                environment=self.environment,
-                device_profiles=self.device_profiles,
-                **kwargs,
-            )
-            self.id = container.uuid
-            self._status = container.status
-        except ContainerCreateWaitError as exc:
-            # ensure container object gets params even on error
-            self.id = exc.zun_container.uuid
-            self._status = exc.zun_container.status
-            raise ResourceError(message=exc.zun_container.status_reason) from exc
-
-        if wait_for_active and self.status != "Running":
+        container = create_container(
+            name=self.name,
+            image=self.image_ref,
+            exposed_ports=self.exposed_ports,
+            reservation_id=self.reservation_id,
+            runtime=self.runtime,
+            environment=self.environment,
+            device_profiles=self.device_profiles,
+            **kwargs,
+        )
+        self.id = container.uuid
+        self._status = container.status
+        
+        if wait_for_active and self._status != "Running":
             self.wait(status="Running", timeout=wait_timeout)
 
         if show:
