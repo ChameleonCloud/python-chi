@@ -28,3 +28,18 @@ class ServiceError(Exception):
 
     def __init__(self, message):
         super().__init__(message)
+
+
+class ContainerCreateWaitError(ResourceError):
+    """Raised when Zun creates a container but waiting for target status fails."""
+
+    def __init__(self, zun_container, cause):
+        self.zun_container = zun_container
+        self.cause = cause
+        message = (
+            "Container {} was created, but waiting for target status failed: {}".format(
+                self.zun_container.uuid,
+                cause,
+            )
+        )
+        super().__init__(message)
