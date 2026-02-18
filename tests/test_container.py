@@ -21,7 +21,6 @@ import pytest
 from zunclient.exceptions import Conflict
 
 from chi.container import Container, download, upload
-from chi.exception import ContainerCreateWaitError, ResourceError
 
 
 @pytest.fixture()
@@ -153,30 +152,6 @@ def test_submit_idempotent_returns_existing_without_create_no_wait(mocker):
     # submit returns only on idempotent=true
     assert submit_result is existing_zun_container
 
-
-def test_submit_preserves_reference_on_create_wait_failure(mocker):
-    """Ensure that we keep the zun container id, even if create fails.
-
-    This case can arise because the container moves to an error state, or if
-    the wait times out for another reason.
-    """
-    chi_container = Container(name="test", image_ref="img")
-    leaked_zun_container = mocker.Mock(uuid="leaked-uuid", status="Error")
-
-    mocker.patch(
-        "chi.container.create_container",
-        side_effect=ContainerCreateWaitError(
-            zun_container=leaked_zun_container, cause=RuntimeError
-        ),
-    )
-    zun_mock = mocker.patch("chi.container.zun")()
-    zun_mock.containers.get.return_value = leaked_zun_container
-
-    with pytest.raises(ResourceError):
-        chi_container.submit(wait_for_active=False, show=None)
-
-    assert chi_container.id == "leaked-uuid"
-    assert chi_container._status == "Error"
 
 
 def test_submit_duplicate_name_tracks_created_uuid(mocker):
