@@ -18,6 +18,7 @@ import os
 import tarfile
 import time
 from typing import Dict, List, Optional, Tuple
+from warnings import warn
 
 from IPython.display import HTML, display
 from packaging.version import Version
@@ -72,12 +73,21 @@ class Container:
         image_ref: str,
         exposed_ports: List[str] = None,
         reservation_id: str = None,
+        start: bool = True,
+        start_timeout: int = 0,
         runtime: str = None,
         command: List[str] = None,
         workdir: str = None,
         environment: Dict[str, str] = {},
         device_profiles: List[str] = [],
     ):
+
+        # check if values are not the defaults.
+        if not start or start_timeout != 0:
+            warn(
+                "start and start_timeout are deprecated. Containers always start immmediately."
+            )
+
         self.name = name
         self.image_ref = image_ref
         self.exposed_ports = exposed_ports
