@@ -373,7 +373,6 @@ def create_container(
     reservation_id: "str" = None,
     start: "bool" = True,
     start_timeout: "int" = None,
-    platform_version: "int" = 2,
     **kwargs,
 ):
     """
@@ -438,16 +437,9 @@ def create_container(
     LOG.info(f"Waiting up to {timeout}s for container creation ...")
 
     try:
-        if platform_version == 2:
             container = _wait_for_status(container.uuid, "Running", timeout=timeout)
-        else:
-            container = _wait_for_status(container.uuid, "Created", timeout=timeout)
-            if start:
-                LOG.info("Starting container ...")
-                zun().containers.start(container.uuid)
     except (RuntimeError, TimeoutError) as exc:
         raise ContainerCreateWaitError(zun_container=container, cause=exc) from exc
-
     return container
 
 
