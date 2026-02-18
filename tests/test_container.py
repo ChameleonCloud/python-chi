@@ -192,3 +192,84 @@ def test_submit_duplicate_name_tracks_created_uuid(mocker):
     # disable optional behavor from wait_for_active and show
     chi_container.submit(wait_for_active=False, show=None)
     assert chi_container.id == "new-uuid"
+
+
+# --- Container.wait() status display tests ---
+
+
+def _make_zun_state(mocker, status, detail=None, reason=None):
+    return mocker.Mock(status=status, status_detail=detail, status_reason=reason)
+
+
+def _setup_wait(mocker, states):
+    """Common setup for wait tests: mock zun, ipynb check, and progress bar."""
+    container = Container(name="t", image_ref="img")
+    container.id = "fake"
+
+    zun_mock = mocker.patch("chi.container.zun")()
+    zun_mock.containers.get.side_effect = states
+    mocker.patch("chi.container.context._is_ipynb", return_value=False)
+
+    pb_cls = mocker.patch("chi.container.util.TimerProgressBar")
+    pb = pb_cls.return_value
+
+    def fake_wait(cb, expected, timeout, interval=5):
+        for _ in states:
+            if cb():
+                return True
+        return False
+
+    pb.wait.side_effect = fake_wait
+    return container, pb
+
+
+def test_wait_logs_status_transitions(mocker):
+    """Status changes produce log lines; same status does not."""
+    states = [
+        _make_zun_state(mocker, "Creating"),
+        _make_zun_state(mocker, "Creating"),
+        _make_zun_state(mocker, "Running"),
+    ]
+    container, pb = _setup_wait(mocker, states)
+
+    container.wait(status="Running")
+
+    log_calls = [c.args[0] for c in pb.log.call_args_list]
+    assert any("Running" in l for l in log_calls)
+    assert len(log_calls) == 1  # one transition
+
+
+def test_wait_accumulates_events_without_duplicates(mocker):
+    """Different details accumulate; same detail is not repeated."""
+    states = [
+        _make_zun_state(mocker, "Creating", detail="Pulling image"),
+        _make_zun_state(mocker, "Creating", detail="Pulling image"),
+        _make_zun_state(mocker, "Creating", detail="Configuring net"),
+        _make_zun_state(mocker, "Running"),
+    ]
+    container, pb = _setup_wait(mocker, states)
+
+    captured_updates = []
+    pb.update_status.side_effect = lambda msg: captured_updates.append(msg)
+
+    container.wait(status="Running")
+
+    creating_updates = [u for u in captured_updates if "Creating" in u]
+    last_creating = creating_updates[-1]
+    assert "Pulling image" in last_creating
+    assert "Configuring net" in last_creating
+    assert last_creating.count("Pulling image") == 1
+
+
+def test_wait_stops_on_error(mocker):
+    """Error status stops the wait loop and is logged."""
+    states = [
+        _make_zun_state(mocker, "Creating"),
+        _make_zun_state(mocker, "Error", detail="OOM", reason="Out of memory"),
+    ]
+    container, pb = _setup_wait(mocker, states)
+
+    container.wait(status="Running")
+
+    log_calls = [c.args[0] for c in pb.log.call_args_list]
+    assert any("Error" in l for l in log_calls)

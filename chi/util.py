@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 import time
 from datetime import datetime, timedelta
@@ -9,6 +10,8 @@ from dateutil import tz
 from IPython.display import display
 
 from chi.exception import ResourceError
+
+LOG = logging.getLogger(__name__)
 
 
 def random_base32(n_bytes):
@@ -60,9 +63,40 @@ class TimerProgressBar:
             orientation="horizontal",
         )
         self.label = widgets.Label()
+        self.status_output = widgets.HTML()
+        self._log_lines = []
+        self._current_status_text = ""
+        self._is_displayed = False
 
     def display(self):
-        display(widgets.HBox([self.label, self.progress]))
+        display(widgets.VBox([
+            widgets.HBox([self.label, self.progress]),
+            self.status_output,
+        ]))
+        self._is_displayed = True
+
+    def log(self, msg):
+        self._log_lines.append(msg)
+        if self._is_displayed:
+            self._render()
+        else:
+            LOG.info(msg)
+
+    def update_status(self, msg):
+        self._current_status_text = msg
+        if self._is_displayed:
+            self._render()
+
+    def _render(self):
+        from html import escape
+        lines = list(self._log_lines)
+        if self._current_status_text:
+            lines.append(self._current_status_text)
+        inner = "\n".join(escape(line) for line in lines)
+        self.status_output.value = (
+            '<pre style="max-height:200px;overflow:auto;margin:4px 0;font-family:inherit;">'
+            f"{inner}</pre>"
+        )
 
     def wait(self, callback, expected_timeout, timeout, interval=5):
         """Wait and update the progress bar.
