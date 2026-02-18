@@ -181,6 +181,9 @@ class Container:
         If the container has an ID, it calls the `destroy_container` function to delete the container.
         After deletion, it sets the ID and status of the container to None.
 
+        Note: Delete is called with "force", which depends on the following zun policy:
+        `container:delete_force: rule:admin_or_owner`
+
         Args:
             None
 
@@ -188,7 +191,7 @@ class Container:
             None
         """
         if self.id:
-            destroy_container(self.id)
+            destroy_container(self.id, force=True)
             self.id = None
             self._status = None
 
@@ -478,7 +481,7 @@ def snapshot_container(
     return zun().containers.commit(container_ref, repository, tag=tag)["uuid"]
 
 
-def destroy_container(container_ref: "str"):
+def destroy_container(container_ref: "str", stop=False, force=False):
     """
     .. deprecated:: 1.0
 
@@ -489,7 +492,7 @@ def destroy_container(container_ref: "str"):
     Args:
         container_ref (str): The name or ID of the container.
     """
-    return zun().containers.delete(container_ref, stop=True)
+    return zun().containers.delete(container_ref, stop=stop, force=force)
 
 
 def get_logs(container_ref: "str", stdout=True, stderr=True):
