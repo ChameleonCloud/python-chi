@@ -157,7 +157,7 @@ class Container:
         )
         self.id = container.uuid
         self._status = container.status
-        
+
         if wait_for_active and self._status != "Running":
             self.wait(status="Running", timeout=wait_timeout)
 

@@ -153,7 +153,6 @@ def test_submit_idempotent_returns_existing_without_create_no_wait(mocker):
     assert submit_result is existing_zun_container
 
 
-
 def test_submit_duplicate_name_tracks_created_uuid(mocker):
     """Test the case where we re-run submit after a failure.
 
