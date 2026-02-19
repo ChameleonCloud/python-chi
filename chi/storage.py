@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
+import cinderclient
 import manilaclient
 import swiftclient
 
@@ -295,7 +296,7 @@ def get_volume(ref) -> Volume:
     """
     try:
         volume = cinder().volumes.get(ref)
-    except cinder.exceptions.NotFound:
+    except cinderclient.exceptions.NotFound:
         volumes = list(cinder().volumes.list(search_opts={"name": ref}))
         if not volumes:
             raise CHIValueError(f'No volumes found matching name "{ref}"')
