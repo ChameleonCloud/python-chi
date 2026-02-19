@@ -113,6 +113,18 @@ def test_download_extracts_tar_and_writes_file(mocker):
             assert f.read() == file_content
 
 
+def test_delete_calls_force(mocker):
+    destroy_mock = mocker.patch("chi.container.destroy_container")
+    container = Container(name="test", image_ref="img")
+    container.id = "fake-id"
+
+    container.delete()
+
+    destroy_mock.assert_called_once_with("fake-id", force=True)
+    assert container.id is None
+    assert container._status is None
+
+
 def test_submit_idempotent_returns_existing_without_create(mocker):
     # idempotent=true, wait=true
     chi_container = Container(name="dup-name", image_ref="img")
