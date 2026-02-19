@@ -18,6 +18,7 @@ import os
 import tarfile
 import time
 from typing import Dict, List, Optional, Tuple
+from warnings import warn
 
 from IPython.display import HTML, display
 from packaging.version import Version
@@ -28,7 +29,7 @@ from chi import network as chi_network
 
 from .clients import connection, zun
 from .context import session
-from .exception import ContainerCreateWaitError, ResourceError, ServiceError
+from .exception import ServiceError
 from .network import bind_floating_ip, get_free_floating_ip
 
 DEFAULT_IMAGE_DRIVER = "docker"
@@ -80,12 +81,17 @@ class Container:
         environment: Dict[str, str] = {},
         device_profiles: List[str] = [],
     ):
+
+        # check if values are not the defaults.
+        if not start or start_timeout != 0:
+            warn(
+                "start and start_timeout are deprecated. Containers always start immmediately."
+            )
+
         self.name = name
         self.image_ref = image_ref
         self.exposed_ports = exposed_ports
         self.reservation_id = reservation_id
-        self.start = start
-        self.start_timeout = start_timeout
         self.runtime = runtime
         self.id = None
         self.created_at = None
@@ -101,7 +107,6 @@ class Container:
             name=zun_container.name,
             image_ref=zun_container.image,
             exposed_ports=zun_container.ports if zun_container.ports else [],
-            start=True,  # Assuming the container is already created
         )
         container.id = zun_container.uuid
         container._status = zun_container.status
@@ -150,28 +155,20 @@ class Container:
         if self.workdir:
             kwargs["workdir"] = self.workdir
 
-        try:
-            container = create_container(
-                name=self.name,
-                image=self.image_ref,
-                exposed_ports=self.exposed_ports,
-                reservation_id=self.reservation_id,
-                start=self.start,
-                start_timeout=self.start_timeout,
-                runtime=self.runtime,
-                environment=self.environment,
-                device_profiles=self.device_profiles,
-                **kwargs,
-            )
-            self.id = container.uuid
-            self._status = container.status
-        except ContainerCreateWaitError as exc:
-            # ensure container object gets params even on error
-            self.id = exc.zun_container.uuid
-            self._status = exc.zun_container.status
-            raise ResourceError(message=exc.zun_container.status_reason) from exc
+        container = create_container(
+            name=self.name,
+            image=self.image_ref,
+            exposed_ports=self.exposed_ports,
+            reservation_id=self.reservation_id,
+            runtime=self.runtime,
+            environment=self.environment,
+            device_profiles=self.device_profiles,
+            **kwargs,
+        )
+        self.id = container.uuid
+        self._status = container.status
 
-        if wait_for_active and self.status != "Running":
+        if wait_for_active and self._status != "Running":
             self.wait(status="Running", timeout=wait_timeout)
 
         if show:
@@ -371,9 +368,6 @@ def create_container(
     image: "str" = None,
     exposed_ports: "list[str]" = None,
     reservation_id: "str" = None,
-    start: "bool" = True,
-    start_timeout: "int" = None,
-    platform_version: "int" = 2,
     **kwargs,
 ):
     """
@@ -409,8 +403,6 @@ def create_container(
     hints = kwargs.setdefault("hints", {})
     if reservation_id:
         hints["reservation"] = reservation_id
-    if platform_version:
-        hints["platform_version"] = platform_version
 
     # Support simpler syntax for exposed_ports
     if exposed_ports and isinstance(exposed_ports, list):
@@ -430,23 +422,6 @@ def create_container(
         image=image,
         **kwargs,
     )
-
-    # Wait for a while, the image may need to download. 30 minutes is
-    # _quite_ a long time, but the user can interrupt or choose a smaller
-    # timeout.
-    timeout = start_timeout or (60 * 30)
-    LOG.info(f"Waiting up to {timeout}s for container creation ...")
-
-    try:
-        if platform_version == 2:
-            container = _wait_for_status(container.uuid, "Running", timeout=timeout)
-        else:
-            container = _wait_for_status(container.uuid, "Created", timeout=timeout)
-            if start:
-                LOG.info("Starting container ...")
-                zun().containers.start(container.uuid)
-    except (RuntimeError, TimeoutError) as exc:
-        raise ContainerCreateWaitError(zun_container=container, cause=exc) from exc
 
     return container
 
