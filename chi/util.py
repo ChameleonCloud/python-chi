@@ -69,10 +69,14 @@ class TimerProgressBar:
         self._is_displayed = False
 
     def display(self):
-        display(widgets.VBox([
-            widgets.HBox([self.label, self.progress]),
-            self.status_output,
-        ]))
+        display(
+            widgets.VBox(
+                [
+                    widgets.HBox([self.label, self.progress]),
+                    self.status_output,
+                ]
+            )
+        )
         self._is_displayed = True
 
     def log(self, msg):
@@ -89,6 +93,7 @@ class TimerProgressBar:
 
     def _render(self):
         from html import escape
+
         lines = list(self._log_lines)
         if self._current_status_text:
             lines.append(self._current_status_text)

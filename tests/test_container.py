@@ -235,7 +235,7 @@ def test_wait_logs_status_transitions(mocker):
     container.wait(status="Running")
 
     log_calls = [c.args[0] for c in pb.log.call_args_list]
-    assert any("Running" in l for l in log_calls)
+    assert any("Running" in log for log in log_calls)
     assert len(log_calls) == 1  # one transition
 
 
@@ -272,4 +272,4 @@ def test_wait_stops_on_error(mocker):
     container.wait(status="Running")
 
     log_calls = [c.args[0] for c in pb.log.call_args_list]
-    assert any("Error" in l for l in log_calls)
+    assert any("Error" in log for log in log_calls)
