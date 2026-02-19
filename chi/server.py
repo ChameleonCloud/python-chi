@@ -76,7 +76,7 @@ class Server:
     Args:
         name (str): The name of the server.
         reservation_id (Optional[str]): The reservation ID associated with the server. Defaults to None.
-        image_name (str): The name of the image to use for the server. Defaults to DEFAULT_IMAGE_NAME.
+        image_name (Optional[str]): The name of the image to use for the server. Defaults to DEFAULT_IMAGE_NAME.
         image (Optional[str]): The image ID or name to use for the server. Defaults to None.
         flavor_name (str): The name of the flavor to use for the server. Defaults to BAREMETAL_FLAVOR.
         key_name (str): The name of the keypair to use for the server. Defaults to None.
@@ -86,7 +86,7 @@ class Server:
     Attributes:
         name (str): The name of the server.
         reservation_id (Optional[str]): The reservation ID associated with the server.
-        image_name (str): The name of the image used for the server.
+        image_name (Optional[str]): The name of the image used for the server.
         flavor_name (str): The name of the flavor used for the server.
         keypair (Optional[Keypair]): The keypair object used for the server.
         network_name (str): The name of the network used for the server.
@@ -104,7 +104,7 @@ class Server:
         self,
         name: str,
         reservation_id: Optional[str] = None,
-        image_name: str = DEFAULT_IMAGE_NAME,
+        image_name: Optional[str] = DEFAULT_IMAGE_NAME,
         image: Optional[Image] = None,
         flavor_name: str = BAREMETAL_FLAVOR,
         key_name: str = None,
@@ -114,8 +114,13 @@ class Server:
         self.name = name
         self.reservation_id = reservation_id or None
         # Add this once chi.image is implemented
-        self.image = image or chi.image.get_image(image_name)
-        self.image_name = self.image.name
+        if image:
+            self.image = image
+        elif image_name:
+            self.image = chi.image.get_image(image_name)
+        else:
+            self.image = None
+        self.image_name = self.image.name if self.image else None
         self.flavor_name = flavor_name
 
         if keypair:
@@ -216,10 +221,13 @@ class Server:
 
     @classmethod
     def _from_nova_server(cls, nova_server):
-        try:
-            image_id = nova_server.image["id"]
-        except Exception:
-            image_id = nova_server.image_id
+        if nova_server.image:
+            if isinstance(nova_server.image, dict):
+                image_id = nova_server.image.get("id")
+            else:
+                image_id = nova_server.image
+        else:
+            image_id = None
         flavor_name = nova_server.flavor.get("original_name", "")
 
         try:
@@ -238,7 +246,7 @@ class Server:
         server = cls(
             name=nova_server.name,
             reservation_id=None,
-            image_name=get_image_name(image_id),
+            image_name=get_image_name(image_id) if image_id else None,
             flavor_name=flavor_name,
             key_name=nova_server.key_name,
             network_name=(
