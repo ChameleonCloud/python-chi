@@ -113,11 +113,14 @@ class Container:
         return container
 
     @property
-    def status(self):
+    def zun_container(self):
         if self.id:
-            container = zun().containers.get(self.id)
-            self._status = container.status
-        return self._status
+            self._zun_container = zun().containers.get(self.id)
+            return self._zun_container
+
+    @property
+    def status(self):
+        return getattr(self.zun_container, "status")
 
     def submit(
         self,
@@ -211,13 +214,47 @@ class Container:
         if show == "widget" and context._is_ipynb():
             pb.display()
 
+        state = {"status": None, "since": time.perf_counter(), "conditions": {}}
+
+        def _zun_attr(obj, name):
+            val = getattr(obj, name, None)
+            return val if val and val != "None" else None
+
         def _callback():
-            # self.status is a property that refreshes itself
-            # NOTE: zun statuses are title case
-            if self.status.upper() == status.upper() or self.status == "Error":
-                print(f"Container has moved to status {self.status}")
-                return True
-            return False
+            zun_container = self.zun_container
+            now = time.perf_counter()
+            elapsed = int(now - state["since"])
+
+            current_status = getattr(zun_container, "status", None)
+            detail = _zun_attr(zun_container, "status_detail")
+            reason = _zun_attr(zun_container, "status_reason")
+
+            if current_status != state["status"]:
+                if state["status"]:
+                    pb.log(f"[{elapsed}s] {state['status']} -> {current_status}")
+                state["status"] = current_status
+                state["since"] = now
+                state["conditions"] = {}
+
+            if detail:
+                entry = state["conditions"].setdefault(detail, {"count": 0})
+                entry["count"] += 1
+                entry["reason"] = reason
+
+            parts = [f"{current_status} ({elapsed}s)"]
+            for name, entry in state["conditions"].items():
+                count = entry["count"]
+
+                if count > 1:
+                    line = f"{name} (x{count})"
+                else:
+                    line = name
+                if entry.get("reason"):
+                    line = f"{line} {entry['reason']}"
+                parts.append(line)
+            pb.update_status("\n".join(parts))
+
+            return current_status == "Error" or current_status.upper() == status.upper()
 
         res = pb.wait(_callback, 2 * 60, timeout)
         if not res:
