@@ -1,11 +1,93 @@
 from datetime import datetime
+from unittest.mock import Mock
 
 import pytest
+
+from chi.server import Server
 
 
 @pytest.fixture()
 def now():
     return datetime(2021, 1, 1, 0, 0, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def mock_server_deps(mocker):
+    def _fake_get_image(name):
+        img = Mock()
+        img.name = name
+        return img
+
+    mocker.patch("chi.server.chi.image.get_image", side_effect=_fake_get_image)
+    mocker.patch("chi.server.get_keypair", return_value=Mock(name="test-key"))
+    mocker.patch("chi.server.connection")
+    mocker.patch("chi.server.session")
+    mocker.patch(
+        "chi.server.chi_network.get_network", return_value={"name": "sharednet1"}
+    )
+
+
+def _nova_server_mock():
+    return Mock(
+        spec=[
+            "image",
+            "flavor",
+            "networks",
+            "name",
+            "key_name",
+            "id",
+            "status",
+            "addresses",
+            "created",
+            "hostId",
+            "host_status",
+            "hypervisor_hostname",
+            "is_locked",
+        ]
+    )
+
+
+def test_from_nova_server_no_image(mocker):
+    mocker.patch("chi.server.get_image_name")
+    ns = _nova_server_mock()
+    ns.image = None
+    ns.flavor = {"original_name": "m1.small"}
+    ns.networks = {"net1": []}
+
+    server = Server._from_nova_server(ns)
+
+    assert server.image is None
+    assert server.image_name is None
+
+
+def test_from_nova_server_with_image_dict(mocker):
+    mock_get_name = mocker.patch(
+        "chi.server.get_image_name", return_value="CC-Ubuntu22.04"
+    )
+    ns = _nova_server_mock()
+    ns.image = {"id": "img-123"}
+    ns.flavor = {"original_name": "m1.small"}
+    ns.networks = {"net1": []}
+
+    server = Server._from_nova_server(ns)
+
+    mock_get_name.assert_called_once_with("img-123")
+    assert server.image_name == "CC-Ubuntu22.04"
+
+
+def test_from_nova_server_with_image_string(mocker):
+    mock_get_name = mocker.patch(
+        "chi.server.get_image_name", return_value="CC-Ubuntu22.04"
+    )
+    ns = _nova_server_mock()
+    ns.image = "img-123"
+    ns.flavor = {"original_name": "m1.small"}
+    ns.networks = {"net1": []}
+
+    server = Server._from_nova_server(ns)
+
+    mock_get_name.assert_called_once_with("img-123")
+    assert server.image_name == "CC-Ubuntu22.04"
 
 
 def example_create_server():
