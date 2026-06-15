@@ -8,6 +8,7 @@ from typing import List, Optional
 import ipywidgets as widgets
 import openstack
 import requests
+from ccauth.plugin import ChameleonDeviceAuth
 from IPython.display import display
 from keystoneauth1 import loading, session
 from keystoneauth1.identity.v3 import OidcAccessToken
@@ -31,6 +32,14 @@ RESOURCE_API_URL = os.getenv("CHI_RESOURCE_API_URL", "https://api.chameleoncloud
 EDGE_RESOURCE_API_URL = os.getenv(
     "EDGE_RESOURCE_API_URL", "https://chameleoncloud.org/edge-hw-discovery/devices"
 )
+DEFAULT_CLIENT_ID = "chi-cli-device-token"
+DEFAULT_DISCOVERY_ENDPOINT = (
+    "https://auth.chameleoncloud.org/auth/realms/chameleon"
+    "/.well-known/openid-configuration"
+)
+DEFAULT_PROTOCOL = "openid"
+DEFAULT_RESOURCE_PROVIDER = "chameleon"
+DEFAULT_PROJECT_DOMAIN_NAME = "chameleon"
 
 
 def default_key_name():
@@ -74,6 +83,7 @@ _auth_plugin = None
 _session = None
 _sites = {}
 _lease_id = None
+_device_auth = False
 
 version = "1.1"
 
@@ -366,7 +376,7 @@ def use_site(site_name: str) -> None:
     Args:
         site_name (str): The name of the site, e.g., "CHI@UC".
     """
-    global _sites
+    global _sites, _session
     if not _sites:
         try:
             _sites = list_sites()
@@ -392,6 +402,11 @@ def use_site(site_name: str) -> None:
             )
         )
 
+    _session = None
+
+    set(
+        "project_domain_name", DEFAULT_PROJECT_DOMAIN_NAME
+    )  # Same for all chameleon sites
     set("auth_url", f"{site['web']}:5000/v3")
     set("region_name", site["name"])
 
@@ -402,6 +417,25 @@ def use_site(site_name: str) -> None:
         f"Support contact: {site.get('user_support_contact')}",
     ]
     print("\n".join(output))
+
+
+def use_device_auth(enable: bool = True) -> None:
+    """Enable or disable device authorization for subsequent sessions.
+
+    Call `use_device_auth()` before creating a session (or before `use_site`)
+    to opt into the device authorization flow. Pass `False` to disable.
+
+    Args:
+        enable (bool): True to enable device auth, False to disable.
+    """
+    global _device_auth, _session
+    _device_auth = bool(enable)
+
+    _session = None
+    if _device_auth:
+        print("Device authorization enabled.")
+    else:
+        print("Device authorization disabled.")
 
 
 def choose_site(default: str = None) -> None:
@@ -650,13 +684,34 @@ def session():
     Returns:
         keystoneauth1.session.Session: the authentication session object.
     """
-    global _session
+    global _session, _device_auth
     if not _session:
-        auth = loading.load_auth_from_conf_options(cfg.CONF, CONF_GROUP)
-        sess = SessionLoader().load_from_conf_options(cfg.CONF, CONF_GROUP, auth=auth)
-        _session = loading.load_adapter_from_conf_options(
-            cfg.CONF, CONF_GROUP, session=sess
-        )
+        if _device_auth:
+            auth_url = get("auth_url")
+            plugin = ChameleonDeviceAuth(
+                auth_url=auth_url,
+                identity_provider=DEFAULT_RESOURCE_PROVIDER,
+                protocol=DEFAULT_PROTOCOL,
+                client_id=DEFAULT_CLIENT_ID,
+                discovery_endpoint=DEFAULT_DISCOVERY_ENDPOINT,
+                scope="openid",
+                project_name=get("project_name"),
+                project_domain_name=get("project_domain_name"),
+            )
+            sess = SessionLoader().load_from_conf_options(
+                cfg.CONF, CONF_GROUP, auth=plugin
+            )
+            _session = loading.load_adapter_from_conf_options(
+                cfg.CONF, CONF_GROUP, session=sess
+            )
+        else:
+            auth = loading.load_auth_from_conf_options(cfg.CONF, CONF_GROUP)
+            sess = SessionLoader().load_from_conf_options(
+                cfg.CONF, CONF_GROUP, auth=auth
+            )
+            _session = loading.load_adapter_from_conf_options(
+                cfg.CONF, CONF_GROUP, session=sess
+            )
     return _session
 
 
@@ -671,8 +726,10 @@ def reset():
     """
     global _session
     global _sites
+    global _device_auth
     _session = None
     _sites = {}
+    _device_auth = False
     cfg.CONF.reset()
     _set_auth_plugin(
         os.getenv("OS_AUTH_TYPE", os.getenv("OS_AUTH_METHOD", DEFAULT_AUTH_TYPE))
