@@ -10,7 +10,7 @@ from .clients import (
     nova,
     zun,
 )
-from .context import get, params, reset, session, set, use_site
+from .context import get, params, reset, session, set, use_site, use_device_auth
 
 __all__ = [
     "get",
@@ -19,6 +19,7 @@ __all__ = [
     "session",
     "set",
     "use_site",
+    "use_device_auth",
     "connection",
     "blazar",
     "cinder",
