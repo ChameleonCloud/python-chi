@@ -8,7 +8,6 @@ from typing import List, Optional
 import ipywidgets as widgets
 import openstack
 import requests
-from ccauth.plugin import ChameleonDeviceAuth
 from IPython.display import display
 from keystoneauth1 import loading, session
 from keystoneauth1.identity.v3 import OidcAccessToken
@@ -38,7 +37,8 @@ DEFAULT_DISCOVERY_ENDPOINT = (
     "/.well-known/openid-configuration"
 )
 DEFAULT_PROTOCOL = "openid"
-DEFAULT_RESOURCE_PROVIDER = "chameleon"
+DEFAULT_IDENTITY_PROVIDER = "chameleon"
+DEFAULT_SCOPE = "openid"
 DEFAULT_PROJECT_DOMAIN_NAME = "chameleon"
 
 
@@ -404,9 +404,7 @@ def use_site(site_name: str) -> None:
 
     _session = None
 
-    set(
-        "project_domain_name", DEFAULT_PROJECT_DOMAIN_NAME
-    )  # Same for all chameleon sites
+    set("project_domain_name", DEFAULT_PROJECT_DOMAIN_NAME)
     set("auth_url", f"{site['web']}:5000/v3")
     set("region_name", site["name"])
 
@@ -688,13 +686,21 @@ def session():
     if not _session:
         if _device_auth:
             auth_url = get("auth_url")
+            try:
+                from ccauth.plugin import ChameleonDeviceAuth
+            except ImportError as e:
+                raise CHIValueError(
+                    "Device auth requested but package 'ccauth' is not installed."
+                    " Install 'ccauth' to use device authorization."
+                ) from e
+
             plugin = ChameleonDeviceAuth(
                 auth_url=auth_url,
-                identity_provider=DEFAULT_RESOURCE_PROVIDER,
+                identity_provider=DEFAULT_IDENTITY_PROVIDER,
                 protocol=DEFAULT_PROTOCOL,
                 client_id=DEFAULT_CLIENT_ID,
                 discovery_endpoint=DEFAULT_DISCOVERY_ENDPOINT,
-                scope="openid",
+                scope=DEFAULT_SCOPE,
                 project_name=get("project_name"),
                 project_domain_name=get("project_domain_name"),
             )
