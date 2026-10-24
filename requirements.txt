@@ -2,7 +2,7 @@ fabric
 keystoneauth1
 openstacksdk
 paramiko
-git+https://github.com/ChameleonCloud/python-blazarclient
+chameleon-blazarclient>=3.6.5
 python-cinderclient
 python-glanceclient
 python-ironicclient
@@ -10,7 +10,7 @@ python-manilaclient
 python-neutronclient
 python-novaclient
 python-swiftclient
-git+https://github.com/chameleoncloud/python-zunclient
+chameleon-zunclient>=2025.1.1
 ipython
 ipydatagrid
 ipywidgets
