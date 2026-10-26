@@ -357,6 +357,19 @@ class Container:
         """
         download(self.id, remote_source, dest)
 
+    def console(self, command: str = "sh"):
+        """Open an interactive shell in the container, in a notebook cell.
+
+        Args:
+            command (str): the program to run. Defaults to "sh".
+
+        Returns:
+            chi.console.Console: a widget that shows the shell.
+        """
+        from chi.console import Console
+
+        return Console(self.id, command)
+
     def associate_floating_ip(self, fip: str = None):
         """
         Associates a floating IP with the container.
