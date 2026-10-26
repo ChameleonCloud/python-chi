@@ -14,6 +14,7 @@ git+https://github.com/chameleoncloud/python-zunclient
 ipython
 ipydatagrid
 ipywidgets
+anywidget
 networkx
 matplotlib
 pandas
