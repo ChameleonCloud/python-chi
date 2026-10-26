@@ -560,7 +560,9 @@ def execute(container_ref: "str", command: "str") -> "dict":
     Returns:
         A summary of the output of the command, with "output" and "exit_code".
     """
-    return zun().containers.execute(container_ref, command=command, run=True)
+    result = zun().containers.execute_run(container_ref, command)
+    output = (result.stdout + result.stderr).decode(errors="replace")
+    return {"output": output, "exit_code": result.returncode}
 
 
 def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
@@ -592,19 +594,14 @@ def download(container_ref: "str", source: "str", dest: "str"):
 
     Download a file or directory from a running container.
 
-    This method requires your running container to include
-    both the POSIX sh and GNU tar utilities.
+    This method requires your running container to include tar.
 
     Args:
         container_ref (str): The name or ID of the container.
         source (str): The (container) path of the file or directory.
         dest (str): The (local) path to download to.
     """
-    res = zun().containers.get_archive(container_ref, source)
-    fd = io.BytesIO(res["data"])
-    with tarfile.open(fileobj=fd, mode="r") as tar:
-        tar.extraction_filter = lambda member, path: member
-        tar.extractall(dest)
+    zun().containers.copy_from(container_ref, source, dest)
 
 
 def wait_for_active(container_ref: "str", timeout: int = (60 * 2)) -> "Container":

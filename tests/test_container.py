@@ -20,7 +20,7 @@ from datetime import datetime
 import pytest
 from zunclient.exceptions import Conflict
 
-from chi.container import Container, download, upload
+from chi.container import Container, download, execute, upload
 
 
 @pytest.fixture()
@@ -88,29 +88,25 @@ def test_upload_creates_tar_and_calls_put_archive(mocker):
             assert os.path.basename(tmpfile.name) in names
 
 
-def test_download_extracts_tar_and_writes_file(mocker):
-    # Patch zun client
+def test_execute_uses_execute_run(mocker):
     zun_mock = mocker.patch("chi.container.zun")()
-    # Create a tar archive in memory with a test file
-    file_content = b"test content"
-    file_name = "testfile.txt"
-    tar_bytes_io = io.BytesIO()
-    with tarfile.open(fileobj=tar_bytes_io, mode="w") as tar:
-        info = tarfile.TarInfo(name=file_name)
-        info.size = len(file_content)
-        tar.addfile(info, io.BytesIO(file_content))
-    tar_bytes = tar_bytes_io.getvalue()
-    zun_mock.containers.get_archive.return_value = {"data": tar_bytes}
+    result = zun_mock.containers.execute_run.return_value
+    result.stdout = b"out\n"
+    result.stderr = b"err\n"
+    result.returncode = 3
 
-    # Use a temporary directory for extraction
-    with tempfile.TemporaryDirectory() as tmpdir:
-        dest_path = os.path.join(tmpdir, file_name)
+    assert execute("container_id", "ls -l") == {"output": "out\nerr\n", "exit_code": 3}
+    zun_mock.containers.execute_run.assert_called_once_with("container_id", "ls -l")
 
-        download("container_id", file_name, tmpdir)
-        # Check that the file was extracted
-        assert os.path.exists(dest_path)
-        with open(dest_path, "rb") as f:
-            assert f.read() == file_content
+
+def test_download_uses_copy_from(mocker):
+    zun_mock = mocker.patch("chi.container.zun")()
+
+    download("container_id", "/root/data", "/tmp/dest")
+
+    zun_mock.containers.copy_from.assert_called_once_with(
+        "container_id", "/root/data", "/tmp/dest"
+    )
 
 
 def test_delete_calls_force(mocker):

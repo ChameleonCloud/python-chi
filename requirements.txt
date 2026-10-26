@@ -10,7 +10,7 @@ python-manilaclient
 python-neutronclient
 python-novaclient
 python-swiftclient
-chameleon-zunclient>=2025.1.1
+chameleon-zunclient>=2025.1.2
 ipython
 ipydatagrid
 ipywidgets
