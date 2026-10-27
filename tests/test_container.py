@@ -11,10 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
-import os
-import tarfile
-import tempfile
 from datetime import datetime
 
 import pytest
@@ -66,26 +62,22 @@ def test_container_download_method(mocker):
     mock_download.assert_called_once_with("fake_id", remote_source, dest)
 
 
-def test_upload_creates_tar_and_calls_put_archive(mocker):
-    # Patch zun client
+def test_upload_uses_copy_to(mocker):
     zun_mock = mocker.patch("chi.container.zun")()
-    # Create a temporary file to upload
-    with tempfile.NamedTemporaryFile() as tmpfile:
-        tmpfile.write(b"hello world")
-        tmpfile.flush()
+    upload("container_id", "/local/file", "/remote/path")
+    zun_mock.containers.copy_to.assert_called_once_with(
+        "container_id", "/local/file", "/remote/path"
+    )
 
-        upload("container_id", tmpfile.name, "/remote/path")
-        # Check that put_archive was called
-        assert zun_mock.containers.put_archive.call_count == 1
-        args = zun_mock.containers.put_archive.call_args[0]
-        assert args[0] == "container_id"
-        assert args[1] == "/remote/path"
-        # The third argument should be a tar archive containing the file
-        tar_bytes = args[2]
-        tarfileobj = io.BytesIO(tar_bytes)
-        with tarfile.open(fileobj=tarfileobj, mode="r") as tar:
-            names = tar.getnames()
-            assert os.path.basename(tmpfile.name) in names
+
+def test_lines_passes_whole_lines():
+    from chi.container import lines
+
+    got = []
+    sink = lines(got.append)
+    for chunk in (b"1 0.5\r\n2 0.", b"7\n3", b" 0.9\n4"):
+        sink(chunk)
+    assert got == ["1 0.5", "2 0.7", "3 0.9"]
 
 
 def test_execute_uses_execute_run(mocker):

@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 session_factory = session
 
 NOVA_API_VERSION = "2.61"
-ZUN_API_VERSION = "1.41"
+# The highest version both zunclient and the server support.
+ZUN_API_VERSION = "1.latest"
 
 
 def connection(session=None) -> "Connection":

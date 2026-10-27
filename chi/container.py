@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import logging
-import os
-import tarfile
 import time
 from typing import Dict, List, Optional, Tuple
 from warnings import warn
@@ -357,6 +354,43 @@ class Container:
         """
         download(self.id, remote_source, dest)
 
+    def console(self, command="sh", height="24em"):
+        """Open a terminal in a notebook cell, running command in the container.
+
+        Closing the terminal doesn't stop the command, as with docker exec
+        -it; quit it, or press Ctrl-C.
+
+        Args:
+            command (str or list): the program to run, with its arguments.
+                Defaults to "sh".
+            height (str): the terminal's height, as a CSS length.
+
+        Returns:
+            chi.console.Console: the terminal, a notebook widget.
+        """
+        from chi.console import Console
+
+        return Console(self.id, command, height=height)
+
+    def start(self, command, stdout=None, stderr=None):
+        """Start a command in the container, and return without waiting.
+
+        Args:
+            command (str or list): the program to run, with its arguments.
+            stdout: where output goes as it arrives: a function that takes
+                bytes, such as one made by chi.container.lines(), or a
+                binary file. If None, read it from the session.
+            stderr: the same, for stderr.
+
+        Returns:
+            zunclient's ExecSession. wait() returns the exit code; close()
+            ends the session, and leaves the command running if it hasn't
+            exited.
+        """
+        return zun().containers.execute_session(
+            self.id, command, stdout=stdout, stderr=stderr
+        )
+
     def associate_floating_ip(self, fip: str = None):
         """
         Associates a floating IP with the container.
@@ -398,6 +432,24 @@ class Container:
                 newline characters.
         """
         return get_logs(self.id, stdout=stdout, stderr=stderr)
+
+
+def lines(on_line):
+    """Make a sink for Container.start() that calls on_line with each line.
+
+    Output arrives in chunks that can end partway through a line. The
+    function gets each whole line as text, without its line ending; a last
+    line without one isn't passed on.
+    """
+    rest = b""
+
+    def sink(data):
+        nonlocal rest
+        *whole, rest = (rest + data).split(b"\n")
+        for line in whole:
+            on_line(line.rstrip(b"\r").decode(errors="replace"))
+
+    return sink
 
 
 def create_container(
@@ -579,13 +631,7 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
         source (str): The (local) path to the file or directory to upload.
         dest (str): The (container) path to upload the file or directory to.
     """
-    fd = io.BytesIO()
-    with tarfile.open(fileobj=fd, mode="w") as tar:
-        tar.add(source, arcname=os.path.basename(source))
-    fd.seek(0)
-    data = fd.read()
-    fd.close()
-    return zun().containers.put_archive(container_ref, dest, data)
+    zun().containers.copy_to(container_ref, source, dest)
 
 
 def download(container_ref: "str", source: "str", dest: "str"):
