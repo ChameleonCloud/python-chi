@@ -166,9 +166,21 @@ def test_top_redraws_and_quits(zun):
         session.close()
 
 
+def test_ctrl_c_stops_a_terminal_program(zun):
+    # As with docker exec -it and kubectl exec -it, Ctrl-C is a key like any
+    # other; the terminal in the container turns it into SIGINT.
+    session = terminal(zun, CONTAINER, ["sleep", "300"])
+    try:
+        time.sleep(1)
+        session.send(b"\x03")
+        assert session.wait(timeout=30) == 130
+    finally:
+        session.close()
+
+
 def test_close_leaves_a_terminal_program_running(zun):
-    # Closing a notebook terminal doesn't stop what runs in it, so the
-    # program has to be quit or killed.
+    # As with docker exec -it and kubectl exec -it, closing the terminal
+    # doesn't stop what runs in it.
     session = terminal(zun, CONTAINER, ["top"])
     try:
         read_until(session, b"PID", timeout=30)
