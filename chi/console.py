@@ -44,7 +44,6 @@ function render({ model, el }) {
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(box);
-  fit.fit();
 
   model.on("msg:custom", (msg, buffers) => {
     if (msg.type === "output") {
@@ -55,9 +54,18 @@ function render({ model, el }) {
   });
   term.onData((data) => model.send({ type: "input", data }));
   term.onResize(({ cols, rows }) => model.send({ type: "resize", cols, rows }));
-  const resize = new ResizeObserver(() => fit.fit());
+  // Start the command once the cell is laid out, so that it starts with
+  // the terminal's real size rather than xterm's default 80x24.
+  let ready = false;
+  const resize = new ResizeObserver(() => {
+    if (!box.clientWidth) return;
+    fit.fit();
+    if (!ready) {
+      ready = true;
+      model.send({ type: "ready", cols: term.cols, rows: term.rows });
+    }
+  });
   resize.observe(box);
-  model.send({ type: "ready", cols: term.cols, rows: term.rows });
   term.focus();
 
   return () => { resize.disconnect(); term.dispose(); };
