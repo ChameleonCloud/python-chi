@@ -261,3 +261,23 @@ def test_wait_stops_on_error(mocker):
 
     log_calls = [c.args[0] for c in pb.log.call_args_list]
     assert any("Error" in log for log in log_calls)
+
+
+def test_container_execute_without_waiting(mocker):
+    zun_mock = mocker.patch("chi.container.zun")()
+    container = Container(name="test", image_ref="image", exposed_ports=[])
+    container.id = "fake_id"
+    sink = mocker.Mock()
+    session = container.execute("sleep 100", wait=False, stdout=sink)
+    assert session is zun_mock.containers.execute_session.return_value
+    zun_mock.containers.execute_session.assert_called_once_with(
+        "fake_id", "sleep 100", stdout=sink, stderr=None
+    )
+    zun_mock.containers.execute_run.assert_not_called()
+
+
+def test_container_execute_sinks_need_no_wait(mocker):
+    mocker.patch("chi.container.zun")
+    container = Container(name="test", image_ref="image", exposed_ports=[])
+    with pytest.raises(ValueError):
+        container.execute("ls", stdout=print)

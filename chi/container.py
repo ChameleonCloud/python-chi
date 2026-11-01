@@ -14,7 +14,7 @@
 
 import logging
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from warnings import warn
 
 from IPython.display import HTML, display
@@ -315,16 +315,32 @@ class Container:
         html_table = html_table.format(rows=rows)
         display(HTML(html_table))
 
-    def execute(self, command: str) -> Tuple[str, str]:
+    def execute(self, command: str, wait=True, stdout=None, stderr=None):
         """
         Executes a command inside the container and returns the output and exit code.
 
         Args:
             command (str): The command to be executed inside the container.
+            wait (bool): If False, return as soon as the command has started,
+                with its session, instead of waiting for it to exit.
+            stdout: with wait=False, where output goes as it arrives: a
+                function that takes bytes, such as one made by
+                chi.container.lines(), or a binary file. If None, read it
+                from the session.
+            stderr: the same, for stderr.
 
         Returns:
             Tuple[str, str]: A tuple containing the output of the command and the exit code.
+            With wait=False, zunclient's ExecSession instead: wait() returns
+            the exit code; close() ends the session, and leaves the command
+            running if it hasn't exited.
         """
+        if not wait:
+            return zun().containers.execute_session(
+                self.id, command, stdout=stdout, stderr=stderr
+            )
+        if stdout is not None or stderr is not None:
+            raise ValueError("stdout and stderr need wait=False")
         result = execute(self.id, command)
         return result.get("output", ""), str(result.get("exit_code", ""))
 
@@ -372,25 +388,6 @@ class Container:
 
         return Console(self.id, command, height=height)
 
-    def start(self, command, stdout=None, stderr=None):
-        """Start a command in the container, and return without waiting.
-
-        Args:
-            command (str or list): the program to run, with its arguments.
-            stdout: where output goes as it arrives: a function that takes
-                bytes, such as one made by chi.container.lines(), or a
-                binary file. If None, read it from the session.
-            stderr: the same, for stderr.
-
-        Returns:
-            zunclient's ExecSession. wait() returns the exit code; close()
-            ends the session, and leaves the command running if it hasn't
-            exited.
-        """
-        return zun().containers.execute_session(
-            self.id, command, stdout=stdout, stderr=stderr
-        )
-
     def associate_floating_ip(self, fip: str = None):
         """
         Associates a floating IP with the container.
@@ -435,7 +432,7 @@ class Container:
 
 
 def lines(on_line):
-    """Make a sink for Container.start() that calls on_line with each line.
+    """Make a sink for Container.execute(wait=False) that calls on_line with each line.
 
     Output arrives in chunks that can end partway through a line. The
     function gets each whole line as text, without its line ending; a last
