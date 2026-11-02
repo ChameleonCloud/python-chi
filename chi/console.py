@@ -17,6 +17,7 @@ import threading
 import anywidget
 import traitlets
 from zunclient import exceptions
+from zunclient.v1.containers import PIPE
 
 from .clients import zun
 
@@ -111,8 +112,8 @@ class Console(anywidget.AnyWidget):
         self._session = zun().containers.execute_session(
             self._container_id,
             self._command,
+            stdin=PIPE,
             stdout=self._output,
-            interactive=True,
             tty=True,
         )
         self._session.resize(cols, rows)
