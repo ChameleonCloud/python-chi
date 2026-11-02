@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import logging
-import os
-import tarfile
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from warnings import warn
 
 from IPython.display import HTML, display
@@ -318,16 +315,32 @@ class Container:
         html_table = html_table.format(rows=rows)
         display(HTML(html_table))
 
-    def execute(self, command: str) -> Tuple[str, str]:
+    def execute(self, command: str, wait=True, stdout=None, stderr=None):
         """
         Executes a command inside the container and returns the output and exit code.
 
         Args:
             command (str): The command to be executed inside the container.
+            wait (bool): If False, return as soon as the command has started,
+                with its session, instead of waiting for it to exit.
+            stdout: with wait=False, where output goes as it arrives: a
+                function that takes bytes, such as one made by
+                chi.container.lines(), or a binary file. If None, read it
+                from the session.
+            stderr: the same, for stderr.
 
         Returns:
             Tuple[str, str]: A tuple containing the output of the command and the exit code.
+            With wait=False, zunclient's ExecSession instead: wait() returns
+            the exit code; close() ends the session, and leaves the command
+            running if it hasn't exited.
         """
+        if not wait:
+            return zun().containers.execute_session(
+                self.id, command, stdout=stdout, stderr=stderr
+            )
+        if stdout is not None or stderr is not None:
+            raise ValueError("stdout and stderr need wait=False")
         result = execute(self.id, command)
         return result.get("output", ""), str(result.get("exit_code", ""))
 
@@ -356,6 +369,24 @@ class Container:
             None
         """
         download(self.id, remote_source, dest)
+
+    def console(self, command="sh", height="24em"):
+        """Open a terminal in a notebook cell, running command in the container.
+
+        Closing the terminal doesn't stop the command, as with docker exec
+        -it; quit it, or press Ctrl-C.
+
+        Args:
+            command (str or list): the program to run, with its arguments.
+                Defaults to "sh".
+            height (str): the terminal's height, as a CSS length.
+
+        Returns:
+            chi.console.Console: the terminal, a notebook widget.
+        """
+        from chi.console import Console
+
+        return Console(self.id, command, height=height)
 
     def associate_floating_ip(self, fip: str = None):
         """
@@ -398,6 +429,24 @@ class Container:
                 newline characters.
         """
         return get_logs(self.id, stdout=stdout, stderr=stderr)
+
+
+def lines(on_line):
+    """Make a sink for Container.execute(wait=False) that calls on_line with each line.
+
+    Output arrives in chunks that can end partway through a line. The
+    function gets each whole line as text, without its line ending; a last
+    line without one isn't passed on.
+    """
+    rest = b""
+
+    def sink(data):
+        nonlocal rest
+        *whole, rest = (rest + data).split(b"\n")
+        for line in whole:
+            on_line(line.rstrip(b"\r").decode(errors="replace"))
+
+    return sink
 
 
 def create_container(
@@ -579,13 +628,7 @@ def upload(container_ref: "str", source: "str", dest: "str") -> "dict":
         source (str): The (local) path to the file or directory to upload.
         dest (str): The (container) path to upload the file or directory to.
     """
-    fd = io.BytesIO()
-    with tarfile.open(fileobj=fd, mode="w") as tar:
-        tar.add(source, arcname=os.path.basename(source))
-    fd.seek(0)
-    data = fd.read()
-    fd.close()
-    return zun().containers.put_archive(container_ref, dest, data)
+    zun().containers.copy_to(container_ref, source, dest)
 
 
 def download(container_ref: "str", source: "str", dest: "str"):

@@ -18,3 +18,4 @@ networkx
 matplotlib
 pandas
 git+https://github.com/ChameleonCloud/ccauth.git
+anywidget
